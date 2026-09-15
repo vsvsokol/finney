@@ -1,0 +1,34 @@
+# Кто обязан ревьюить изменения в каждой зоне.
+# ВАЖНО: подставьте реальные GitHub-логины вместо заглушек,
+# иначе автоназначение ревьюеров работать не будет.
+#
+# Действует только при включённой защите ветки Main:
+# Settings -> Branches -> Add rule -> Require review from Code Owners
+
+# По умолчанию — владелец репозитория
+*                           @vsvsokol
+
+# Ядро: экономика, состояние питомца, хранилище, навигация.
+# Только [@lemonke68]. Правки сюда от других не принимаются без его ревью.
+/app/src/main/java/**/core/        @github-логин-вани
+/app/src/main/java/**/data/        @github-логин-вани
+/app/src/main/java/**/domain/      @github-логин-вани
+/app/src/test/**                   @github-логин-вани
+/app/build.gradle.kts              @github-логин-вани
+/build.gradle.kts                  @github-логин-вани
+/settings.gradle.kts               @github-логин-вани
+/gradle/libs.versions.toml         @github-логин-вани
+
+# Экраны и анимация
+/app/src/main/java/**/ui/          @github-логин-ярика
+
+# Графика — ревью арт-директора
+/app/src/main/res/drawable**/      @github-логин-иры
+/design/                           @github-логин-иры
+
+# Учебный контент и баланс
+/app/src/main/assets/content/      @vsvsokol
+
+# Документация и инфраструктура
+/docs/                             @vsvsokol
+/.github/                          @vsvsokol

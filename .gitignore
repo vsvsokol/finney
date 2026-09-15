@@ -1,0 +1,107 @@
+# ============================================================
+#  Finney — Android / Kotlin (.gitignore)
+# ============================================================
+
+# --- Gradle ---
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+local.properties
+
+# --- Android build output ---
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+bin/
+gen/
+out/
+release/
+captures/
+.externalNativeBuild/
+.cxx/
+app/release/
+app/debug/
+
+# --- ПОДПИСЬ РЕЛИЗА: НИКОГДА НЕ КОММИТИМ (п. 3.4 ТЗ) ---
+*.jks
+*.keystore
+keystore.properties
+signing.properties
+*.p12
+*.pem
+*.pepk
+secrets.properties
+google-services.json
+
+# --- Android Studio / IntelliJ ---
+.idea/*
+!.idea/codeStyles/
+!.idea/inspectionProfiles/
+!.idea/icon.png
+*.iml
+*.ipr
+*.iws
+.navigation/
+freeline/
+freeline_project_description.json
+
+# --- Kotlin ---
+.kotlin/
+kotlin-js-store/
+
+# --- Тесты / отчёты ---
+lint/
+lint-results*.html
+lint-results*.xml
+**/test-results/
+**/reports/
+
+# --- Room: НЕ игнорируем схемы, они нужны для миграций ---
+!app/schemas/
+
+# --- Логи, временные, кэш ---
+*.log
+*.hprof
+.DS_Store
+Thumbs.db
+desktop.ini
+*~
+*.tmp
+*.bak
+*.swp
+
+# --- Python (если появятся скрипты генерации контента) ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.mypy_cache/
+.pytest_cache/
+
+# --- Node (если появится скрипт/линтер для JSON-контента) ---
+node_modules/
+package-lock.json
+
+# --- Исходники дизайна и 3D: тяжёлые рабочие файлы НЕ в git ---
+# в репозиторий кладём только экспорт (png/webp/json/lottie)
+*.fig
+*.sketch
+*.xd
+*.psd
+*.ai
+*.blend
+*.blend1
+*.blend2
+*.spine
+design/_wip/
+assets/_raw/
+assets/_source/
+
+# --- Прочее ---
+.env
+.env.*
+!.env.example
