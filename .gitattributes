@@ -1,0 +1,7 @@
+*.webp !text !filter !merge !diff
+*.mp3 !text !filter !merge !diff
+*.ogg !text !filter !merge !diff
+*.wav !text !filter !merge !diff
+*.glb !text !filter !merge !diff
+*.gltf !text !filter !merge !diff
+*.fbx !text !filter !merge !diff
