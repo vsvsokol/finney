@@ -118,7 +118,8 @@ app/                 модуль приложения (Kotlin, Compose)
 docs/
   manual.pdf                  техническое задание
   requirements-matrix.md      статус обязательных требований ТЗ
-  architecture.md             архитектура, структура данных, формулы экономики
+  architecture.md             архитектура и структура данных
+  economy.md                  правила и формулы игровой экономики
   content-tasks.md            задания и правила текстов
   assets-spec.md              спецификация графики для дизайнеров
 design/exports/      готовые PNG от дизайнеров до переноса в app/
