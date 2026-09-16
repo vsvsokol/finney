@@ -31,6 +31,7 @@ class ContentTest {
         assertTrue("заданий ≥ 6", content.tasks.size >= 6)
         assertEquals("задания по 3 темам", TaskTheme.entries.toSet(), content.tasks.map { it.theme }.toSet())
         assertTrue("стадий ≥ 3", content.economy.stageStartLevels.size >= 3)
+        assertTrue("справочник терминов не пуст, ТЗ п. 2.5.11", content.glossary.isNotEmpty())
     }
 
     @Test

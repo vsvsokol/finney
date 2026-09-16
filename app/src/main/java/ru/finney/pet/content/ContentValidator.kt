@@ -34,6 +34,11 @@ object ContentValidator {
         duplicates(content.goals.map { it.id }).forEach { add("goals.json: повторяется id $it") }
         content.goals.filter { it.price <= 0 }.forEach { add("goals.json: ${it.id} — цена должна быть > 0") }
 
+        duplicates(content.glossary.map { it.id }).forEach { add("glossary.json: повторяется id $it") }
+        content.glossary.filter { it.term.isBlank() || it.text.isBlank() }.forEach {
+            add("glossary.json: ${it.id} — пустой термин или объяснение")
+        }
+
         duplicates(content.tasks.map { it.id }).forEach { add("tasks.json: повторяется id $it") }
         for (task in content.tasks) {
             val at = "tasks.json: ${task.id}"

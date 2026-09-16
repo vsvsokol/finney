@@ -44,12 +44,23 @@ data class Goal(
     val moodBonus: Int = 0,
 )
 
+/** glossary.json — справочник терминов, ТЗ п. 2.5.11. */
+@Serializable
+data class Glossary(
+    @SerialName("_comment") val comment: String? = null,
+    val terms: List<GlossaryTerm>,
+)
+
+@Serializable
+data class GlossaryTerm(val id: String, val term: String, val text: String)
+
 /** Весь учебный контент из assets/content. Загружается и проверяется пакетом `content`. */
 data class GameContent(
     val economy: EconomyConfig,
     val shop: List<ShopItem>,
     val goals: List<Goal>,
     val tasks: List<TaskDefinition>,
+    val glossary: List<GlossaryTerm> = emptyList(),
 ) {
     fun item(id: String): ShopItem? = shop.firstOrNull { it.id == id }
     fun goal(id: String): Goal? = goals.firstOrNull { it.id == id }

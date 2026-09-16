@@ -3,6 +3,7 @@ package ru.finney.pet.content
 import kotlinx.serialization.json.Json
 import ru.finney.pet.domain.model.EconomyConfig
 import ru.finney.pet.domain.model.GameContent
+import ru.finney.pet.domain.model.Glossary
 import ru.finney.pet.domain.model.Goal
 import ru.finney.pet.domain.model.ShopItem
 import ru.finney.pet.domain.model.TaskDefinition
@@ -17,13 +18,15 @@ object ContentParser {
     const val SHOP = "shop.json"
     const val GOALS = "goals.json"
     const val TASKS = "tasks.json"
+    const val GLOSSARY = "glossary.json"
 
-    /** @param read возвращает текст файла по имени из [ECONOMY], [SHOP], [GOALS], [TASKS]. */
+    /** @param read возвращает текст файла по имени из [ECONOMY], [SHOP], [GOALS], [TASKS], [GLOSSARY]. */
     fun parse(read: (String) -> String): GameContent = GameContent(
         economy = decode<EconomyConfig>(ECONOMY, read),
         shop = decode<List<ShopItem>>(SHOP, read),
         goals = decode<List<Goal>>(GOALS, read),
         tasks = decode<List<TaskDefinition>>(TASKS, read),
+        glossary = decode<Glossary>(GLOSSARY, read).terms,
     )
 
     private inline fun <reified T> decode(file: String, read: (String) -> String): T =

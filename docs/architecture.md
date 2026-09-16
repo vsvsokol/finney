@@ -43,7 +43,8 @@ ru.finney.pet
 │   └── theme/       палитра, типографика, компоненты
 │
 ├── domain/          ИГРОВАЯ ЭКОНОМИКА              — [@lemonke68], только он
-│   ├── game/        Game — единственная точка команд: план, покупка, копилка, задание, закрытие периода
+│   ├── game/        Game — команды игры; GameStore — команды с сохранением; GameStorage — интерфейс хранилища
+│   ├── profile/     проверка имени питомца
 │   ├── economy/     темп накоплений и срок до цели
 │   ├── period/      план и факт периода
 │   ├── progress/    очки развития, уровни, стадии
@@ -52,9 +53,9 @@ ru.finney.pet
 │   └── model/       состояние игры и модели контента (@Serializable)
 │
 ├── data/            ХРАНИЛИЩЕ                      — [@lemonke68], только он
-│   ├── db/          Room: entity, dao, database
-│   ├── repository/  репозитории
-│   └── prefs/       DataStore
+│   ├── db/          Room: entity, dao, database, маппинг в domain
+│   ├── repository/  RoomGameStorage — реализация domain/game/GameStorage
+│   └── prefs/       DataStore — настройки звука и анимаций (ещё не сделано)
 │
 └── content/         ЗАГРУЗКА УЧЕБНОГО КОНТЕНТА     — [@lemonke68]
                      ContentParser, ContentValidator, AssetContentLoader
@@ -66,17 +67,32 @@ ru.finney.pet
 
 `Game` — набор чистых функций: получает `GameState` и команду, возвращает новое состояние
 или отказ с причиной (`Rejection`). Сам ничего не хранит и ничего не знает про Room.
-Репозиторий в `data/` загружает состояние профиля, передаёт в `Game` и сохраняет результат.
-Данных на профиль — десятки строк, поэтому состояние целиком держится в памяти.
+
+Экраны работают не с `Game` напрямую, а с **`GameStore`** из `AppContainer`. Он берёт последнее
+сохранённое состояние, выполняет команду и сразу сохраняет результат. Команды идут строго
+по очереди: двойное нажатие не спишет деньги дважды.
 
 ```kotlin
-when (val result = game.buy(state, "food_apple")) {
-    is GameResult.Ok -> save(result.state)
-    is GameResult.Rejected -> showReason(result.reason) // InsufficientFunds(needed, balance) и т. д.
+val store = container.gameStore
+
+// создание профиля на экране питомца
+when (val r = store.createProfile(name, PetAppearance(BodyColor.A, EyesVariant.ROUND))) {
+    is ProfileResult.Saved -> openHome(r.profileId)
+    is ProfileResult.InvalidName -> showError(r.error)          // BLANK / TOO_LONG
 }
+
+// любая команда игры
+when (val r = store.execute(profileId) { buy(it, "food_apple") }) {
+    is GameResult.Ok -> Unit                                    // экран обновится сам через observeGame
+    is GameResult.Rejected -> showReason(r.reason)              // InsufficientFunds(needed, balance) и т. д.
+}
+
+// экран подписывается на состояние
+store.observeGame(profileId).collect { saved -> /* saved.profile, saved.state; null — профиль удалён */ }
 ```
 
-Для экранов подтверждения есть предпросмотры без изменения состояния:
+Задания — `store.submitTask(profileId, taskId, input)`: возвращает исход, числа для объяснения
+и награду. Чтение без изменения состояния — через `container.game`: `level`, `stage`, `emotion`,
 `previewPurchase` (цена, шкалы до и после, нехватка), `previewWithdraw` (накопления и срок до и после),
 `needsHint` (сколько стоит закрыть нужное), `goalProgress` (накоплено, осталось, срок).
 
@@ -88,83 +104,34 @@ when (val result = game.buy(state, "food_apple")) {
 (баланс, накопления, уровень, стадия, эмоция), не хранится и считается в `domain/`.
 Так число на экране не может разойтись с историей операций. Формулы — [economy.md](economy.md).
 
-```kotlin
-@Entity
-data class Profile(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val petName: String,         // игровое имя, ТЗ п. 2.5.2
-    val bodyColor: String,       // a / b / c          — кастомизация
-    val eyesVariant: String,     // round / oval / sly — 3 × 3 = 9 комбинаций
-    val activeGoalId: String?,   // id из goals.json
-    val isDemo: Boolean,         // тестовый профиль, ТЗ п. 2.5.13
-    val createdAt: Long,
-)
+Код — `data/db/Entities.kt`, схема базы каждой версии — `app/schemas/`.
 
-@Entity
-data class PetState(
-    @PrimaryKey val profileId: Long,
-    val satiety: Int,            // 0..100
-    val hygiene: Int,            // 0..100
-    val mood: Int,               // 0..100
-)
+| Таблица | Ключ | Что хранит |
+|---|---|---|
+| `profiles` | `id` | имя питомца, цвет тела (`A/B/C`), глаза (`ROUND/OVAL/SLY`), активная цель, `isDemo`, дата создания |
+| `pet_state` | `profileId` | сытость, чистота, настроение |
+| `periods` | `profileId + number` | номер, стадия, фаза; план (бюджет и три направления) после подтверждения; итоги (факт, незапланированный доход, флаги, очки) после закрытия |
+| `ledger` | `id` | операции: тип, Δ баланса, Δ копилки, категория, товар, цель, задание, `unplanned`, время |
+| `task_attempts` | `id` | попытки заданий: период, задание, исход, награда, время |
 
-@Entity
-data class Period(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val profileId: Long,
-    val number: Int,             // 1, 2, 3…
-    val stage: Int,              // стадия на момент открытия: снижение шкал и доход
-    val phase: String,           // PLANNING / ACTIVE / CLOSED
-    val budget: Int?,            // баланс в момент подтверждения плана
-    val plannedNeeds: Int?,
-    val plannedWants: Int?,
-    val plannedSavings: Int?,
-    val pointsEarned: Int?,      // заполняется при закрытии
-    val needsCovered: Boolean?,  // снимок итогов — для истории, ТЗ п. 2.5.11
-    val planMatched: Boolean?,
-)
-
-@Entity
-data class LedgerEntry(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val profileId: Long,
-    val periodId: Long,
-    val type: String,            // INCOME / TASK_REWARD / PARENT_BONUS / PURCHASE /
-                                 // SAVINGS_DEPOSIT / SAVINGS_WITHDRAW / GOAL_COMPLETE
-    val balanceDelta: Int,       // изменение доступного баланса
-    val savingsDelta: Int,       // изменение копилки цели
-    val category: String?,       // NEEDS / WANTS — только для PURCHASE
-    val itemId: String?,         // товар из shop.json
-    val goalId: String?,         // цель из goals.json
-    val taskId: String?,         // задание из tasks.json
-    val unplanned: Boolean,      // доход после подтверждения плана
-    val createdAt: Long,
-)
-
-@Entity
-data class TaskAttempt(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val profileId: Long,
-    val periodId: Long,
-    val taskId: String,
-    val outcome: String,         // SUCCESS / FAIL
-    val reward: Int,             // 0, если награда за это задание уже выдавалась
-    val createdAt: Long,
-)
-```
+- Все таблицы ссылаются на профиль с `ON DELETE CASCADE`: удаление профиля убирает все его данные одним запросом.
+- Перечисления хранятся строкой по имени: переименовал значение enum — нужна миграция.
+- Операции и попытки заданий только дописываются. При сохранении в базу добавляется хвост, которого там ещё нет.
+- Период адресуется номером и в `domain`, и в базе — отдельного id нет.
 
 | Величина | Откуда берётся |
 |---|---|
 | Баланс | Σ `balanceDelta` |
 | Копилка цели | Σ `savingsDelta` по `goalId` |
 | Факт периода | Σ операций периода по типу и категории |
-| Очки, уровень, стадия | Σ `Period.pointsEarned` |
+| Очки, уровень, стадия | Σ `periods.pointsEarned` |
 | Купленные аксессуары | операции `PURCHASE` с `itemId` аксессуара |
-| Завершённые задания | `TaskAttempt` с `outcome = SUCCESS` |
-| Эмоция | шкалы `PetState` |
+| Завершённые задания | `task_attempts` с `outcome = SUCCESS` |
+| Эмоция | шкалы `pet_state` |
 | Подпись операции для ребёнка | `type` + название товара, цели или задания из контента, ТЗ п. 2.5.4 |
 
-В `domain` период адресуется номером (`periodNumber`), в Room — `periodId`; сопоставление делает репозиторий.
+**Меняешь entity — поднимаешь `version` в `FinneyDatabase` и пишешь миграцию.** Без неё Room
+при обновлении приложения упадёт, а удалять базу у экспертов нельзя.
 
 ### JSON: учебный контент
 
