@@ -10,14 +10,17 @@
 
 # Ядро: экономика, состояние питомца, хранилище, навигация.
 # Только [@lemonke68]. Правки сюда от других не принимаются без его ревью.
-/app/src/main/java/**/core/        @github-логин-вани
-/app/src/main/java/**/data/        @github-логин-вани
-/app/src/main/java/**/domain/      @github-логин-вани
-/app/src/test/**                   @github-логин-вани
-/app/build.gradle.kts              @github-логин-вани
-/build.gradle.kts                  @github-логин-вани
-/settings.gradle.kts               @github-логин-вани
-/gradle/libs.versions.toml         @github-логин-вани
+/app/src/main/java/**/core/        @lemonke68
+/app/src/main/java/**/data/        @lemonke68
+/app/src/main/java/**/domain/      @lemonke68
+/app/src/main/java/**/content/     @lemonke68
+/app/src/main/java/**/navigation/  @lemonke68
+/app/src/main/java/ru/finney/pet/*.kt  @lemonke68
+/app/src/test/**                   @lemonke68
+/app/build.gradle.kts              @lemonke68
+/build.gradle.kts                  @lemonke68
+/settings.gradle.kts               @lemonke68
+/gradle/libs.versions.toml         @lemonke68
 
 # Экраны — [@zYafALL]
 /app/src/main/java/**/ui/          @github-логин-ярика
