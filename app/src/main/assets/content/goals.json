@@ -1,0 +1,5 @@
+[
+  { "id": "goal_crown", "label": "Корона",    "price": 50,  "moodBonus": 20 },
+  { "id": "goal_bike",  "label": "Велосипед", "price": 100, "moodBonus": 30 },
+  { "id": "goal_house", "label": "Домик",     "price": 150, "moodBonus": 40 }
+]

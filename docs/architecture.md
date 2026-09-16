@@ -43,10 +43,13 @@ ru.finney.pet
 │   └── theme/       палитра, типографика, компоненты
 │
 ├── domain/          ИГРОВАЯ ЭКОНОМИКА              — [@lemonke68], только он
-│   ├── economy/     баланс, списания, накопления
-│   ├── period/      игровой период, план vs факт
+│   ├── game/        Game — единственная точка команд: план, покупка, копилка, задание, закрытие периода
+│   ├── economy/     темп накоплений и срок до цели
+│   ├── period/      план и факт периода
 │   ├── progress/    очки развития, уровни, стадии
-│   └── model/       доменные модели
+│   ├── pet/         шкалы, эмоция, подсказка по нужному
+│   ├── tasks/       три движка заданий
+│   └── model/       состояние игры и модели контента (@Serializable)
 │
 ├── data/            ХРАНИЛИЩЕ                      — [@lemonke68], только он
 │   ├── db/          Room: entity, dao, database
@@ -54,10 +57,28 @@ ru.finney.pet
 │   └── prefs/       DataStore
 │
 └── content/         ЗАГРУЗКА УЧЕБНОГО КОНТЕНТА     — [@lemonke68]
-    └── model/       схемы JSON
+                     ContentParser, ContentValidator, AssetContentLoader
 ```
 
 Правило: `ui` не знает про `data`, обращается только к `domain`. Зависимости экраны получают из `AppContainer` через фабрики ViewModel и сами ничего не создают. Экономика не зависит от Compose — поэтому её можно покрыть обычными unit-тестами без устройства.
+
+### Как устроен `domain`
+
+`Game` — набор чистых функций: получает `GameState` и команду, возвращает новое состояние
+или отказ с причиной (`Rejection`). Сам ничего не хранит и ничего не знает про Room.
+Репозиторий в `data/` загружает состояние профиля, передаёт в `Game` и сохраняет результат.
+Данных на профиль — десятки строк, поэтому состояние целиком держится в памяти.
+
+```kotlin
+when (val result = game.buy(state, "food_apple")) {
+    is GameResult.Ok -> save(result.state)
+    is GameResult.Rejected -> showReason(result.reason) // InsufficientFunds(needed, balance) и т. д.
+}
+```
+
+Для экранов подтверждения есть предпросмотры без изменения состояния:
+`previewPurchase` (цена, шкалы до и после, нехватка), `previewWithdraw` (накопления и срок до и после),
+`needsHint` (сколько стоит закрыть нужное), `goalProgress` (накоплено, осталось, срок).
 
 ## Структура данных
 
@@ -117,7 +138,6 @@ data class LedgerEntry(
     val goalId: String?,         // цель из goals.json
     val taskId: String?,         // задание из tasks.json
     val unplanned: Boolean,      // доход после подтверждения плана
-    val label: String,           // «Задание „Что сначала“» — источник для ребёнка, ТЗ п. 2.5.4
     val createdAt: Long,
 )
 
@@ -142,6 +162,9 @@ data class TaskAttempt(
 | Купленные аксессуары | операции `PURCHASE` с `itemId` аксессуара |
 | Завершённые задания | `TaskAttempt` с `outcome = SUCCESS` |
 | Эмоция | шкалы `PetState` |
+| Подпись операции для ребёнка | `type` + название товара, цели или задания из контента, ТЗ п. 2.5.4 |
+
+В `domain` период адресуется номером (`periodNumber`), в Room — `periodId`; сопоставление делает репозиторий.
 
 ### JSON: учебный контент
 

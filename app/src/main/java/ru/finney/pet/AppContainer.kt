@@ -1,6 +1,9 @@
 package ru.finney.pet
 
 import android.content.Context
+import ru.finney.pet.content.AssetContentLoader
+import ru.finney.pet.domain.game.Game
+import ru.finney.pet.domain.model.GameContent
 
 /**
  * Ручной DI: единственное место, где создаются база, репозитории и загрузчик контента.
@@ -9,4 +12,8 @@ import android.content.Context
  */
 class AppContainer(context: Context) {
     private val appContext: Context = context.applicationContext
+
+    val content: GameContent by lazy { AssetContentLoader(appContext).load() }
+
+    val game: Game by lazy { Game(content) }
 }
