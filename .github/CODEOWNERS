@@ -13,6 +13,9 @@
 /app/src/main/java/**/core/        @github-логин-вани
 /app/src/main/java/**/data/        @github-логин-вани
 /app/src/main/java/**/domain/      @github-логин-вани
+/app/src/main/java/**/content/     @github-логин-вани
+/app/src/main/java/**/navigation/  @github-логин-вани
+/app/src/main/java/ru/finney/pet/*.kt  @github-логин-вани
 /app/src/test/**                   @github-логин-вани
 /app/build.gradle.kts              @github-логин-вани
 /build.gradle.kts                  @github-логин-вани
