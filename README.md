@@ -41,10 +41,16 @@
 |---|---|
 | Android Studio | Quail 4 (2026.1.4) или новее |
 | JDK | 25 — JetBrains Runtime внутри Android Studio, отдельно ставить не нужно. Код компилируется в Java 17 |
-| Android SDK | Platform 37 (compileSdk/targetSdk); эмулятор API 26, arm64-v8a — проверка нижней границы |
-| Gradle / AGP | 9.6+ / 9.4+ (приходят с проектом) |
+| Android SDK | Platform 37 (compileSdk/targetSdk), Platform-Tools |
+| Эмулятор | API 37 для работы и **API 26 (Android 8.0) для проверки нижней границы**. Образ под свой процессор: `arm64-v8a` на Apple Silicon, `x86_64` на Intel/AMD |
+| Kotlin / Gradle / AGP | 2.4.20 / 9.6 / 9.4 — приходят с проектом, отдельно не ставятся |
 | Git | 2.40+ |
 | Git LFS | нужен только для видео (`*.mp4`), для кода и графики не требуется |
+
+Версию Android Studio проверить: `Android Studio → About`. Если старше 2026.1.4 —
+`Help → Check for Updates`, иначе синхронизация проекта может не пройти.
+
+Физическое устройство обязательно (ТЗ п. 3.1): Android 8.0+, от 3 ГБ RAM, отладка по USB включена.
 
 ## Быстрый запуск
 
@@ -61,14 +67,47 @@ cd finney
 ./gradlew assembleDebug
 ```
 
-Для `./gradlew` из терминала нужны переменные окружения (из Android Studio не нужны):
+Windows: `gradlew.bat assembleDebug`.
+
+### Переменные окружения
+
+Нужны только для сборки и `adb` из терминала — из Android Studio всё работает и без них.
+`JAVA_HOME` указывает на Java, встроенную в Android Studio: если в системе стоит другая
+(например, 26), без этой переменной сборка из терминала упадёт.
+
+macOS — в `~/.zshrc`:
 
 ```bash
 export ANDROID_HOME="$HOME/Library/Android/sdk"
 export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
+export PATH="$PATH:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator"
 ```
 
-Если в системе стоит другая Java (например, 26), без `JAVA_HOME` сборка из терминала упадёт.
+Linux — в `~/.bashrc` или `~/.zshrc` (путь к Studio зависит от способа установки, для snap — `/snap/android-studio/current`):
+
+```bash
+export ANDROID_HOME="$HOME/Android/Sdk"
+export JAVA_HOME="/opt/android-studio/jbr"
+export PATH="$PATH:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator"
+```
+
+Windows — `Параметры → Система → О системе → Дополнительные параметры → Переменные среды`:
+
+```
+ANDROID_HOME = %LOCALAPPDATA%\Android\Sdk
+JAVA_HOME    = C:\Program Files\Android\Android Studio\jbr
+Path        += %ANDROID_HOME%\platform-tools
+```
+
+### Проверка окружения
+
+```bash
+java -version      # должна быть 25 (JetBrains Runtime)
+adb version
+./gradlew --version
+```
+
+Все три команды отвечают без ошибок — окружение готово.
 
 Релизная сборка описана в разделе «Подпись релиза».
 
@@ -91,10 +130,14 @@ CONTRIBUTING.md      правила работы с репозиторием
 
 Ключ подписи и пароли в репозиторий не попадают (ТЗ п. 3.4). Релиз подписывает [@lemonke68].
 
-1. Ключ создаётся один раз, в корне репозитория (`*.jks` в `.gitignore`):
+1. Ключ создаётся один раз и лежит **рядом с папкой репозитория, а не внутри неё** —
+   именно такой путь `../finney-release.jks` прописан в `keystore.properties.example`.
+   Из корня репозитория:
    ```bash
-   keytool -genkey -v -keystore finney-release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias finney
+   keytool -genkeypair -v -keystore ../finney-release.jks -storetype PKCS12 -keyalg RSA -keysize 2048 -validity 10000 -alias finney
    ```
+   В формате PKCS12 пароль ключа совпадает с паролем хранилища: `storePassword` и `keyPassword`
+   в `keystore.properties` одинаковые.
 2. Скопировать `keystore.properties.example` в `keystore.properties` и заполнить. Файл в `.gitignore`.
 3. Резервная копия `.jks` и паролей — ещё у одного человека в команде. Без ключа приложение
    нельзя обновить в RuStore: только публиковать заново под другим именем пакета.
