@@ -40,15 +40,13 @@
 | Android SDK | Platform 37 (compileSdk/targetSdk), Platform 26 для проверки нижней границы |
 | Gradle / AGP | 9.6+ / 9.4+ (приходят с проектом) |
 | Git | 2.40+ |
-| Git LFS | 3.x, обязателен |
+| Git LFS | нужен только для видео (`*.mp4`), для кода и графики не требуется |
 
 ## Быстрый запуск
 
 ```bash
 git clone https://github.com/vsvsokol/finney.git
 cd finney
-git lfs install
-git lfs pull
 ```
 
 Дальше: открыть папку в Android Studio, дождаться синхронизации Gradle, запустить конфигурацию `app`.

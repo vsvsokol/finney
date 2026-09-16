@@ -20,15 +20,14 @@ gradlew.bat text eol=crlf
 *.apk binary
 *.aab binary
 *.jar binary
-# Git LFS — крупные ассеты (нужен `git lfs install` у каждого)
-*.webp filter=lfs diff=lfs merge=lfs -text
-*.mp3  filter=lfs diff=lfs merge=lfs -text
-*.ogg  filter=lfs diff=lfs merge=lfs -text
-*.wav  filter=lfs diff=lfs merge=lfs -text
-*.mp4  filter=lfs diff=lfs merge=lfs -text
-*.glb  filter=lfs diff=lfs merge=lfs -text
-*.gltf filter=lfs diff=lfs merge=lfs -text
-*.fbx  filter=lfs diff=lfs merge=lfs -text
+# Git LFS — только то, что действительно большое.
+# Графика (webp/png) в LFS НЕ идёт: наши ассеты — единицы и десятки килобайт,
+# обычный git с ними справляется, а LFS требует отдельной авторизации,
+# расходует квоту GitHub и ломается у всех, кто забыл `git lfs install`.
+# Здесь остаётся только видео: резервная запись демонстрации по ТЗ п. 4.1
+# может весить сотню мегабайт.
+*.mp4 filter=lfs diff=lfs merge=lfs -text
+*.mov filter=lfs diff=lfs merge=lfs -text
 # Чтобы GitHub не считал проект "PDF-репозиторием"
 docs/** linguist-documentation
 *.webp !text !filter !merge !diff
