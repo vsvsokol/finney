@@ -63,57 +63,85 @@ ru.finney.pet
 
 ### Room: локальный профиль
 
+Правило: в базе хранятся **факты** — что произошло. Всё, что можно посчитать из фактов
+(баланс, накопления, уровень, стадия, эмоция), не хранится и считается в `domain/`.
+Так число на экране не может разойтись с историей операций. Формулы — [economy.md](economy.md).
+
 ```kotlin
 @Entity
 data class Profile(
-    @PrimaryKey val id: Long,
-    val petName: String,        // игровое имя
-    val bodyColor: String,      // a / b / c      — кастомизация
-    val eyesVariant: String,    // round / oval / sly
-    val balance: Int,           // доступный баланс
-    val savings: Int,           // накопления
-    val currentGoalId: String?, // выбранная цель
-    val progressPoints: Int,    // очки развития
-    val level: Int,             // 1..9
-    val isDemo: Boolean,        // тестовый профиль, ТЗ п. 2.5.13
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val petName: String,         // игровое имя, ТЗ п. 2.5.2
+    val bodyColor: String,       // a / b / c          — кастомизация
+    val eyesVariant: String,     // round / oval / sly — 3 × 3 = 9 комбинаций
+    val activeGoalId: String?,   // id из goals.json
+    val isDemo: Boolean,         // тестовый профиль, ТЗ п. 2.5.13
+    val createdAt: Long,
 )
 
 @Entity
-data class PetStateEntity(
+data class PetState(
     @PrimaryKey val profileId: Long,
-    val hunger: Int,    // 0..100, обязательные траты
-    val hygiene: Int,   // 0..100, обязательные траты
-    val mood: Int,      // 0..100, необязательные траты
+    val satiety: Int,            // 0..100
+    val hygiene: Int,            // 0..100
+    val mood: Int,               // 0..100
 )
 
 @Entity
-data class GamePeriod(
+data class Period(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val profileId: Long,
-    val number: Int,
-    val income: Int,
-    val plannedNeeds: Int,      // план, ТЗ п. 2.5.5
-    val plannedWants: Int,
-    val plannedSavings: Int,
-    val actualNeeds: Int,       // факт
-    val actualWants: Int,
-    val actualSavings: Int,
-    val isClosed: Boolean,
+    val number: Int,             // 1, 2, 3…
+    val stage: Int,              // стадия на момент открытия: снижение шкал и доход
+    val phase: String,           // PLANNING / ACTIVE / CLOSED
+    val budget: Int?,            // баланс в момент подтверждения плана
+    val plannedNeeds: Int?,
+    val plannedWants: Int?,
+    val plannedSavings: Int?,
+    val pointsEarned: Int?,      // заполняется при закрытии
+    val needsCovered: Boolean?,  // снимок итогов — для истории, ТЗ п. 2.5.11
+    val planMatched: Boolean?,
 )
 
 @Entity
-data class Transaction(
+data class LedgerEntry(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val profileId: Long,
     val periodId: Long,
-    val amount: Int,            // + доход, - расход
-    val sourceType: String,     // INCOME / TASK / PARENT_BONUS / PURCHASE / SAVINGS
-    val sourceLabel: String,    // «карманные деньги», «задание „Копилка“»
-    val timestamp: Long,
+    val type: String,            // INCOME / TASK_REWARD / PARENT_BONUS / PURCHASE /
+                                 // SAVINGS_DEPOSIT / SAVINGS_WITHDRAW / GOAL_COMPLETE
+    val balanceDelta: Int,       // изменение доступного баланса
+    val savingsDelta: Int,       // изменение копилки цели
+    val category: String?,       // NEEDS / WANTS — только для PURCHASE
+    val itemId: String?,         // товар из shop.json
+    val goalId: String?,         // цель из goals.json
+    val taskId: String?,         // задание из tasks.json
+    val unplanned: Boolean,      // доход после подтверждения плана
+    val label: String,           // «Задание „Что сначала“» — источник для ребёнка, ТЗ п. 2.5.4
+    val createdAt: Long,
+)
+
+@Entity
+data class TaskAttempt(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val profileId: Long,
+    val periodId: Long,
+    val taskId: String,
+    val outcome: String,         // SUCCESS / FAIL
+    val reward: Int,             // 0, если награда за это задание уже выдавалась
+    val createdAt: Long,
 )
 ```
 
-`Transaction` закрывает ТЗ п. 2.5.4: «для каждого начисления указываются источник и сумма».
+| Величина | Откуда берётся |
+|---|---|
+| Баланс | Σ `balanceDelta` |
+| Копилка цели | Σ `savingsDelta` по `goalId` |
+| Факт периода | Σ операций периода по типу и категории |
+| Очки, уровень, стадия | Σ `Period.pointsEarned` |
+| Купленные аксессуары | операции `PURCHASE` с `itemId` аксессуара |
+| Завершённые задания | `TaskAttempt` с `outcome = SUCCESS` |
+| Эмоция | шкалы `PetState` |
 
 ### JSON: учебный контент
 
@@ -124,101 +152,45 @@ content/
 ├── tasks.json      задания
 ├── shop.json       товары и цены
 ├── goals.json      цели накопления
-├── economy.json    баланс: доход, пороги уровней, награды
+├── economy.json    баланс: доход, награды, очки, шкалы питомца
+├── feedback.json   тексты эмоций, итогов периода, отказов
 └── glossary.json   справочник терминов, ТЗ п. 2.5.11
 ```
 
-Пример `economy.json`:
+Пример `economy.json` — значения по умолчанию из [economy.md](economy.md):
 
 ```json
 {
-  "incomePerPeriod": 50,
-  "taskReward": { "success": 15, "partial": 5 },
-  "parentBonusMax": 20,
-  "pointsPerLevel": 3,
-  "levelToStage": { "1-3": "SMALL", "4-6": "MEDIUM", "7-9": "BIG" },
-  "progressPoints": {
+  "incomeByStage": [50, 60, 70],
+  "taskReward": { "success": 15, "fail": 5 },
+  "parentBonus": { "step": 5, "maxPerPeriod": 20 },
+  "planTolerance": 5,
+  "points": {
     "needsCovered": 2,
     "planMatched": 2,
     "savingsAdded": 2,
-    "taskCompleted": 1
+    "taskSuccess": 1,
+    "taskSuccessMaxPerPeriod": 2
   },
-  "needsCostByLevel": [25, 26, 28, 30, 32, 35, 38, 41, 45]
+  "pointsPerLevel": 5,
+  "maxLevel": 9,
+  "stageStartLevels": [1, 4, 7],
+  "pet": {
+    "start": { "satiety": 70, "hygiene": 70, "mood": 70 },
+    "decayByStage": [
+      { "satiety": 40, "hygiene": 30, "mood": 20 },
+      { "satiety": 50, "hygiene": 35, "mood": 25 },
+      { "satiety": 60, "hygiene": 40, "mood": 30 }
+    ],
+    "needsThreshold": 50,
+    "emotionLow": 30,
+    "emotionHappy": 60
+  }
 }
 ```
 
 ## Игровая экономика
 
-Формулы по ТЗ п. 5.6 — должны быть описаны в документации.
-
-### Доход
-
-| Источник | Размер | Пункт ТЗ |
-|---|---|---|
-| Регулярный доход в начале периода | 50 | 2.5.4 |
-| Награда за задание | +15 верно, +5 неудачно | 2.5.4, 2.2 |
-| Бонус от взрослого | до 20, по решению взрослого | 2.5.12 |
-
-За ошибку награда **не нулевая** — ТЗ п. 2.2 требует безопасной ошибки, п. 8.1 запрещает давление и стыд.
-
-### Расходы
-
-Обязательные расходы растут с уровнем (`needsCostByLevel`), но доход тоже индексируется так,
-чтобы обязательное всегда оставалось покрываемым. Тупиковых состояний быть не должно —
-ТЗ п. 2.5.6 и 2.5.9 требуют объяснения и пути восстановления.
-
-### Очки развития и уровни
-
-По итогам закрытого периода:
-
-```
-+2  все обязательные расходы обеспечены
-+2  факт совпал с планом (допуск ±10%)
-+2  накопления пополнены
-+1  за каждое выполненное задание (максимум +2)
-```
-
-Максимум ~8 за период. Уровень растёт каждые 3 очка, всего 9 уровней, по 3 на стадию роста.
-При максимальной игре 9-й уровень достижим к 5-му периоду — это важно, потому что
-демо-режим воспроизводит именно 5 периодов (ТЗ п. 2.6).
-
-**Уровень никогда не падает.** ТЗ п. 2.2: неудачное решение «не обнуляет ранее достигнутый
-прогресс». Падают только обратимые шкалы состояния.
-
-### Три независимые оси
-
-| Ось | Чем задаётся | Минимум ТЗ |
-|---|---|---|
-| Кастомизация | 3 цвета × 3 варианта глаз = 9 | 9 комбинаций (п. 2.6) |
-| Развитие | 9 уровней → 3 стадии | 3 стадии (п. 2.6) |
-| Состояние | голод, гигиена, настроение | обратимо, п. 2.5.9 |
-
-Кастомизация сохраняется при смене стадии.
-
-## Игровой период
-
-Период **не привязан к календарным суткам**. Это цикл, который закрывается кнопкой:
-
-```
-доход → план бюджета → траты и задания → итог (план vs факт) → начисление очков → следующий период
-```
-
-Так требование «5 периодов подряд без ожидания реального времени» (ТЗ п. 2.5.13)
-выполняется само, без отдельного костыля под демо-режим.
-
-## Демо-режим
-
-- Отдельный профиль с флагом `isDemo`.
-- Все задания открыты сразу (ТЗ п. 2.5.8).
-- Сброс к исходному состоянию одной кнопкой из раздела взрослого (ТЗ п. 2.5.13).
-
-## Тесты
-
-ТЗ п. 3.4 требует покрыть логику бюджета, списаний, накоплений и прогресса.
-Минимальный набор:
-
-- покупка при недостатке средств не проходит и не уводит баланс в минус;
-- сумма плана не превышает доступный бюджет;
-- перевод в накопления уменьшает баланс ровно на ту же сумму;
-- очки развития начисляются по правилам и уровень не убывает;
-- прогресс сохраняется и восстанавливается после перезапуска.
+Правила периода, плана и факта, покупок, шкал, целей, очков, заданий и демо-режима —
+в [economy.md](economy.md). Там же значения по умолчанию, симуляция баланса
+и список инвариантов, каждый из которых покрывается unit-тестом (ТЗ п. 3.4).
