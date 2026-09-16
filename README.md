@@ -12,7 +12,7 @@
 
 | | |
 |---|---|
-| Стадия | подготовка репозитория, проект ещё не сгенерирован |
+| Стадия | скелет проекта создан, разработка не начата |
 | Промежуточная сдача | 29 сентября 2026, 23:59 |
 | Матрица требований | [docs/requirements-matrix.md](docs/requirements-matrix.md) |
 
@@ -35,9 +35,10 @@
 
 | Инструмент | Версия |
 |---|---|
-| Android Studio | последняя стабильная |
-| JDK | 17 или 21 (входит в Android Studio как JBR) |
-| Android SDK | Platform 35+, Build-Tools, Platform-Tools |
+| Android Studio | Quail 4 (2026.1.4) или новее |
+| JDK | 17 (входит в Android Studio, отдельно ставить не нужно) |
+| Android SDK | Platform 37 (compileSdk/targetSdk), Platform 26 для проверки нижней границы |
+| Gradle / AGP | 9.6+ / 9.4+ (приходят с проектом) |
 | Git | 2.40+ |
 | Git LFS | 3.x, обязателен |
 
@@ -63,7 +64,7 @@ git lfs pull
 ## Состав репозитория
 
 ```
-app/                 модуль приложения (появится после генерации проекта)
+app/                 модуль приложения (Kotlin, Compose)
 docs/
   manual.pdf                  техническое задание
   requirements-matrix.md      статус обязательных требований ТЗ

@@ -19,8 +19,11 @@
 /settings.gradle.kts               @github-логин-вани
 /gradle/libs.versions.toml         @github-логин-вани
 
-# Экраны и анимация
+# Экраны — [@zYafALL]
 /app/src/main/java/**/ui/          @github-логин-ярика
+
+# Анимация питомца — [@vsvsokol]. Выделено отдельно, чтобы не пересекаться с [@zYafALL].
+/app/src/main/java/**/ui/pet/      @vsvsokol
 
 # Графика — ревью арт-директора
 /app/src/main/res/drawable**/      @github-логин-иры
