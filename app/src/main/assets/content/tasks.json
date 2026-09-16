@@ -1,0 +1,197 @@
+[
+  {
+    "id": "budget_01",
+    "theme": "planning",
+    "engine": "distributor",
+    "title": "Разложи по конвертам",
+    "intro": "Финни получил 60 монет. Помоги распределить их на неделю.",
+    "amount": 60,
+    "baskets": [
+      {
+        "id": "needs",
+        "label": "Нужное",
+        "hint": "еда и шампунь"
+      },
+      {
+        "id": "wants",
+        "label": "Хочется",
+        "hint": "игрушки"
+      },
+      {
+        "id": "savings",
+        "label": "Копилка",
+        "hint": "на цель"
+      }
+    ],
+    "rules": [
+      {
+        "type": "min",
+        "basket": "needs",
+        "value": 25
+      },
+      {
+        "type": "min",
+        "basket": "savings",
+        "value": 5
+      }
+    ],
+    "explainOk": "Ты закрыл всё нужное и ещё отложил. Финни сыт, а цель стала ближе.",
+    "explainFail": "На нужное не хватило. Финни проголодается. В следующий раз сначала закрой обязательное, потом остальное."
+  },
+  {
+    "id": "budget_02",
+    "theme": "planning",
+    "engine": "basket",
+    "title": "Что сначала",
+    "intro": "У Финни 40 монет. В магазине есть еда и новая игрушка.",
+    "limit": 40,
+    "shelf": [
+      {
+        "id": "soup",
+        "label": "Супчик",
+        "price": 25,
+        "category": "needs"
+      },
+      {
+        "id": "robot",
+        "label": "Робот",
+        "price": 30,
+        "category": "wants"
+      },
+      {
+        "id": "apple",
+        "label": "Яблоко",
+        "price": 10,
+        "category": "needs"
+      }
+    ],
+    "rules": [
+      {
+        "type": "hasCategory",
+        "category": "needs"
+      },
+      {
+        "type": "excludes",
+        "item": "robot"
+      }
+    ],
+    "explainOk": "Сначала еда, потом игрушки. Финни не остался голодным.",
+    "explainFail": "Игрушка куплена, а еды не хватило. Игрушку можно было купить в следующий раз — она никуда не денется."
+  },
+  {
+    "id": "savings_01",
+    "theme": "savings",
+    "engine": "goal_slider",
+    "title": "Успеть ко дню рождения",
+    "intro": "Праздничная шляпа стоит 90 монет. До праздника 3 периода.",
+    "goalPrice": 90,
+    "periods": 3,
+    "incomePerPeriod": 50,
+    "explainOk": "По 30 монет за раз — и к празднику наберётся ровно 90. Откладывать понемногу, но регулярно — это и есть копить.",
+    "explainFail": "Столько откладывать мало: до праздника наберётся меньше 90. Попробуй увеличить взнос."
+  },
+  {
+    "id": "savings_02",
+    "theme": "savings",
+    "engine": "distributor",
+    "title": "Соблазн",
+    "intro": "В копилке 100 из 150 монет на велосипед. А в магазине появилась игрушка за 40.",
+    "amount": 40,
+    "baskets": [
+      {
+        "id": "wants",
+        "label": "Купить игрушку"
+      },
+      {
+        "id": "savings",
+        "label": "В копилку"
+      }
+    ],
+    "goal": {
+      "label": "Велосипед",
+      "price": 150,
+      "saved": 100,
+      "basket": "savings"
+    },
+    "rules": [
+      {
+        "type": "min",
+        "basket": "savings",
+        "value": 40
+      }
+    ],
+    "explainOk": "Ты не потратил и стал ближе к велосипеду. Иногда подождать выгоднее.",
+    "explainFail": "Игрушка твоя, но велосипед отодвинулся. Это нормально — просто теперь копить дольше."
+  },
+  {
+    "id": "shopping_01",
+    "theme": "shopping",
+    "engine": "basket",
+    "title": "Что выгоднее",
+    "intro": "Финни любит яблоки. В магазине два предложения.",
+    "limit": 20,
+    "shelf": [
+      {
+        "id": "pack_small",
+        "label": "2 яблока",
+        "price": 10,
+        "category": "needs"
+      },
+      {
+        "id": "pack_big",
+        "label": "5 яблок",
+        "price": 20,
+        "category": "needs"
+      }
+    ],
+    "rules": [
+      {
+        "type": "includes",
+        "item": "pack_big"
+      }
+    ],
+    "explainOk": "За те же деньги яблок больше. Полезно сравнивать, сколько получаешь за свою монету.",
+    "explainFail": "Можно было взять больше яблок за ту же сумму. Сравнивай не только цену, но и сколько дают."
+  },
+  {
+    "id": "shopping_02",
+    "theme": "shopping",
+    "engine": "basket",
+    "title": "Не хватило на кассе",
+    "intro": "У Финни 50 монет, а в корзине набралось на 55.",
+    "limit": 50,
+    "preloaded": [
+      "soup",
+      "candy",
+      "ball"
+    ],
+    "shelf": [
+      {
+        "id": "soup",
+        "label": "Супчик",
+        "price": 25,
+        "category": "needs"
+      },
+      {
+        "id": "candy",
+        "label": "Конфета",
+        "price": 15,
+        "category": "wants"
+      },
+      {
+        "id": "ball",
+        "label": "Мячик",
+        "price": 15,
+        "category": "wants"
+      }
+    ],
+    "rules": [
+      {
+        "type": "hasCategory",
+        "category": "needs"
+      }
+    ],
+    "explainOk": "Ты убрал необязательное и уложился. Отложить желаемое — не ошибка.",
+    "explainFail": "Ты уложился в деньги, но без еды. Финни останется голодным — верни супчик и убери игрушку."
+  }
+]

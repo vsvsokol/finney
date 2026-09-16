@@ -1,0 +1,27 @@
+{
+  "incomeByStage": [50, 60, 70],
+  "taskReward": { "success": 15, "fail": 5 },
+  "parentBonus": { "step": 5, "maxPerPeriod": 20 },
+  "planTolerance": 5,
+  "points": {
+    "needsCovered": 2,
+    "planMatched": 2,
+    "savingsAdded": 2,
+    "taskSuccess": 1,
+    "taskSuccessMaxPerPeriod": 2
+  },
+  "pointsPerLevel": 5,
+  "maxLevel": 9,
+  "stageStartLevels": [1, 4, 7],
+  "pet": {
+    "start": { "satiety": 70, "hygiene": 70, "mood": 70 },
+    "decayByStage": [
+      { "satiety": 40, "hygiene": 30, "mood": 20 },
+      { "satiety": 50, "hygiene": 35, "mood": 25 },
+      { "satiety": 60, "hygiene": 40, "mood": 30 }
+    ],
+    "needsThreshold": 50,
+    "emotionLow": 30,
+    "emotionHappy": 60
+  }
+}

@@ -1,0 +1,10 @@
+[
+  { "id": "food_apple",  "label": "Яблоко",      "price": 10, "category": "needs", "effect": { "satiety": 20 } },
+  { "id": "food_bowl",   "label": "Миска корма", "price": 20, "category": "needs", "effect": { "satiety": 45 } },
+  { "id": "care_soap",   "label": "Мыло",        "price": 10, "category": "needs", "effect": { "hygiene": 35 } },
+  { "id": "care_towel",  "label": "Полотенце",   "price": 15, "category": "needs", "effect": { "hygiene": 50 } },
+  { "id": "treat_candy", "label": "Конфета",     "price": 5,  "category": "wants", "effect": { "mood": 10 } },
+  { "id": "toy_book",    "label": "Книжка",      "price": 10, "category": "wants", "effect": { "mood": 20 } },
+  { "id": "toy_ball",    "label": "Мячик",       "price": 15, "category": "wants", "effect": { "mood": 30 } },
+  { "id": "decor_lamp",  "label": "Лампа",       "price": 25, "category": "wants", "effect": { "mood": 50 } }
+]
