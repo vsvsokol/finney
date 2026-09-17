@@ -8,6 +8,7 @@ import ru.finney.pet.domain.model.Goal
 import ru.finney.pet.domain.model.ItemKind
 import ru.finney.pet.domain.model.LedgerEntry
 import ru.finney.pet.domain.model.Period
+import ru.finney.pet.domain.model.PeriodFacts
 import ru.finney.pet.domain.model.PeriodPhase
 import ru.finney.pet.domain.model.PeriodResult
 import ru.finney.pet.domain.model.PetStats
@@ -48,6 +49,16 @@ data class WithdrawPreview(
     val savedAfter: Int,
     val periodsBefore: Int?,
     val periodsAfter: Int?,
+)
+
+/** План текущего периода против факта на эту минуту. */
+data class PlanReport(
+    val plan: Plan,
+    val facts: PeriodFacts,
+    /** Перерасход по нужному и желаемому сверх плана. */
+    val overspend: Int,
+    /** Засчитается ли «план выполнен», если закрыть период сейчас. */
+    val onTrack: Boolean,
 )
 
 sealed interface TaskResult {
@@ -131,6 +142,19 @@ class Game(
     }
 
     // ---------- План ----------
+
+    /** null — план текущего периода ещё не подтверждён. */
+    fun planReport(state: GameState): PlanReport? {
+        val period = state.currentPeriod
+        val plan = period.plan ?: return null
+        val facts = PeriodRules.facts(state.ledger, period.number)
+        return PlanReport(
+            plan = plan,
+            facts = facts,
+            overspend = PeriodRules.overspend(plan, facts),
+            onTrack = PeriodRules.planMatched(plan, facts, economy.planTolerance),
+        )
+    }
 
     fun confirmPlan(state: GameState, needs: Int, wants: Int, savings: Int): GameResult {
         val period = state.currentPeriod

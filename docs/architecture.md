@@ -28,10 +28,12 @@
 ru.finney.pet
 ├── FinneyApplication   создаёт AppContainer          — [@lemonke68]
 ├── AppContainer        ручной DI: база, репозитории   — [@lemonke68]
+├── ViewModelFactory    appContainer() для фабрик ViewModel — [@lemonke68]
 │
-├── navigation/      маршруты и NavHost             — [@lemonke68]
+├── navigation/      маршруты, NavHost, выбор стартового экрана — [@lemonke68]
 │
 ├── ui/              экраны и анимация              — [@zYafALL]
+│   ├── onboarding/  знакомство, имя и внешность питомца
 │   ├── home/        главный экран
 │   ├── budget/      план бюджета
 │   ├── shop/        покупки
@@ -43,7 +45,8 @@ ru.finney.pet
 │   └── theme/       палитра, типографика, компоненты
 │
 ├── domain/          ИГРОВАЯ ЭКОНОМИКА              — [@lemonke68], только он
-│   ├── game/        Game — команды игры; GameStore — команды с сохранением; GameStorage — интерфейс хранилища
+│   ├── game/        Game — команды игры; GameStore — команды с сохранением; Session — открытый профиль;
+│   │                GameStorage, ActiveProfileStorage — интерфейсы хранилища
 │   ├── profile/     проверка имени питомца
 │   ├── economy/     темп накоплений и срок до цели
 │   ├── period/      план и факт периода
@@ -55,7 +58,7 @@ ru.finney.pet
 ├── data/            ХРАНИЛИЩЕ                      — [@lemonke68], только он
 │   ├── db/          Room: entity, dao, database, маппинг в domain
 │   ├── repository/  RoomGameStorage — реализация domain/game/GameStorage
-│   └── prefs/       DataStore — настройки звука и анимаций (ещё не сделано)
+│   └── prefs/       DataStore — открытый профиль; настройки звука и анимаций (ещё не сделано)
 │
 └── content/         ЗАГРУЗКА УЧЕБНОГО КОНТЕНТА     — [@lemonke68]
                      ContentParser, ContentValidator, AssetContentLoader
@@ -68,7 +71,7 @@ ru.finney.pet
 `Game` — набор чистых функций: получает `GameState` и команду, возвращает новое состояние
 или отказ с причиной (`Rejection`). Сам ничего не хранит и ничего не знает про Room.
 
-Экраны работают не с `Game` напрямую, а с **`GameStore`** из `AppContainer`. Он берёт последнее
+Экраны работают не с `Game` напрямую, а с **`GameStore`** из `AppContainer` — точнее, с **`Session`** поверх него (ниже). Он берёт последнее
 сохранённое состояние, выполняет команду и сразу сохраняет результат. Команды идут строго
 по очереди: двойное нажатие не спишет деньги дважды.
 
@@ -95,6 +98,79 @@ store.observeGame(profileId).collect { saved -> /* saved.profile, saved.state; n
 и награду. Чтение без изменения состояния — через `container.game`: `level`, `stage`, `emotion`,
 `previewPurchase` (цена, шкалы до и после, нехватка), `previewWithdraw` (накопления и срок до и после),
 `needsHint` (сколько стоит закрыть нужное), `goalProgress` (накоплено, осталось, срок).
+
+### Открытый профиль: `Session`
+
+Экраны игры не передают `profileId`. `container.session` знает, какой профиль открыт
+(id хранится в DataStore), и повторяет команды `GameStore` без id:
+
+```kotlin
+val session = container.session
+
+session.activeGame                                  // Flow<SavedGame?>: null — профиль не выбран или удалён
+session.createProfile(name, appearance)             // создаёт и сразу открывает профиль
+session.execute { buy(it, "food_apple") }           // команда над открытым профилем
+session.submitTask(taskId, input)
+session.deleteActiveProfile()                       // сброс; открывается оставшийся профиль, если есть
+session.restore()                                   // при старте: true — есть профиль, идём на главный
+```
+
+База и DataStore восстанавливаются из резервной копии независимо. Если сохранённый id указывает
+на несуществующий профиль, `restore()` открывает первый из оставшихся.
+
+## Как устроены экраны
+
+Навигация — `navigation/`. Маршруты — `@Serializable`-объекты в `Routes.kt`, граф — `FinneyNavHost`.
+Экран не знает про `NavController`: получает лямбды `onOpenShop`, `onBack` и т. п., куда они ведут —
+решает только `FinneyNavHost`. Стартовый экран выбирает `StartViewModel` через `session.restore()`.
+
+Каждый экран — пара «ViewModel + Composable» в своём пакете `ui/`. Образцы: `ui/home`, `ui/onboarding`, `ui/budget`.
+
+```kotlin
+class ShopViewModel(private val session: Session, private val game: Game) : ViewModel() {
+
+    // Всё, что рисует экран, — одно состояние. Считается из сохранённой игры, поэтому обновляется само.
+    val uiState: StateFlow<ShopUiState> = session.activeGame
+        .filterNotNull()
+        .map { saved -> ShopUiState.Ready(balance = saved.state.balance /* … */) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ShopUiState.Loading)
+
+    // Разовое: перейти на другой экран, показать отказ.
+    private val _events = Channel<ShopEvent>(Channel.BUFFERED)
+    val events: Flow<ShopEvent> = _events.receiveAsFlow()
+
+    fun buy(itemId: String) {
+        viewModelScope.launch {
+            when (val r = session.execute { buy(it, itemId) }) {
+                is GameResult.Ok -> Unit                               // uiState обновится сам
+                is GameResult.Rejected -> _events.send(ShopEvent.Rejected(r.reason))
+            }
+        }
+    }
+
+    companion object {
+        val Factory = viewModelFactory {
+            initializer { appContainer().let { ShopViewModel(it.session, it.game) } }
+        }
+    }
+}
+
+@Composable
+fun ShopScreen(onBack: () -> Unit, viewModel: ShopViewModel = viewModel(factory = ShopViewModel.Factory)) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    LaunchedEffect(viewModel) { viewModel.events.collect { /* … */ } }
+    ShopContent(state, onBuy = viewModel::buy, onBack = onBack)   // без ViewModel — для @Preview
+}
+```
+
+Правила:
+
+- Команды запускаются в `viewModelScope`, а не в `rememberCoroutineScope`: уход с экрана
+  не должен оборвать сохранение на середине.
+- Баланс, шкалы, копилку на экране не пересчитывать и не кэшировать — брать из `activeGame`
+  и чтений `Game` (`level`, `emotion`, `goalProgress`, `planReport`, `previewPurchase` …).
+- Параметр маршрута (например, `taskId`) передаётся в фабрику: `TaskViewModel.factory(taskId)`.
+- Тест ViewModel — наследник `ViewModelTest` в `app/src/test/.../ui`: игра в памяти, без эмулятора.
 
 ## Структура данных
 

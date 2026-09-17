@@ -3,9 +3,12 @@ package ru.finney.pet
 import android.content.Context
 import ru.finney.pet.content.AssetContentLoader
 import ru.finney.pet.data.db.FinneyDatabase
+import ru.finney.pet.data.prefs.DataStoreActiveProfileStorage
+import ru.finney.pet.data.prefs.settingsDataStore
 import ru.finney.pet.data.repository.RoomGameStorage
 import ru.finney.pet.domain.game.Game
 import ru.finney.pet.domain.game.GameStore
+import ru.finney.pet.domain.game.Session
 import ru.finney.pet.domain.model.GameContent
 
 /**
@@ -22,6 +25,11 @@ class AppContainer(context: Context) {
 
     private val database: FinneyDatabase by lazy { FinneyDatabase.create(appContext) }
 
-    /** Экраны работают только через него: команды игры с сохранением и наблюдение за профилями. */
+    /** Команды игры с сохранением для любого профиля. Экранам игры удобнее [session]. */
     val gameStore: GameStore by lazy { GameStore(game, RoomGameStorage(database.gameDao())) }
+
+    /** Открытый профиль: его состояние и команды без profileId. */
+    val session: Session by lazy {
+        Session(gameStore, DataStoreActiveProfileStorage(appContext.settingsDataStore))
+    }
 }
