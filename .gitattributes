@@ -30,10 +30,13 @@ gradlew.bat text eol=crlf
 *.mov filter=lfs diff=lfs merge=lfs -text
 # Чтобы GitHub не считал проект "PDF-репозиторием"
 docs/** linguist-documentation
-*.webp !text !filter !merge !diff
-*.mp3 !text !filter !merge !diff
-*.ogg !text !filter !merge !diff
-*.wav !text !filter !merge !diff
-*.glb !text !filter !merge !diff
-*.gltf !text !filter !merge !diff
-*.fbx !text !filter !merge !diff
+# Снимаем с этих расширений LFS-фильтр, оставшийся от прежней настройки.
+# Минус, а не «!»: «!» делает атрибут неопределённым, и при core.autocrlf=true
+# git начинает считать файл текстом и вырезает CR из байтов картинки.
+*.webp -text -filter -merge -diff
+*.mp3 -text -filter -merge -diff
+*.ogg -text -filter -merge -diff
+*.wav -text -filter -merge -diff
+*.glb -text -filter -merge -diff
+*.gltf -text -filter -merge -diff
+*.fbx -text -filter -merge -diff

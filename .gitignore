@@ -116,6 +116,8 @@ package-lock.json
 *.blend1
 *.blend2
 *.spine
+*.procreate
+*.ipv
 design/_wip/
 assets/_raw/
 assets/_source/
