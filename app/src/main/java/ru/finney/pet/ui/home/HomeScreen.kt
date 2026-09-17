@@ -13,6 +13,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -44,6 +45,7 @@ fun HomeScreen(
     onOpenAdult: () -> Unit,
     onOpenHelp: () -> Unit,
     onPeriodClosed: (periodNumber: Int) -> Unit,
+    onOpenPetLab: () -> Unit,
     viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -71,6 +73,7 @@ fun HomeScreen(
             onOpenProgress = onOpenProgress,
             onOpenAdult = onOpenAdult,
             onOpenHelp = onOpenHelp,
+            onOpenPetLab = onOpenPetLab,
             onClosePeriod = viewModel::closePeriod,
         )
     }
@@ -87,6 +90,7 @@ private fun HomeContent(
     onOpenProgress: () -> Unit,
     onOpenAdult: () -> Unit,
     onOpenHelp: () -> Unit,
+    onOpenPetLab: () -> Unit,
     onClosePeriod: () -> Unit,
 ) {
     Column(
@@ -112,6 +116,8 @@ private fun HomeContent(
         OutlinedButton(onClick = onOpenProgress, modifier = action) { Text("Прогресс") }
         OutlinedButton(onClick = onOpenHelp, modifier = action) { Text("Подсказка") }
         OutlinedButton(onClick = onOpenAdult, modifier = action) { Text("Для взрослых") }
+        // Временный вход в черновик анимаций. Удалить вместе с PetLabScreen.
+        OutlinedButton(onClick = onOpenPetLab, modifier = action) { Text("Анимации питомца") }
         Button(onClick = onClosePeriod, enabled = state.canClosePeriod, modifier = action) {
             Text("Завершить период")
         }
@@ -140,7 +146,8 @@ private fun HomeContentPreview() {
                 nextTask = null,
             ),
             onOpenBudget = {}, onOpenShop = {}, onOpenGoals = {}, onOpenTasks = {}, onOpenTask = {},
-            onOpenProgress = {}, onOpenAdult = {}, onOpenHelp = {}, onClosePeriod = {},
+            onOpenProgress = {}, onOpenAdult = {}, onOpenHelp = {}, onOpenPetLab = {},
+            onClosePeriod = {},
         )
     }
 }

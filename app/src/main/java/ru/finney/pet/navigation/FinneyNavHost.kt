@@ -15,6 +15,7 @@ import androidx.navigation.toRoute
 import ru.finney.pet.ui.budget.BudgetScreen
 import ru.finney.pet.ui.home.HomeScreen
 import ru.finney.pet.ui.onboarding.PetSetupScreen
+import ru.finney.pet.ui.pet.PetLabScreen
 
 /**
  * Граф экранов. Экраны не знают про NavController: получают лямбды `onOpenX`,
@@ -73,8 +74,13 @@ fun FinneyNavHost(
                 onOpenAdult = { navController.navigate(AdultRoute) },
                 onOpenHelp = { navController.navigate(OnboardingRoute(isReplay = true)) },
                 onPeriodClosed = { number -> navController.navigate(PeriodResultRoute(number)) },
+                onOpenPetLab = { navController.navigate(PetLabRoute) },
             )
         }
+
+        // Черновой экран анимаций. Удалить вместе с PetLabRoute, когда анимации
+        // переедут на главный экран.
+        composable<PetLabRoute> { PetLabScreen() }
 
         composable<BudgetRoute> {
             BudgetScreen(onBack = { navController.popBackStack() })

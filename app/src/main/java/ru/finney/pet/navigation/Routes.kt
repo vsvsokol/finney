@@ -20,6 +20,10 @@ data class PetSetupRoute(val isEditing: Boolean = false)
 @Serializable
 data object HomeRoute
 
+// Черновой экран анимаций питомца. Уедет, когда анимации переедут на главный экран.
+@Serializable
+data object PetLabRoute
+
 /** План бюджета периода: до подтверждения — распределение, после — план против факта. */
 @Serializable
 data object BudgetRoute
