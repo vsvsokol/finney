@@ -15,38 +15,22 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import ru.finney.pet.R
+import ru.finney.pet.domain.model.PetCharacter
 
-// Питомец собирается из слоёв одного холста 2048 x 2048, поэтому детали совпадают
-// по положению сами и координаты подбирать не нужно.
+// Питомец собирается из слоёв одного холста, поэтому детали совпадают по положению
+// сами и координаты подбирать не нужно.
 //
 // Порядок отрисовки снизу вверх: ноги, руки, базовый слой (голова и туловище).
-// Базовый слой получен из состояния лица вычитанием конечностей — см.
-// tools/split_pet_base.py. Без этого вычитания под повёрнутой рукой видно исходную.
+// В базовом слое конечности вырезаны из состояния лица — см. tools/split_pet_base.py.
+// Без выреза под повёрнутой рукой видно исходную; вырез обязан быть точным по краю,
+// иначе по контуру рук и ног идёт светлый шов.
+//
+// Чем один питомец отличается от другого — только набором слоёв и точками
+// вращения: всё это в PetSkin, а сборка и анимация общие.
 //
 // Сейчас только обычный размер тела. Файлы стадий роста (_middle, _big) лежат в
 // design/exports/pet и в ресурсы пока не конвертируются: добавить стадию — это
 // параметр у Limb и у базового слоя плюс строка в tools/split_pet_base.py.
-
-/** Выражение лица. Файлы различаются только областью лица, тело во всех одинаковое. */
-enum class PetMood(@DrawableRes val baseRes: Int) {
-    HAPPY(R.drawable.pushistik_base_happy),
-    SAD(R.drawable.pushistik_base_sad),
-    DIRTY(R.drawable.pushistik_base_dirty),
-    SLEEP(R.drawable.pushistik_base_sleep),
-}
-
-/**
- * Точки вращения конечностей — доли от стороны холста 2048.
- * Плечи и бёдра: там, где конечность прилегает к туловищу.
- */
-private val LeftHandPivot = TransformOrigin(930f / 2048f, 1500f / 2048f)
-private val RightHandPivot = TransformOrigin(1130f / 2048f, 1500f / 2048f)
-private val LeftLegPivot = TransformOrigin(960f / 2048f, 1640f / 2048f)
-private val RightLegPivot = TransformOrigin(1100f / 2048f, 1640f / 2048f)
-
-/** Персонаж стоит на ногах: масштабируем и наклоняем относительно точки опоры, а не центра. */
-private val GroundOrigin = TransformOrigin(0.5f, 0.89f)
 
 /** Мгновенное положение всех частей. Анимации только заполняют эту структуру. */
 data class PetPose(
@@ -62,10 +46,12 @@ data class PetPose(
 
 @Composable
 fun PetView(
+    character: PetCharacter,
     mood: PetMood,
     pose: PetPose,
     modifier: Modifier = Modifier,
 ) {
+    val skin = character.skin
     Box(
         modifier = modifier
             .aspectRatio(1f)
@@ -74,22 +60,22 @@ fun PetView(
                 scaleY = pose.scaleY
                 translationY = pose.offsetY.toPx()
                 rotationZ = pose.tilt
-                transformOrigin = GroundOrigin
+                transformOrigin = skin.ground
             },
     ) {
-        Limb(R.drawable.pushistik_left_leg, LeftLegPivot, pose.leftLeg)
-        Limb(R.drawable.pushistik_right_leg, RightLegPivot, pose.rightLeg)
-        Limb(R.drawable.pushistik_left_hand, LeftHandPivot, pose.leftHand)
-        Limb(R.drawable.pushistik_right_hand, RightHandPivot, pose.rightHand)
+        Limb(skin.leftLeg, skin.leftLegPivot, pose.leftLeg)
+        Limb(skin.rightLeg, skin.rightLegPivot, pose.rightLeg)
+        Limb(skin.leftHand, skin.leftHandPivot, pose.leftHand)
+        Limb(skin.rightHand, skin.rightHandPivot, pose.rightHand)
 
         Crossfade(
-            targetState = mood,
+            targetState = skin.base(mood),
             animationSpec = tween(durationMillis = 280),
             label = "mood",
             modifier = Modifier.matchParentSize(),
         ) { current ->
             Image(
-                painter = painterResource(current.baseRes),
+                painter = painterResource(current),
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
             )

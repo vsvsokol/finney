@@ -17,6 +17,7 @@ import ru.finney.pet.domain.model.TaskAttempt
 fun Profile.toEntity() = ProfileEntity(
     id = id,
     petName = petName,
+    petCharacter = appearance.character,
     bodyColor = appearance.bodyColor,
     eyes = appearance.eyes,
     activeGoalId = null,
@@ -27,7 +28,7 @@ fun Profile.toEntity() = ProfileEntity(
 fun ProfileEntity.toDomain() = Profile(
     id = id,
     petName = petName,
-    appearance = PetAppearance(bodyColor, eyes),
+    appearance = PetAppearance(petCharacter, bodyColor, eyes),
     isDemo = isDemo,
     createdAt = createdAt,
 )

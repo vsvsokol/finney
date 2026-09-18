@@ -15,11 +15,12 @@ import ru.finney.pet.domain.game.Rejection
 import ru.finney.pet.domain.model.BodyColor
 import ru.finney.pet.domain.model.EyesVariant
 import ru.finney.pet.domain.model.PetAppearance
+import ru.finney.pet.domain.model.PetCharacter
 import ru.finney.pet.domain.profile.PetNameError
 
 class GameStoreTest {
 
-    private val appearance = PetAppearance(BodyColor.B, EyesVariant.SLY)
+    private val appearance = PetAppearance(PetCharacter.PUSHISTIK, BodyColor.B, EyesVariant.SLY)
 
     @Test
     fun `имя питомца обрезается и проверяется`() = runBlocking {
@@ -74,7 +75,7 @@ class GameStoreTest {
         store.execute(id) { confirmPlan(it, 20, 0, 0) }
         val before = storage.load(id)!!.state
 
-        val newLook = PetAppearance(BodyColor.C, EyesVariant.ROUND)
+        val newLook = PetAppearance(PetCharacter.PUSHISTIK, BodyColor.C, EyesVariant.ROUND)
         store.updateProfile(id, "Бублик", newLook)
 
         val after = storage.load(id)!!

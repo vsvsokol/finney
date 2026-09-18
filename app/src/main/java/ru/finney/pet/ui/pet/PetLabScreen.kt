@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import ru.finney.pet.domain.model.PetCharacter
 import ru.finney.pet.ui.theme.FinneyTheme
 
 private val MoodLabels = mapOf(
@@ -38,6 +39,7 @@ private val MoodLabels = mapOf(
  */
 @Composable
 fun PetLabScreen(modifier: Modifier = Modifier) {
+    var character by remember { mutableStateOf(PetCharacter.PUSHISTIK) }
     var mood by remember { mutableStateOf(PetMood.HAPPY) }
     val animation = rememberPetAnimation()
     val pose = animation.currentPose()
@@ -51,6 +53,7 @@ fun PetLabScreen(modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.Center,
     ) {
         PetView(
+            character = character,
             mood = mood,
             pose = pose,
             modifier = Modifier
@@ -73,6 +76,21 @@ fun PetLabScreen(modifier: Modifier = Modifier) {
                 .fillMaxWidth()
                 .padding(top = 8.dp, bottom = 24.dp),
         )
+
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+        ) {
+            PetCharacter.entries.forEach { entry ->
+                FilterChip(
+                    selected = entry == character,
+                    onClick = { character = entry },
+                    label = { Text(entry.name) },
+                    shape = FilterChipDefaults.shape,
+                )
+            }
+        }
 
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),

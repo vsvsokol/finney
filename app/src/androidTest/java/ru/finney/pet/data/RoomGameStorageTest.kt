@@ -24,6 +24,7 @@ import ru.finney.pet.domain.game.TaskResult
 import ru.finney.pet.domain.model.BodyColor
 import ru.finney.pet.domain.model.EyesVariant
 import ru.finney.pet.domain.model.PetAppearance
+import ru.finney.pet.domain.model.PetCharacter
 import ru.finney.pet.domain.tasks.TaskInput
 
 /** ТЗ п. 2.5.13: профиль, баланс, покупки, накопления, цель и прогресс переживают перезапуск. */
@@ -77,7 +78,7 @@ class RoomGameStorageTest {
     @Test
     fun stateSurvivesDatabaseReopen() = runBlocking {
         val store = store(db)
-        val look = PetAppearance(BodyColor.C, EyesVariant.OVAL)
+        val look = PetAppearance(PetCharacter.PUSHISTIK, BodyColor.C, EyesVariant.OVAL)
         val id = (store.createProfile("Финни", look, isDemo = true) as ProfileResult.Saved).profileId
         playTwoPeriods(store, id)
         val before = RoomGameStorage(db.gameDao()).load(id)!!
@@ -98,7 +99,7 @@ class RoomGameStorageTest {
     @Test
     fun savedStateEqualsInMemoryGame() = runBlocking {
         val store = store(db)
-        val id = (store.createProfile("Финни", PetAppearance(BodyColor.A, EyesVariant.ROUND)) as ProfileResult.Saved).profileId
+        val id = (store.createProfile("Финни", PetAppearance(PetCharacter.PUSHISTIK, BodyColor.A, EyesVariant.ROUND)) as ProfileResult.Saved).profileId
         playTwoPeriods(store, id)
 
         // Тот же сценарий без базы: сохранение не должно ничего терять или добавлять.
@@ -130,7 +131,7 @@ class RoomGameStorageTest {
     @Test
     fun deletingProfileRemovesAllItsRows() = runBlocking {
         val store = store(db)
-        val look = PetAppearance(BodyColor.B, EyesVariant.SLY)
+        val look = PetAppearance(PetCharacter.PUSHISTIK, BodyColor.B, EyesVariant.SLY)
         val first = (store.createProfile("Финни", look) as ProfileResult.Saved).profileId
         val second = (store.createProfile("Бублик", look) as ProfileResult.Saved).profileId
         playTwoPeriods(store, first)

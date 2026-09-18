@@ -9,13 +9,14 @@ import ru.finney.pet.domain.game.Rejection
 import ru.finney.pet.domain.model.BodyColor
 import ru.finney.pet.domain.model.EyesVariant
 import ru.finney.pet.domain.model.PetAppearance
+import ru.finney.pet.domain.model.PetCharacter
 import ru.finney.pet.ui.budget.BudgetUiState
 import ru.finney.pet.ui.budget.BudgetViewModel
 
 class BudgetViewModelTest : ViewModelTest() {
 
     private suspend fun viewModel(): BudgetViewModel {
-        session.createProfile("Финни", PetAppearance(BodyColor.A, EyesVariant.ROUND))
+        session.createProfile("Финни", PetAppearance(PetCharacter.PUSHISTIK, BodyColor.A, EyesVariant.ROUND))
         return BudgetViewModel(session, game)
     }
 

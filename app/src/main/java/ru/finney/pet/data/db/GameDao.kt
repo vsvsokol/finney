@@ -8,6 +8,7 @@ import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
 import ru.finney.pet.domain.model.BodyColor
 import ru.finney.pet.domain.model.EyesVariant
+import ru.finney.pet.domain.model.PetCharacter
 
 @Dao
 abstract class GameDao {
@@ -26,8 +27,17 @@ abstract class GameDao {
     @Insert
     abstract suspend fun insertProfile(profile: ProfileEntity): Long
 
-    @Query("UPDATE profiles SET petName = :petName, bodyColor = :bodyColor, eyes = :eyes WHERE id = :profileId")
-    abstract suspend fun updateProfile(profileId: Long, petName: String, bodyColor: BodyColor, eyes: EyesVariant)
+    @Query(
+        "UPDATE profiles SET petName = :petName, petCharacter = :character, bodyColor = :bodyColor, eyes = :eyes " +
+            "WHERE id = :profileId",
+    )
+    abstract suspend fun updateProfile(
+        profileId: Long,
+        petName: String,
+        character: PetCharacter,
+        bodyColor: BodyColor,
+        eyes: EyesVariant,
+    )
 
     @Query("UPDATE profiles SET activeGoalId = :goalId WHERE id = :profileId")
     abstract suspend fun setActiveGoal(profileId: Long, goalId: String?)

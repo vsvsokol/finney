@@ -11,6 +11,7 @@ import ru.finney.pet.domain.model.BodyColor
 import ru.finney.pet.domain.model.EyesVariant
 import ru.finney.pet.domain.model.PeriodPhase
 import ru.finney.pet.domain.model.PetAppearance
+import ru.finney.pet.domain.model.PetCharacter
 import ru.finney.pet.ui.home.HomeEvent
 import ru.finney.pet.ui.home.HomeUiState
 import ru.finney.pet.ui.home.HomeViewModel
@@ -19,7 +20,7 @@ class HomeViewModelTest : ViewModelTest() {
 
     @Test
     fun `главный показывает открытый профиль и обновляется после команд`() = test {
-        session.createProfile("Финни", PetAppearance(BodyColor.B, EyesVariant.SLY))
+        session.createProfile("Финни", PetAppearance(PetCharacter.PUSHISTIK, BodyColor.B, EyesVariant.SLY))
         val viewModel = HomeViewModel(session, game, Fixtures.content)
         backgroundScope.launch { viewModel.uiState.collect {} }
         settle()
@@ -43,7 +44,7 @@ class HomeViewModelTest : ViewModelTest() {
 
     @Test
     fun `закрытие периода сообщает номер закрытого периода`() = test {
-        session.createProfile("Финни", PetAppearance(BodyColor.A, EyesVariant.ROUND))
+        session.createProfile("Финни", PetAppearance(PetCharacter.PUSHISTIK, BodyColor.A, EyesVariant.ROUND))
         session.execute { confirmPlan(it, needs = 0, wants = 0, savings = 0) }
         val viewModel = HomeViewModel(session, game, Fixtures.content)
 

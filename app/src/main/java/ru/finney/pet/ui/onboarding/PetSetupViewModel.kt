@@ -19,6 +19,7 @@ import ru.finney.pet.domain.game.Session
 import ru.finney.pet.domain.model.BodyColor
 import ru.finney.pet.domain.model.EyesVariant
 import ru.finney.pet.domain.model.PetAppearance
+import ru.finney.pet.domain.model.PetCharacter
 import ru.finney.pet.domain.profile.PetNameError
 import ru.finney.pet.domain.profile.ProfileRules
 
@@ -28,7 +29,7 @@ data class PetSetupUiState(
     /** При редактировании — пока профиль не загружен. */
     val isLoading: Boolean = isEditing,
     val name: String = "",
-    val appearance: PetAppearance = PetAppearance(BodyColor.A, EyesVariant.ROUND),
+    val appearance: PetAppearance = PetAppearance(PetCharacter.PUSHISTIK, BodyColor.A, EyesVariant.ROUND),
     /** Показывается после попытки сохранить, сбрасывается при вводе. */
     val nameError: PetNameError? = null,
     val isSaving: Boolean = false,
@@ -68,6 +69,9 @@ class PetSetupViewModel(
     }
 
     fun setName(name: String) = _uiState.update { it.copy(name = name, nameError = null) }
+
+    fun setCharacter(character: PetCharacter) =
+        _uiState.update { it.copy(appearance = it.appearance.copy(character = character)) }
 
     fun setBodyColor(color: BodyColor) = _uiState.update { it.copy(appearance = it.appearance.copy(bodyColor = color)) }
 

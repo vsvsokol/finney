@@ -13,10 +13,11 @@ import ru.finney.pet.domain.game.Session
 import ru.finney.pet.domain.model.BodyColor
 import ru.finney.pet.domain.model.EyesVariant
 import ru.finney.pet.domain.model.PetAppearance
+import ru.finney.pet.domain.model.PetCharacter
 
 class SessionTest {
 
-    private val appearance = PetAppearance(BodyColor.A, EyesVariant.OVAL)
+    private val appearance = PetAppearance(PetCharacter.PUSHISTIK, BodyColor.A, EyesVariant.OVAL)
     private val storage = FakeStorage()
     private val store = GameStore(Fixtures.game(), storage)
 

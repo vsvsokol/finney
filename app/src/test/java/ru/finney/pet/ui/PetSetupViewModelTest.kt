@@ -8,6 +8,7 @@ import org.junit.Test
 import ru.finney.pet.domain.model.BodyColor
 import ru.finney.pet.domain.model.EyesVariant
 import ru.finney.pet.domain.model.PetAppearance
+import ru.finney.pet.domain.model.PetCharacter
 import ru.finney.pet.domain.profile.PetNameError
 import ru.finney.pet.ui.onboarding.PetSetupEvent
 import ru.finney.pet.ui.onboarding.PetSetupViewModel
@@ -31,10 +32,11 @@ class PetSetupViewModelTest : ViewModelTest() {
     }
 
     @Test
-    fun `создание открывает профиль с выбранной внешностью`() = test {
+    fun `создание открывает профиль с выбранным питомцем и внешностью`() = test {
         val viewModel = PetSetupViewModel(session, isEditing = false)
 
         viewModel.setName(" Финни ")
+        viewModel.setCharacter(PetCharacter.ROGATIK)
         viewModel.setBodyColor(BodyColor.C)
         viewModel.setEyes(EyesVariant.SLY)
         viewModel.save()
@@ -42,18 +44,18 @@ class PetSetupViewModelTest : ViewModelTest() {
         assertEquals(PetSetupEvent.Saved, viewModel.events.first())
         val profile = session.activeGame.first()!!.profile
         assertEquals("Финни", profile.petName)
-        assertEquals(PetAppearance(BodyColor.C, EyesVariant.SLY), profile.appearance)
+        assertEquals(PetAppearance(PetCharacter.ROGATIK, BodyColor.C, EyesVariant.SLY), profile.appearance)
     }
 
     @Test
     fun `повторная настройка подставляет текущие имя и внешность`() = test {
-        session.createProfile("Финни", PetAppearance(BodyColor.B, EyesVariant.OVAL))
+        session.createProfile("Финни", PetAppearance(PetCharacter.ROGATIK, BodyColor.B, EyesVariant.OVAL))
         val viewModel = PetSetupViewModel(session, isEditing = true)
         settle()
 
         assertFalse(viewModel.uiState.value.isLoading)
         assertEquals("Финни", viewModel.uiState.value.name)
-        assertEquals(PetAppearance(BodyColor.B, EyesVariant.OVAL), viewModel.uiState.value.appearance)
+        assertEquals(PetAppearance(PetCharacter.ROGATIK, BodyColor.B, EyesVariant.OVAL), viewModel.uiState.value.appearance)
 
         viewModel.setName("Бублик")
         viewModel.save()

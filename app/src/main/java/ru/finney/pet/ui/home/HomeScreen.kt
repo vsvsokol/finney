@@ -27,6 +27,7 @@ import ru.finney.pet.domain.model.BodyColor
 import ru.finney.pet.domain.model.EyesVariant
 import ru.finney.pet.domain.model.PeriodPhase
 import ru.finney.pet.domain.model.PetAppearance
+import ru.finney.pet.domain.model.PetCharacter
 import ru.finney.pet.domain.model.PetStats
 import ru.finney.pet.domain.pet.Emotion
 import ru.finney.pet.ui.theme.FinneyTheme
@@ -131,7 +132,7 @@ private fun HomeContentPreview() {
         HomeContent(
             state = HomeUiState.Ready(
                 petName = "Финни",
-                appearance = PetAppearance(BodyColor.A, EyesVariant.ROUND),
+                appearance = PetAppearance(PetCharacter.PUSHISTIK, BodyColor.A, EyesVariant.ROUND),
                 isDemo = false,
                 stats = PetStats(30, 40, 50),
                 emotion = Emotion.CALM,

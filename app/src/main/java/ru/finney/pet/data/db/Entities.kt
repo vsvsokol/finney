@@ -10,6 +10,7 @@ import ru.finney.pet.domain.model.BodyColor
 import ru.finney.pet.domain.model.Category
 import ru.finney.pet.domain.model.EntryType
 import ru.finney.pet.domain.model.EyesVariant
+import ru.finney.pet.domain.model.PetCharacter
 import ru.finney.pet.domain.model.PeriodPhase
 import ru.finney.pet.domain.model.TaskOutcome
 
@@ -20,6 +21,7 @@ import ru.finney.pet.domain.model.TaskOutcome
 data class ProfileEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val petName: String,
+    val petCharacter: PetCharacter,
     val bodyColor: BodyColor,
     val eyes: EyesVariant,
     val activeGoalId: String?,
