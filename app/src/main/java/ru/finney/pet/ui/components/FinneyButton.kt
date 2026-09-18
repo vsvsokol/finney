@@ -1,5 +1,8 @@
 package ru.finney.pet.ui.components
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -26,6 +29,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
@@ -35,6 +39,7 @@ import ru.finney.pet.ui.theme.FinneyCream
 import ru.finney.pet.ui.theme.FinneyGlare
 import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneyPeach
+import ru.finney.pet.ui.theme.FinneyPink
 import ru.finney.pet.ui.theme.FinneyTheme
 import ru.finney.pet.ui.theme.FinneyYellow
 
@@ -51,8 +56,17 @@ private val OutlineWidth = 3.dp
 /** Заливка в покое: жёлтая с переходом в персиковый снизу. */
 private val RestBrush = Brush.verticalGradient(listOf(FinneyYellow, FinneyPeach))
 
-/** Заливка под пальцем: та же форма целиком в персиковом. */
-private val PressedBrush = Brush.verticalGradient(listOf(FinneyPeach, FinneyPeach))
+/**
+ * Заливка под пальцем. Не плоский цвет: в макете нажатая кнопка — такой же
+ * градиент, только сдвинутый в персиково-розовое, сверху светлее, снизу гуще.
+ */
+private val PressedBrush = Brush.verticalGradient(listOf(FinneyPeach, FinneyPink))
+
+/**
+ * Сжатие под пальцем. Нажатие в игре должно отзываться телом, а не только цветом:
+ * ребёнок 7–11 лет должен видеть, что игра его услышала.
+ */
+private const val PressedScale = 0.96f
 
 /**
  * Основная кнопка: «Играть», «Закрыть», «Подтвердить план».
@@ -70,12 +84,23 @@ fun FinneyButton(
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
     val shape = RoundedCornerShape(percent = 50)
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) PressedScale else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "press",
+    )
 
     Surface(
         onClick = onClick,
         modifier = modifier
             .then(if (fillWidth) Modifier.fillMaxWidth() else Modifier)
-            .defaultMinSize(minHeight = ButtonHeight),
+            .defaultMinSize(minHeight = ButtonHeight)
+            // Масштаб читается внутри graphicsLayer, то есть на отрисовке:
+            // пружина не пересобирает кнопку на каждом кадре.
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            },
         enabled = enabled,
         shape = shape,
         color = Color.Transparent,
@@ -110,6 +135,11 @@ fun FinneyIconButton(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) PressedScale else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "press",
+    )
 
     Surface(
         onClick = onClick,
@@ -117,6 +147,10 @@ fun FinneyIconButton(
         // задаётся здесь и заменяет собой то, что внутри.
         modifier = modifier
             .size(size)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
             .semantics { this.contentDescription = contentDescription },
         enabled = enabled,
         shape = CircleShape,
