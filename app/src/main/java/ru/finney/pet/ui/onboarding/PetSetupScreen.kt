@@ -41,7 +41,7 @@ import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.pet.PetMood
 import ru.finney.pet.ui.pet.PetPose
 import ru.finney.pet.ui.pet.PetView
-import ru.finney.pet.ui.pet.currentPose
+import ru.finney.pet.ui.pet.rememberPoseProvider
 import ru.finney.pet.ui.pet.rememberPetAnimation
 import ru.finney.pet.ui.theme.FinneyBlue
 import ru.finney.pet.ui.theme.FinneyGreen
@@ -245,53 +245,82 @@ private fun CharacterPicker(
         modifier = Modifier.fillMaxWidth(),
     ) {
         PetCharacter.entries.forEach { character ->
-            val isSelected = character == selected
-            val animation = rememberPetAnimation()
-            val pose = if (isSelected) animation.currentPose() else PetPose()
-            val label = CharacterLabels.getValue(character)
-
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(24.dp))
-                    // Выбранная карточка отличается и заливкой, и толщиной рамки,
-                    // а не одним цветом (ТЗ п. 3.6).
-                    .background(if (isSelected) FinneyYellow else FinneySand)
-                    .border(
-                        width = if (isSelected) 4.dp else 2.dp,
-                        color = FinneyInk,
-                        shape = RoundedCornerShape(24.dp),
-                    )
-                    .selectable(
-                        selected = isSelected,
-                        enabled = enabled,
-                        role = Role.RadioButton,
-                        onClick = {
-                            onSelect(character)
-                            animation.playJoy()
-                        },
-                    )
-                    .padding(8.dp)
-                    .clearAndSetSemantics { contentDescription = label },
-            ) {
-                PetView(
-                    character = character,
-                    mood = PetMood.HAPPY,
-                    pose = pose,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = FinneyInk,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
+            CharacterCard(
+                character = character,
+                isSelected = character == selected,
+                enabled = enabled,
+                onSelect = { onSelect(character) },
+                modifier = Modifier.weight(1f),
+            )
         }
     }
 }
+
+/**
+ * Карточка одного питомца.
+ *
+ * Вынесена из [CharacterPicker] не для красоты: `currentPose()` читает кадры анимации,
+ * и та функция, в теле которой стоит чтение, пересобирается каждый кадр. Пока вызов
+ * был в `CharacterPicker`, каждый кадр пересобирал обе карточки разом — вместе с
+ * `PetView`, а тот на каждой пересборке заново достаёт слои питомца из ресурсов.
+ * На экране выходило 5 кадров в секунду. Здесь пересборка ограничена одной карточкой.
+ */
+@Composable
+private fun CharacterCard(
+    character: PetCharacter,
+    isSelected: Boolean,
+    enabled: Boolean,
+    onSelect: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val animation = rememberPetAnimation()
+    val label = CharacterLabels.getValue(character)
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+            .clip(RoundedCornerShape(24.dp))
+            // Выбранная карточка отличается и заливкой, и толщиной рамки,
+            // а не одним цветом (ТЗ п. 3.6).
+            .background(if (isSelected) FinneyYellow else FinneySand)
+            .border(
+                width = if (isSelected) 4.dp else 2.dp,
+                color = FinneyInk,
+                shape = RoundedCornerShape(24.dp),
+            )
+            .selectable(
+                selected = isSelected,
+                enabled = enabled,
+                role = Role.RadioButton,
+                onClick = {
+                    onSelect()
+                    animation.playJoy()
+                },
+            )
+            .padding(8.dp)
+            .clearAndSetSemantics { contentDescription = label },
+    ) {
+        // Живым остаётся только выбранный: неподвижному поза не нужна,
+        // и лишний источник кадров ему незачем.
+        val pose = rememberPoseProvider(animation)
+        PetView(
+            character = character,
+            mood = PetMood.HAPPY,
+            pose = if (isSelected) pose else StillPose,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = FinneyInk,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+/** Поза невыбранного питомца: стоит ровно. Одна на всех, чтобы не плодить лямбды. */
+private val StillPose: () -> PetPose = { PetPose() }
 
 /** Кружок цвета. Выбранный — с толстой рамкой и подписью под ним, чтобы не полагаться на цвет. */
 @Composable

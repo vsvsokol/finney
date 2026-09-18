@@ -36,6 +36,14 @@ from PIL import Image, ImageMath
 
 SRC = Path("design/exports/pet")
 RES = Path("app/src/main/res/drawable-nodpi")
+
+# Сторона слоя в ресурсах. Холсты у дизайнеров 2048 и 2200, и класть их в
+# drawable-nodpi как есть нельзя: nodpi запрещает Android масштабировать картинку
+# при загрузке, поэтому слой разворачивается в памяти целиком — 2200×2200×4 ≈ 19 МБ.
+# На питомца пять слоёв, а на экране подбора их двое: выходило под 190 МБ растра
+# ради кружка в 400 пикселей, и кадр падал до 200 мс (5 fps) при 60 на главном.
+# 512 хватает с запасом: крупнее всего питомца рисуют примерно в 400 px.
+SIDE = 512
 STATES = ("happy", "sad", "dirty", "sleep")
 LIMBS = ("left_leg", "right_leg", "left_hand", "right_hand")
 
@@ -50,6 +58,8 @@ def load(pet: str, name: str) -> Image.Image:
 
 def save(image: Image.Image, pet: str, name: str) -> None:
     out = RES / f"{pet}_{name}.webp"
+    if max(image.size) > SIDE:
+        image = image.resize((SIDE, SIDE), Image.LANCZOS)
     image.save(out, "WEBP", lossless=True, method=6)
     print(f"{out} — {out.stat().st_size // 1024} КБ")
 

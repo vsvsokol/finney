@@ -59,7 +59,66 @@ fun rememberPetAnimation(): PetAnimation {
     return remember(scope) { PetAnimation(scope) }
 }
 
-/** Складывает анимацию покоя и текущий кадр прыжка в одну позу. */
+/**
+ * Поза как функция — то, что нужно передавать в [PetView].
+ *
+ * Здесь наружу отдаётся не значение, а способ его получить. Анимируемые величины
+ * читаются только внутри возвращённой лямбды, а её [PetView] вызывает на отрисовке.
+ * Поэтому кадры анимации вообще не задевают композицию: слои питомца достаются
+ * из ресурсов один раз.
+ *
+ * Пользоваться так: `PetView(pose = rememberPoseProvider(animation))`.
+ */
+@Composable
+fun rememberPoseProvider(animation: PetAnimation): () -> PetPose {
+    val idle = rememberInfiniteTransition(label = "idle")
+    val breath = idle.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2600, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "breath",
+    )
+    val sway = idle.animateFloat(
+        initialValue = -1f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2300, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "sway",
+    )
+
+    // Лямбда запоминается один раз: все четыре источника кадров — стабильные объекты,
+    // и значения из них берутся в момент вызова, то есть при отрисовке.
+    return remember(animation, breath, sway) {
+        { composePose(breath.value, sway.value, animation.lift.value, animation.crouch.value) }
+    }
+}
+
+/** Общая арифметика позы: одна на [rememberPoseProvider] и [currentPose]. */
+private fun composePose(breath: Float, sway: Float, lift: Float, crouch: Float): PetPose =
+    // Дыхание и прыжок — это объём: что прибавилось по высоте, то убавилось по ширине.
+    PetPose(
+        scaleX = 1f - breath * 0.008f + crouch * 0.07f - lift * 0.035f,
+        scaleY = 1f + breath * 0.016f - crouch * 0.10f + lift * 0.055f,
+        offsetY = (-38f * lift + 8f * crouch).dp,
+        tilt = sway * 0.7f,
+        leftHand = sway * 3f - lift * 34f,
+        rightHand = sway * 3f + lift * 34f,
+        leftLeg = -lift * 8f,
+        rightLeg = lift * 8f,
+    )
+
+/**
+ * Складывает анимацию покоя и текущий кадр прыжка в одну позу.
+ *
+ * Вызывающий пересобирается каждый кадр — в разметке экранов это дорого.
+ * Для показа питомца берите [rememberPoseProvider]; эта остаётся для `@Preview`
+ * и мест, где поза нужна разово.
+ */
 @Composable
 fun PetAnimation.currentPose(): PetPose {
     val idle = rememberInfiniteTransition(label = "idle")
@@ -82,18 +141,5 @@ fun PetAnimation.currentPose(): PetPose {
         label = "sway",
     )
 
-    val lift = lift.value
-    val crouch = crouch.value
-
-    // Дыхание и прыжок — это объём: что прибавилось по высоте, то убавилось по ширине.
-    return PetPose(
-        scaleX = 1f - breath * 0.008f + crouch * 0.07f - lift * 0.035f,
-        scaleY = 1f + breath * 0.016f - crouch * 0.10f + lift * 0.055f,
-        offsetY = (-38f * lift + 8f * crouch).dp,
-        tilt = sway * 0.7f,
-        leftHand = sway * 3f - lift * 34f,
-        rightHand = sway * 3f + lift * 34f,
-        leftLeg = -lift * 8f,
-        rightLeg = lift * 8f,
-    )
+    return composePose(breath, sway, lift.value, crouch.value)
 }

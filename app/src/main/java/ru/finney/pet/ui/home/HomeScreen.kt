@@ -42,7 +42,7 @@ import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.components.StatBar
 import ru.finney.pet.ui.pet.PetMood
 import ru.finney.pet.ui.pet.PetView
-import ru.finney.pet.ui.pet.currentPose
+import ru.finney.pet.ui.pet.rememberPoseProvider
 import ru.finney.pet.ui.pet.rememberPetAnimation
 import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneySand
@@ -158,7 +158,7 @@ private fun HomeContent(
             PetView(
                 character = state.appearance.character,
                 mood = state.emotion.toMood(),
-                pose = animation.currentPose(),
+                pose = rememberPoseProvider(animation),
                 modifier = Modifier.weight(1f),
             )
 

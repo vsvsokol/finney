@@ -42,7 +42,7 @@ fun PetLabScreen(modifier: Modifier = Modifier) {
     var character by remember { mutableStateOf(PetCharacter.PUSHISTIK) }
     var mood by remember { mutableStateOf(PetMood.HAPPY) }
     val animation = rememberPetAnimation()
-    val pose = animation.currentPose()
+    val pose = rememberPoseProvider(animation)
     val interactionSource = remember { MutableInteractionSource() }
 
     Column(
