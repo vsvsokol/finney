@@ -1,11 +1,13 @@
 package ru.finney.pet.ui.components
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -14,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextAlign
@@ -23,7 +26,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ru.finney.pet.ui.theme.FinneyCream
 import ru.finney.pet.ui.theme.FinneyGreen
+import ru.finney.pet.ui.theme.FinneyGreenDark
 import ru.finney.pet.ui.theme.FinneyInk
+import ru.finney.pet.ui.theme.FinneyStrokeRatio
 import ru.finney.pet.ui.theme.FinneyTheme
 import ru.finney.pet.ui.theme.FinneyYellow
 
@@ -33,23 +38,41 @@ import ru.finney.pet.ui.theme.FinneyYellow
 
 /**
  * Монета игровой валюты. Только значок, без суммы — сумму ставит [CoinAmount].
+ *
+ * Структура слоёв снята с эталона `Frame 24.png` промером по горизонтали:
+ * синее кольцо снаружи → кремовый зазор → тёмно-зелёное кольцо → светло-зелёное
+ * тело → кремовая «Ф». Раньше монета была просто зелёным кружком с буквой,
+ * и рядом с эталоном выглядела пустой.
+ *
+ * Доли радиуса, а не dp: монета одинаково собирается и в 20 dp у цены товара,
+ * и в 40 dp у баланса.
  */
 @Composable
 fun Coin(modifier: Modifier = Modifier, size: Dp = 28.dp) {
     Box(
-        modifier = modifier
-            .size(size)
-            .clip(CircleShape)
-            .background(FinneyGreen)
-            .border(size * 0.09f, FinneyInk, CircleShape),
+        modifier = modifier.size(size),
         contentAlignment = Alignment.Center,
     ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val d = this.size.minDimension
+            val centre = Offset(this.size.width / 2f, this.size.height / 2f)
+
+            // Радиусы — доли диаметра, снятые с горизонтального среза эталона
+            // Frame 24.png. Рисуем от внешнего к внутреннему: каждый следующий
+            // круг перекрывает предыдущий.
+            drawCircle(FinneyInk, d * 0.500f, centre)       // синяя обводка
+            drawCircle(FinneyCream, d * 0.448f, centre)     // кремовый зазор
+            drawCircle(FinneyGreenDark, d * 0.428f, centre) // тёмное кольцо
+            drawCircle(FinneyGreen, d * 0.376f, centre)     // светлое тело
+        }
+
         // Кегль привязан к размеру кружка, а не к настройкам шрифта системы:
         // это значок, и буква должна помещаться в монету при любом масштабе текста.
         OutlinedText(
             text = "Ф",
-            style = MaterialTheme.typography.labelMedium.copy(fontSize = (size.value * 0.5f).sp),
+            style = MaterialTheme.typography.labelMedium.copy(fontSize = (size.value * 0.58f).sp),
             fill = FinneyCream,
+            outline = FinneyGreenDark,
         )
     }
 }
@@ -82,7 +105,7 @@ fun LevelBadge(level: Int, modifier: Modifier = Modifier, size: Dp = 64.dp) {
             .size(size)
             .clip(CircleShape)
             .background(FinneyYellow)
-            .border(size * 0.06f, FinneyInk, CircleShape)
+            .border(size * FinneyStrokeRatio, FinneyInk, CircleShape)
             .clearAndSetSemantics { contentDescription = "Уровень $level" },
         contentAlignment = Alignment.Center,
     ) {
@@ -94,7 +117,7 @@ fun LevelBadge(level: Int, modifier: Modifier = Modifier, size: Dp = 64.dp) {
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFFFDF0D5)
+@Preview(showBackground = true, backgroundColor = 0xFFFFEDCD)
 @Composable
 private fun MoneyPreview() {
     FinneyTheme {

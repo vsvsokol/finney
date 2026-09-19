@@ -3,7 +3,6 @@ package ru.finney.pet.ui.components
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -13,7 +12,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -26,9 +24,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -38,29 +40,56 @@ import androidx.compose.ui.unit.dp
 import ru.finney.pet.ui.theme.FinneyCream
 import ru.finney.pet.ui.theme.FinneyGlare
 import ru.finney.pet.ui.theme.FinneyInk
+import ru.finney.pet.ui.theme.FinneyStrokeRatio
 import ru.finney.pet.ui.theme.FinneyPeach
 import ru.finney.pet.ui.theme.FinneyPink
 import ru.finney.pet.ui.theme.FinneyTheme
 import ru.finney.pet.ui.theme.FinneyYellow
 
-// Кнопки из UI-кита. Общее у всех: синяя обводка снаружи, градиентная заливка
-// и блик-эллипс слева сверху. Нажатие — не затемнение, как в Material, а смена
-// заливки с жёлтой на персиковую: именно так нарисованы «нормальное» и
-// «нажатое» состояния в макете.
+// Кнопки из UI-кита. Общее у всех: синяя обводка снаружи, плоская заливка,
+// полоса потемнее по низу и блик-эллипс слева сверху. Нажатие — не затемнение,
+// как в Material, а смена пары цветов с жёлтой на персиковую: именно так
+// нарисованы «нормальное» и «нажатое» состояния в макете.
+//
+// Все числа ниже промерены по эталону design/reference/Figma export finney/Frame 3.png
+// (кнопка 420 × 120) — не на глаз и не из ранних заметок. Силуэт со скруглением
+// ровно в половину высоты («стадион»), обводка 10 (= 1/12 высоты), нижняя полоса
+// начинается на y = 90 из 120, то есть ровно нижняя четверть, граница прямая.
 
 /** Высота кнопки. Больше минимальных 48 dp из ТЗ п. 3.6 — по кнопке должен попадать ребёнок. */
 private val ButtonHeight = 64.dp
 
-private val OutlineWidth = 3.dp
+/**
+ * Доля высоты под нижнюю полосу. В эталоне полоса занимает y 90..119 из 120.
+ * Это не тень-подложка и не градиент: плоский цвет с прямой границей,
+ * обрезанный общей формой кнопки.
+ */
+private const val BottomBandFraction = 0.25f
 
-/** Заливка в покое: жёлтая с переходом в персиковый снизу. */
-private val RestBrush = Brush.verticalGradient(listOf(FinneyYellow, FinneyPeach))
+// Блик — наклонённый эллипс, а не круг: в эталоне он лежит вдоль скругления угла.
+// Всё в долях высоты кнопки. Размеры получены как bbox чисто белых пикселей
+// в Frame 3.png: 34 × 24 при высоте 120 с отступом 29 / 24 от левого верхнего угла.
+//
+// Раньше здесь стояли 0.31 × 0.14 при 0.38 / 0.25, а в шапке файла — третий
+// вариант. Числа ниже — замер, остальные версии удалены, чтобы не расходились снова.
+
+/** Ширина блика — доля высоты кнопки. */
+private const val GlareWidthFraction = 0.283f
+
+/** Высота блика — доля высоты кнопки. */
+private const val GlareHeightFraction = 0.200f
+
+/** Отступ центра блика от левого края — доля высоты кнопки. */
+private const val GlareCentreFraction = 0.242f + GlareWidthFraction / 2f
+
+/** Отступ центра блика от верха — доля высоты кнопки. */
+private const val GlareTopFraction = 0.200f + GlareHeightFraction / 2f
 
 /**
- * Заливка под пальцем. Не плоский цвет: в макете нажатая кнопка — такой же
- * градиент, только сдвинутый в персиково-розовое, сверху светлее, снизу гуще.
+ * Наклон блика. Отрицательный — против часовой, вдоль скругления угла.
+ * Отдельным числом в макете не задан, подобран на глаз по эталону.
  */
-private val PressedBrush = Brush.verticalGradient(listOf(FinneyPeach, FinneyPink))
+private const val GlareAngle = -29.5f
 
 /**
  * Сжатие под пальцем. Нажатие в игре должно отзываться телом, а не только цветом:
@@ -104,16 +133,15 @@ fun FinneyButton(
         enabled = enabled,
         shape = shape,
         color = Color.Transparent,
-        border = BorderStroke(OutlineWidth, FinneyInk),
         interactionSource = interactionSource,
     ) {
         Box(
             modifier = Modifier
-                .background(if (pressed) PressedBrush else RestBrush, shape)
+                .clip(shape)
+                .buttonFill(pressed, round = false)
                 .padding(horizontal = 24.dp, vertical = 12.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Glare(Modifier.align(Alignment.TopStart).offset(x = 6.dp, y = 2.dp))
             OutlinedText(text, style = MaterialTheme.typography.titleLarge)
         }
     }
@@ -155,43 +183,97 @@ fun FinneyIconButton(
         enabled = enabled,
         shape = CircleShape,
         color = Color.Transparent,
-        border = BorderStroke(OutlineWidth, FinneyInk),
         interactionSource = interactionSource,
     ) {
         Box(
-            modifier = Modifier.background(if (pressed) PressedBrush else RestBrush, CircleShape),
+            modifier = Modifier.clip(CircleShape).buttonFill(pressed, round = true),
             contentAlignment = Alignment.Center,
         ) {
-            Glare(
-                modifier = Modifier.align(Alignment.TopStart).offset(x = size * 0.22f, y = size * 0.07f),
-                width = size * 0.26f,
-                height = size * 0.22f,
-            )
             content()
         }
     }
 }
 
 /**
- * Блик в левом верхнем углу — белый эллипс. В макете он есть у каждой кнопки
- * и делает её «выпуклой»; без него форма выглядит плоской наклейкой.
+ * Заливка кнопки: плоский цвет, полоса потемнее по низу, блик и обводка.
+ *
+ * Обе пары цветов идут по палитре: в покое жёлтый на персиковом (кнопка —
+ * это «деньги и награда»), под пальцем всё сдвигается на шаг в тёплое.
+ *
+ * [round] — кнопка круглая. У прямоугольной нижняя полоса прямая, у круглой
+ * это **серп с выпуклой верхней границей**: в эталоне видно, что персиковая
+ * область у кружка глубже всего по центру и сходит на нет к краям. Прямая
+ * полоса на круге выглядит как ошибка отрисовки.
+ *
+ * Обводка рисуется здесь, а не `BorderStroke` у `Surface`: `BorderStroke`
+ * кладёт линию внутрь границ, а в макете `stroke position: outside`. Рисуем
+ * сами с `Stroke` по краю — половина толщины уходит за границу формы и
+ * обрезается `clip`, поэтому видимая обводка получается ровной и не съедает
+ * заливку изнутри.
  */
-@Composable
-private fun Glare(
-    modifier: Modifier = Modifier,
-    width: Dp = 26.dp,
-    height: Dp = 20.dp,
-    shape: Shape = CircleShape,
-) {
-    Box(
-        modifier = modifier
-            .size(width = width, height = height)
-            .clip(shape)
-            .background(FinneyGlare),
-    )
+private fun Modifier.buttonFill(pressed: Boolean, round: Boolean): Modifier = drawBehind {
+    val face = if (pressed) FinneyPeach else FinneyYellow
+    val band = if (pressed) FinneyPink else FinneyPeach
+    drawRect(face)
+
+    if (round) {
+        // Серп: широкий плоский овал, чья верхняя дуга проходит по границе
+        // BottomBandFraction в центре кнопки и поднимается к краям. Всё, что
+        // вышло за круг, срезает clip.
+        //
+        // Овал намеренно шире кнопки: если взять его по ширине круга, дуга у
+        // краёв уходит слишком высоко и персикового становится больше половины,
+        // а в эталоне он занимает примерно нижнюю четверть.
+        val top = size.height * (1f - BottomBandFraction)
+        val overhang = size.width * 0.9f
+        drawOval(
+            color = band,
+            topLeft = Offset(-overhang, top),
+            size = Size(size.width + overhang * 2f, (size.height - top) * 2.4f),
+        )
+    } else {
+        val bandHeight = size.height * BottomBandFraction
+        drawRect(
+            color = band,
+            topLeft = Offset(0f, size.height - bandHeight),
+            size = Size(size.width, bandHeight),
+        )
+    }
+
+    // Блик. Все размеры — доли высоты кнопки, поэтому он одинаково ложится
+    // и на широкую кнопку, и на круглую иконку.
+    val glareWidth = size.height * GlareWidthFraction
+    val glareHeight = size.height * GlareHeightFraction
+    val centre = Offset(size.height * GlareCentreFraction, size.height * GlareTopFraction)
+    rotate(degrees = GlareAngle, pivot = centre) {
+        drawOval(
+            color = FinneyGlare,
+            topLeft = Offset(centre.x - glareWidth / 2f, centre.y - glareHeight / 2f),
+            size = Size(glareWidth, glareHeight),
+        )
+    }
+
+    // Обводка по краю. Толщина — 1/12 высоты, как промерено в эталоне.
+    val outline = size.height * FinneyStrokeRatio
+    if (round) {
+        drawCircle(
+            color = FinneyInk,
+            radius = (size.minDimension - outline) / 2f,
+            style = Stroke(width = outline),
+        )
+    } else {
+        val radius = CornerRadius(size.height / 2f)
+        drawRoundRect(
+            color = FinneyInk,
+            topLeft = Offset(outline / 2f, outline / 2f),
+            size = Size(size.width - outline, size.height - outline),
+            cornerRadius = radius,
+            style = Stroke(width = outline),
+        )
+    }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFFFDF0D5)
+@Preview(showBackground = true, backgroundColor = 0xFFFFEDCD)
 @Composable
 private fun FinneyButtonPreview() {
     FinneyTheme {

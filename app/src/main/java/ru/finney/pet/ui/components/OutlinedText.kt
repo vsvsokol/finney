@@ -61,7 +61,7 @@ fun OutlinedText(
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFFFDF0D5)
+@Preview(showBackground = true, backgroundColor = 0xFFFFEDCD)
 @Composable
 private fun OutlinedTextPreview() {
     FinneyTheme {
