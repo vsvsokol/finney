@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Фирменный шрифт макета — Glina Script em, лицензия SIL OFL 1.1
+  (текст лицензии — design/GLINA-SCRIPT-OFL.txt).
+
+  В семье всего два начертания: Thin (100) и Regular (400). Жирных нет —
+  поэтому в Type.kt нигде не стоит Bold или Black: Android подделывал бы
+  их синтетически, и контур букв «поплыл» бы.
+-->
+<font-family xmlns:android="http://schemas.android.com/apk/res/android">
+    <font
+        android:font="@font/glina_script_thin"
+        android:fontStyle="normal"
+        android:fontWeight="100" />
+    <font
+        android:font="@font/glina_script"
+        android:fontStyle="normal"
+        android:fontWeight="400" />
+</font-family>
