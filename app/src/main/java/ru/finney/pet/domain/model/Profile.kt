@@ -7,7 +7,7 @@ package ru.finney.pet.domain.model
  * Добавить питомца — значение здесь, папка в design/exports/pet, строка в
  * tools/split_pet_base.py и скин в ui/pet/PetSkin.kt.
  */
-enum class PetCharacter { PUSHISTIK, ROGATIK }
+enum class PetCharacter { PUSHISTIK, ROGATIK, ZVEZDOCHKA, BANTIK, LUCHIK }
 
 /** Цвет тела. 3 цвета × 3 варианта глаз = 9 комбинаций внешности (ТЗ п. 2.6). */
 enum class BodyColor { A, B, C }

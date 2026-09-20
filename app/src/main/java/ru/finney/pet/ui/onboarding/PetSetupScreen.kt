@@ -5,10 +5,14 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -60,6 +64,9 @@ import ru.finney.pet.ui.theme.FinneyYellow
 private val CharacterLabels = mapOf(
     PetCharacter.PUSHISTIK to "Пушистик",
     PetCharacter.ROGATIK to "Рогатик",
+    PetCharacter.ZVEZDOCHKA to "Звёздочка",
+    PetCharacter.BANTIK to "Бантик",
+    PetCharacter.LUCHIK to "Лучик",
 )
 
 /** Цвета тела для плашек выбора. Пока графики нет, вариант показывается кружком. */
@@ -240,17 +247,25 @@ private fun CharacterPicker(
     enabled: Boolean,
     onSelect: (PetCharacter) -> Unit,
 ) {
-    Row(
+    // LazyRow, а не Row: питомцев стало пять, и в ряд по ширине экрана они не
+    // помещаются — карточка ужималась до полусотни точек. Ширина фиксированная,
+    // список прокручивается вбок.
+    //
+    // Ленивый он не ради памяти, а ради кадров: каждая карточка крутит свою
+    // анимацию (см. комментарий к CharacterCard про 5 fps), и в LazyRow
+    // одновременно живут только видимые — две-три вместо пяти.
+    LazyRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(horizontal = 4.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        PetCharacter.entries.forEach { character ->
+        items(PetCharacter.entries) { character ->
             CharacterCard(
                 character = character,
                 isSelected = character == selected,
                 enabled = enabled,
                 onSelect = { onSelect(character) },
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.width(132.dp),
             )
         }
     }
