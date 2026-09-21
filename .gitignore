@@ -126,6 +126,3 @@ assets/_source/
 .env
 .env.*
 !.env.example
-
-# Локальные заметки, в репозиторий не идут
-NOTES.md
