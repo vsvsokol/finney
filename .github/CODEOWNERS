@@ -1,7 +1,4 @@
 # Кто обязан ревьюить изменения в каждой зоне.
-# ВАЖНО: подставьте реальные GitHub-логины вместо заглушек,
-# иначе автоназначение ревьюеров работать не будет.
-#
 # Действует только при включённой защите ветки Main:
 # Settings -> Branches -> Add rule -> Require review from Code Owners
 
@@ -9,7 +6,7 @@
 *                           @vsvsokol
 
 # Ядро: экономика, состояние питомца, хранилище, навигация.
-# Только [@lemonke68]. Правки сюда от других не принимаются без его ревью.
+# Только @lemonke68. Правки сюда от других не принимаются без его ревью.
 /app/src/main/java/**/core/        @lemonke68
 /app/src/main/java/**/data/        @lemonke68
 /app/src/main/java/**/domain/      @lemonke68
@@ -22,15 +19,15 @@
 /settings.gradle.kts               @lemonke68
 /gradle/libs.versions.toml         @lemonke68
 
-# Экраны — [@zYafALL]
-/app/src/main/java/**/ui/          @github-логин-ярика
+# Экраны — @zYafALL
+/app/src/main/java/**/ui/          @zYafALL
 
-# Анимация питомца — [@vsvsokol]. Выделено отдельно, чтобы не пересекаться с [@zYafALL].
+# Анимация питомца — @vsvsokol. Выделено отдельно, чтобы не пересекаться с @zYafALL.
 /app/src/main/java/**/ui/pet/      @vsvsokol
 
 # Графика — ревью арт-директора
-/app/src/main/res/drawable**/      @github-логин-иры
-/design/                           @github-логин-иры
+/app/src/main/res/drawable**/      @mitzzi4
+/design/                           @mitzzi4
 
 # Учебный контент и баланс
 /app/src/main/assets/content/      @vsvsokol

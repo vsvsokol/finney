@@ -80,3 +80,8 @@ docs: матрица требований ТЗ
 - Тесты экономики проходят.
 - Секретов в диффе нет.
 - Новые строки интерфейса — короткие и понятные ребёнку 7–11 лет (ТЗ п. 3.6).
+
+[@lemonke68]: https://github.com/lemonke68
+[@mitzzi4]: https://github.com/mitzzi4
+[@vsvsokol]: https://github.com/vsvsokol
+[@zYafALL]: https://github.com/zYafALL

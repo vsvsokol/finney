@@ -134,3 +134,9 @@
 | 10 | Переход к следующему периоду, изменение прогресса или стадии | не начато |
 | 11 | Закрытие и повторный запуск с сохранением прогресса | не начато |
 | 12 | Раздел взрослого, сброс или удаление тестового профиля | не начато |
+
+[@lemonke68]: https://github.com/lemonke68
+[@Lix2w78]: https://github.com/Lix2w78
+[@mitzzi4]: https://github.com/mitzzi4
+[@vsvsokol]: https://github.com/vsvsokol
+[@zYafALL]: https://github.com/zYafALL
