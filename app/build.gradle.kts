@@ -51,6 +51,14 @@ android {
             }
             signingConfigs.findByName("release")?.let { signingConfig = it }
         }
+        debug {
+            // Отдельный id, чтобы отладочная сборка вставала рядом с уже
+            // установленной, а не поверх неё: на устройстве удобно держать
+            // рабочую версию и ту, что проверяешь. Release не затрагивается —
+            // в магазин уходит прежний ru.finney.pet.
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
