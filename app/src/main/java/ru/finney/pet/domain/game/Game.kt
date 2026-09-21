@@ -159,13 +159,21 @@ class Game(
         )
     }
 
+    /**
+     * Нужное и желаемое — намерение: деньги за них уходят покупками в магазине.
+     * Копилка ведёт себя иначе: сумма уходит с баланса сразу при подтверждении,
+     * потому что отложить — это и есть действие, отдельного шага после плана нет.
+     * Поэтому план с копилкой без выбранной цели не принимается: откладывать некуда.
+     */
     fun confirmPlan(state: GameState, needs: Int, wants: Int, savings: Int): GameResult {
         val period = state.currentPeriod
         if (period.phase != PeriodPhase.PLANNING) return reject(Rejection.PlanAlreadyConfirmed)
         if (needs < 0 || wants < 0 || savings < 0) return reject(Rejection.InvalidAmount)
         val plan = Plan(budget = state.balance, needs = needs, wants = wants, savings = savings)
         if (plan.remainder < 0) return reject(Rejection.PlanExceedsBudget(plan.budget, plan.planned))
-        return ok(state.withCurrentPeriod(period.copy(phase = PeriodPhase.ACTIVE, plan = plan)))
+        val confirmed = state.withCurrentPeriod(period.copy(phase = PeriodPhase.ACTIVE, plan = plan))
+        // Отказ здесь оставляет состояние нетронутым: план без копилки не сохранится.
+        return if (savings > 0) deposit(confirmed, savings) else ok(confirmed)
     }
 
     // ---------- Покупки ----------

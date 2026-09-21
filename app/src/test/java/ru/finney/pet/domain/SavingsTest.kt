@@ -12,9 +12,13 @@ class SavingsTest {
 
     private val game = Fixtures.game()
 
+    /**
+     * Активный период с выбранной целью. Копилка в плане нулевая: план с копилкой
+     * сразу списывает сумму с баланса, а этим тестам нужны деньги на сами пополнения.
+     */
     private fun activeWithGoal(): GameState {
         val s = game.selectGoal(game.newGame(), "bike").state()
-        return game.confirmPlan(s, needs = 0, wants = 0, savings = 50).state()
+        return game.confirmPlan(s, needs = 0, wants = 0, savings = 0).state()
     }
 
     @Test
@@ -78,7 +82,7 @@ class SavingsTest {
     fun `достижение цели списывает цену из копилки, не трогает баланс и поднимает настроение`() {
         var s = game.selectGoal(game.newGame(), "crown").state()
         s = game.addParentBonus(s, 20).state()
-        s = game.confirmPlan(s, 0, 0, 70).state()
+        s = game.confirmPlan(s, 0, 0, 0).state()
         assertEquals(Rejection.GoalNotReached(price = 50, saved = 0), game.completeGoal(s).reason())
 
         s = game.deposit(s, 60).state()

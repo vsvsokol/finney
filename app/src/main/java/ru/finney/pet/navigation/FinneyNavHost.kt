@@ -13,6 +13,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import ru.finney.pet.ui.budget.BudgetScreen
+import ru.finney.pet.ui.goals.GoalsScreen
 import ru.finney.pet.ui.home.HomeScreen
 import ru.finney.pet.ui.onboarding.PetSetupScreen
 import ru.finney.pet.ui.period.PeriodResultScreen
@@ -92,7 +93,7 @@ fun FinneyNavHost(
         }
 
         composable<GoalsRoute> {
-            StubScreen("Цели и копилка", "Назад" to { navController.popBackStack() })
+            GoalsScreen(onBack = { navController.popBackStack() })
         }
 
         composable<TasksRoute> {

@@ -20,7 +20,9 @@ class InvariantsTest {
         var executed = 0
         repeat(20) { seed -> executed += run(Random(seed)) }
         // Защита от бесполезного теста: большая часть команд должна реально выполняться.
-        assertTrue("выполнено команд: $executed из 8000", executed > 3000)
+        // Порог снижен с 3000 после того, как копилка в плане стала списывать деньги сразу:
+        // денег на балансе меньше, и случайные покупки чаще упираются в нехватку средств.
+        assertTrue("выполнено команд: $executed из 8000", executed > 2800)
     }
 
     /** @return сколько команд выполнено без отказа. */
@@ -36,7 +38,11 @@ class InvariantsTest {
                 // обычно в пределах бюджета, иногда сверх — чтобы проверялись оба пути
                 0 -> {
                     val third = s.balance / 3 + random.nextInt(0, 10)
-                    game.confirmPlan(s, random.nextInt(-2, third + 1), random.nextInt(0, third + 1), random.nextInt(0, third + 1)).okState()
+                    // Копилка в плане требует выбранной цели — так же, как на экране плана.
+                    // Копилка съедает меньше трети: иначе на покупки почти не остаётся
+                    // денег и проверка вырождается в поток отказов.
+                    val savings = if (s.activeGoalId == null) 0 else random.nextInt(0, third / 2 + 1)
+                    game.confirmPlan(s, random.nextInt(-2, third + 1), random.nextInt(0, third + 1), savings).okState()
                 }
                 1 -> game.buy(s, Fixtures.shop.random(random).id).okState()
                 2 -> game.selectGoal(s, Fixtures.goals.random(random).id).okState()

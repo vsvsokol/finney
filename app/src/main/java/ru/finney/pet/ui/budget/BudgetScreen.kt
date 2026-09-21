@@ -120,12 +120,14 @@ private fun PlanningContent(
             onChange = onWantsChange,
             canAdd = canAdd,
         )
+        // Без выбранной цели откладывать некуда: план с копилкой домен не примет,
+        // поэтому «+» здесь недоступен, а подпись объясняет почему.
         AmountRow(
             label = state.goalLabel?.let { "Копилка: $it" } ?: "Копилка",
-            hint = if (state.goalLabel == null) "цель пока не выбрана" else null,
+            hint = if (state.goalLabel == null) "сначала выбери цель" else null,
             value = state.savings,
             onChange = onSavingsChange,
-            canAdd = canAdd,
+            canAdd = canAdd && state.goalLabel != null,
         )
 
         Remainder(remainder = state.remainder)
@@ -235,6 +237,7 @@ private fun RejectionNote(rejection: Rejection) {
         is Rejection.InsufficientFunds -> "Не хватает ${rejection.shortage} финок."
         Rejection.InvalidAmount -> "Так не получится: суммы не могут быть меньше нуля."
         Rejection.PlanAlreadyConfirmed -> "План на этот период уже готов."
+        Rejection.NoActiveGoal -> "Выбери цель — тогда будет куда откладывать."
         else -> "Так пока нельзя."
     }
     Text(

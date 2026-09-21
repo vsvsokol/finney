@@ -50,6 +50,8 @@ class BudgetAndPurchaseTest {
 
     @Test
     fun `3 план больше бюджета не подтверждается, остаток считается`() {
+        // Цель нужна: копилка в плане списывается сразу, а откладывать без цели некуда.
+        val start = game.selectGoal(start, "bike").state()
         assertEquals(
             Rejection.PlanExceedsBudget(budget = 50, planned = 55),
             game.confirmPlan(start, needs = 30, wants = 20, savings = 5).reason(),

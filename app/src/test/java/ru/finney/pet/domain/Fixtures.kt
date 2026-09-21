@@ -122,7 +122,7 @@ fun Game.playPerfectPeriod(start: GameState): GameState {
         s = submitTask(s, it, Fixtures.success).submitted().state
     }
     s = coverNeeds(s)
-    s = deposit(s, 10).state()
+    // Отдельного пополнения нет: копилка в плане списывается при подтверждении.
     return closePeriod(s).state()
 }
 
