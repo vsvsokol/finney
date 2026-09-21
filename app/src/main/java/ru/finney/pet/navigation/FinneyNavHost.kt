@@ -15,6 +15,7 @@ import androidx.navigation.toRoute
 import ru.finney.pet.ui.budget.BudgetScreen
 import ru.finney.pet.ui.home.HomeScreen
 import ru.finney.pet.ui.onboarding.PetSetupScreen
+import ru.finney.pet.ui.period.PeriodResultScreen
 import ru.finney.pet.ui.pet.PetLabScreen
 
 /**
@@ -105,7 +106,10 @@ fun FinneyNavHost(
 
         composable<PeriodResultRoute> { entry ->
             val route = entry.toRoute<PeriodResultRoute>()
-            StubScreen("Итоги периода ${route.periodNumber}", "На главный" to { navController.popBackStack() })
+            PeriodResultScreen(
+                periodNumber = route.periodNumber,
+                onBack = { navController.popBackStack() },
+            )
         }
 
         composable<ProgressRoute> {

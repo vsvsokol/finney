@@ -97,7 +97,10 @@ class Game(
 
     // ---------- Чтение ----------
 
-    fun level(state: GameState): Int = Progression.level(state.points, economy)
+    fun level(state: GameState): Int = levelFor(state.points)
+
+    /** Уровень по произвольной сумме очков: нужен, чтобы сравнить уровень до и после периода. */
+    fun levelFor(points: Int): Int = Progression.level(points, economy)
 
     fun stage(state: GameState): Int = Progression.stage(level(state), economy)
 
