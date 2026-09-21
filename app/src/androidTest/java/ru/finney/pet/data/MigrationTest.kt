@@ -28,7 +28,7 @@ class MigrationTest {
 
     /** Профили, созданные до выбора питомца, остаются на [@Lix2w78]: до версии 2 рисовалась только она. */
     @Test
-    fun `миграция 1 - 2 сохраняет профиль и ставит [@Lix2w78]`() {
+    fun migration1To2KeepsProfileAndSetsZalina() {
         helper.createDatabase(dbName, 1).use { db ->
             db.execSQL(
                 "INSERT INTO profiles (id, petName, bodyColor, eyes, activeGoalId, isDemo, createdAt) " +

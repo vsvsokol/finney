@@ -204,7 +204,7 @@ fun ShopScreen(onBack: () -> Unit, viewModel: ShopViewModel = viewModel(factory 
 
 | Таблица | Ключ | Что хранит |
 |---|---|---|
-| `profiles` | `id` | имя питомца, цвет тела (`A/B/C`), глаза (`ROUND/OVAL/SLY`), активная цель, `isDemo`, дата создания |
+| `profiles` | `id` | имя питомца, персонаж (значения `PetCharacter`), цвет тела (`A/B/C`), глаза (`ROUND/OVAL/SLY`), активная цель, `isDemo`, дата создания |
 | `pet_state` | `profileId` | сытость, чистота, настроение |
 | `periods` | `profileId + number` | номер, стадия, фаза; план (бюджет и три направления) после подтверждения; итоги (факт, незапланированный доход, флаги, очки) после закрытия |
 | `ledger` | `id` | операции: тип, Δ баланса, Δ копилки, категория, товар, цель, задание, `unplanned`, время |
@@ -228,6 +228,17 @@ fun ShopScreen(onBack: () -> Unit, viewModel: ShopViewModel = viewModel(factory 
 
 **Меняешь entity — поднимаешь `version` в `FinneyDatabase` и пишешь миграцию.** Без неё Room
 при обновлении приложения упадёт, а удалять базу у экспертов нельзя.
+
+Каждая миграция проверяется тестом в `app/src/androidTest/.../data/MigrationTest.kt`:
+`MigrationTestHelper` поднимает настоящую базу предыдущей версии из `app/schemas/`.
+Имена методов в `androidTest` — camelCase без обратных кавычек: `minSdk = 26`, а DEX
+до версии 040 не принимает пробелы в именах методов, и тесты не соберутся вовсе.
+Описание теста — в KDoc над ним. CI это ловит шагом «Build instrumented tests».
+
+`BUILD SUCCESSFUL` у `connectedDebugAndroidTest` ещё не значит, что тесты выполнились:
+если устройство не приняло APK, движок тестов AGP пишет ошибку в лог, но сборку не валит.
+Смотреть отчёт `app/build/reports/androidTests/connected/debug/index.html` — там видно,
+сколько тестов на самом деле прошло.
 
 ### JSON: учебный контент
 

@@ -39,6 +39,12 @@ jobs:
         run: ./gradlew lintDebug --stacktrace
         continue-on-error: true
 
+      # Эмулятора в CI нет, но сборка ловит ошибки, из-за которых
+      # инструментальные тесты не доходят до устройства, — например имена
+      # методов с пробелами: DEX до версии 040 их не принимает.
+      - name: Build instrumented tests
+        run: ./gradlew assembleDebugAndroidTest --stacktrace
+
       - name: Build debug APK
         run: ./gradlew assembleDebug --stacktrace
 
