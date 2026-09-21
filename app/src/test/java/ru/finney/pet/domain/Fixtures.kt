@@ -22,7 +22,7 @@ import ru.finney.pet.domain.model.TaskTheme
 import ru.finney.pet.domain.tasks.TaskInput
 
 /**
- * Контент для тестов правил. Не зависит от assets: [@vsvsokol] меняет числа в JSON,
+ * Контент для тестов правил. Не зависит от assets: @vsvsokol меняет числа в JSON,
  * а тесты правил от этого не краснеют. Реальный контент проверяет ContentTest.
  */
 object Fixtures {

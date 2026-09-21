@@ -63,7 +63,7 @@ import ru.finney.pet.ui.theme.FinneyYellow
 /**
  * Подписи питомцев для игрока. В домене они названы по автору рисунка
  * (design/exports/pet) — ребёнку такое имя ничего не говорит. Здесь заглушки:
- * настоящие имена придумывает [@vsvsokol] вместе с текстами знакомства.
+ * настоящие имена придумывает @vsvsokol вместе с текстами знакомства.
  */
 private val CharacterLabels = mapOf(
     PetCharacter.PUSHISTIK to "Пушистик",

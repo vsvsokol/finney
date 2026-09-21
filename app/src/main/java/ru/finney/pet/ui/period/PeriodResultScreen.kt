@@ -35,7 +35,7 @@ import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneyTheme
 import ru.finney.pet.ui.theme.FinneyYellow
 
-// Черновик под вёрстку [@zYafALL]: разметка простая, контракт ViewModel останется.
+// Черновик под вёрстку @zYafALL: разметка простая, контракт ViewModel останется.
 // Что показывать, решает PeriodResultViewModel — экран только раскладывает готовое.
 
 @Composable

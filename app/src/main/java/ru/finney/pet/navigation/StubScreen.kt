@@ -13,7 +13,7 @@ import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.theme.FinneyInk
 
 /**
- * Временный экран, чтобы граф был проходим целиком. [@zYafALL] заменяет вызов в FinneyNavHost
+ * Временный экран, чтобы граф был проходим целиком. @zYafALL заменяет вызов в FinneyNavHost
  * на настоящий экран; когда заглушек не останется — файл удалить.
  */
 @Composable

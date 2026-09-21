@@ -47,8 +47,8 @@ SIDE = 512
 STATES = ("happy", "sad", "dirty", "sleep")
 LIMBS = ("left_leg", "right_leg", "left_hand", "right_hand")
 
-# Имя питомца → суффикс файлов конечностей обычного размера. У [@Lix2w78] он пустой
-# (pushistik_left_hand.png), у [@lemonke68] размер указан явно (rogatik_left_hand_small.png).
+# Имя питомца → суффикс файлов конечностей обычного размера. У Пушистика он пустой
+# (pushistik_left_hand.png), у Рогатика размер указан явно (rogatik_left_hand_small.png).
 PETS = {"pushistik": "", "rogatik": "_small", "zvezdochka": "", "bantik": "", "luchik": ""}
 
 

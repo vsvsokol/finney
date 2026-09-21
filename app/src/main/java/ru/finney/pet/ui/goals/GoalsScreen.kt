@@ -37,7 +37,7 @@ import ru.finney.pet.ui.theme.FinneySand
 import ru.finney.pet.ui.theme.FinneyTheme
 import ru.finney.pet.ui.theme.FinneyYellow
 
-// Черновик под вёрстку [@zYafALL]. Шаг сумм тот же, что на экране плана.
+// Черновик под вёрстку @zYafALL. Шаг сумм тот же, что на экране плана.
 private const val STEP = 5
 
 @Composable
@@ -173,7 +173,7 @@ private fun InfoRow(label: String, value: String) {
     }
 }
 
-/** Тексты временные, до `feedback.json` [@vsvsokol] — как на экране плана. */
+/** Тексты временные, до `feedback.json` @vsvsokol — как на экране плана. */
 @Composable
 private fun RejectionNote(rejection: Rejection) {
     val text = when (rejection) {

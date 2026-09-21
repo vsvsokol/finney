@@ -223,7 +223,7 @@ private fun Remainder(remainder: Int) {
     }
 }
 
-/** Отказ домена, переведённый на детский язык. Тексты потом заменит feedback.json [@vsvsokol]. */
+/** Отказ домена, переведённый на детский язык. Тексты потом заменит feedback.json @vsvsokol. */
 @Composable
 private fun RejectionNote(rejection: Rejection) {
     val text = when (rejection) {

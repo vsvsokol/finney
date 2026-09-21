@@ -4,13 +4,13 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import androidx.room.migration.Migration
-import androidx.sqlite.db.SupportSQLiteDatabase
-import ru.finney.pet.domain.model.PetCharacter
 
 /**
  * Схема каждой версии экспортируется в app/schemas и коммитится.
- * Меняешь entity — поднимаешь [version] и пишешь миграцию: у экспертов не должен пропасть прогресс.
+ *
+ * Миграций нет: версия 3 переименовала питомцев, а перенести старые значения было бы
+ * возможно только храня прежние имена прямо в коде. База пересоздаётся с нуля —
+ * обычный перезапуск прогресс сохраняет, а установка новой сборки поверх старой его стирает.
  */
 @Database(
     entities = [
@@ -20,7 +20,7 @@ import ru.finney.pet.domain.model.PetCharacter
         LedgerEntryEntity::class,
         TaskAttemptEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class FinneyDatabase : RoomDatabase() {
@@ -30,22 +30,9 @@ abstract class FinneyDatabase : RoomDatabase() {
     companion object {
         const val NAME = "finney.db"
 
-        /**
-         * Выбор питомца (ТЗ п. 2.5.2). У кого профиль создан до выбора — [@Lix2w78]:
-         * до этой версии рисовалась только она.
-         */
-        val MIGRATION_1_2 = object : Migration(1, 2) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL(
-                    "ALTER TABLE profiles ADD COLUMN petCharacter TEXT NOT NULL " +
-                        "DEFAULT '${PetCharacter.PUSHISTIK.name}'",
-                )
-            }
-        }
-
         fun create(context: Context): FinneyDatabase =
             Room.databaseBuilder(context.applicationContext, FinneyDatabase::class.java, NAME)
-                .addMigrations(MIGRATION_1_2)
+                .fallbackToDestructiveMigration(dropAllTables = true)
                 .build()
     }
 }
