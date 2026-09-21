@@ -29,6 +29,7 @@ import ru.finney.pet.domain.model.PeriodFacts
 import ru.finney.pet.domain.model.Plan
 import ru.finney.pet.ui.components.CoinAmount
 import ru.finney.pet.ui.components.FinneyButton
+import ru.finney.pet.ui.components.FinneyCard
 import ru.finney.pet.ui.components.FinneyIconButton
 import ru.finney.pet.ui.components.FinneyPanel
 import ru.finney.pet.ui.components.FinneyScreen
@@ -38,6 +39,8 @@ import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneyPink
 import ru.finney.pet.ui.theme.FinneySand
 import ru.finney.pet.ui.theme.FinneyTheme
+import ru.finney.pet.ui.theme.RadiusCard
+import ru.finney.pet.ui.theme.StrokeRegular
 import ru.finney.pet.ui.theme.FinneyYellow
 
 // Экран плана (ТЗ п. 2.5.5). Суммы набираются кнопками «плюс» и «минус», а не
@@ -158,15 +161,7 @@ private fun AmountRow(
     onChange: (Int) -> Unit,
     canAdd: Boolean,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(FinneySand)
-            .border(2.dp, FinneyInk, RoundedCornerShape(20.dp))
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
+    FinneyCard {
         Text(label, style = MaterialTheme.typography.titleMedium, color = FinneyInk)
         hint?.let {
             Text(it, style = MaterialTheme.typography.bodyMedium, color = FinneyInk)
@@ -211,9 +206,9 @@ private fun Remainder(remainder: Int) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(RadiusCard))
             .background(if (over) FinneyPink else FinneyGreen)
-            .border(3.dp, FinneyInk, RoundedCornerShape(20.dp))
+            .border(StrokeRegular, FinneyInk, RoundedCornerShape(RadiusCard))
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -246,9 +241,9 @@ private fun RejectionNote(rejection: Rejection) {
         color = FinneyInk,
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(RadiusCard))
             .background(FinneyPink)
-            .border(2.dp, FinneyInk, RoundedCornerShape(16.dp))
+            .border(StrokeRegular, FinneyInk, RoundedCornerShape(RadiusCard))
             .padding(12.dp),
     )
 }
@@ -283,9 +278,9 @@ private fun ActiveContent(state: BudgetUiState.Active, onBack: () -> Unit) {
             color = FinneyInk,
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(20.dp))
+                .clip(RoundedCornerShape(RadiusCard))
                 .background(if (report.onTrack) FinneyGreen else FinneyYellow)
-                .border(3.dp, FinneyInk, RoundedCornerShape(20.dp))
+                .border(StrokeRegular, FinneyInk, RoundedCornerShape(RadiusCard))
                 .padding(14.dp),
             textAlign = TextAlign.Center,
         )
@@ -315,7 +310,7 @@ private fun FactRow(label: String, fact: Int, planned: Int) {
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFFFDF0D5)
+@Preview(showBackground = true, backgroundColor = 0xFFFFEDCD)
 @Composable
 private fun PlanningContentPreview() {
     FinneyTheme {
@@ -329,7 +324,7 @@ private fun PlanningContentPreview() {
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFFFDF0D5)
+@Preview(showBackground = true, backgroundColor = 0xFFFFEDCD)
 @Composable
 private fun ActiveContentPreview() {
     FinneyTheme {

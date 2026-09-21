@@ -40,6 +40,7 @@ import ru.finney.pet.domain.model.EyesVariant
 import ru.finney.pet.domain.model.PetCharacter
 import ru.finney.pet.domain.profile.PetNameError
 import ru.finney.pet.ui.components.FinneyButton
+import ru.finney.pet.ui.components.FinneyTextField
 import ru.finney.pet.ui.components.FinneyScreen
 import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.pet.PetMood
@@ -54,6 +55,9 @@ import ru.finney.pet.ui.theme.FinneyPeach
 import ru.finney.pet.ui.theme.FinneyPink
 import ru.finney.pet.ui.theme.FinneySand
 import ru.finney.pet.ui.theme.FinneyTheme
+import ru.finney.pet.ui.theme.RadiusCard
+import ru.finney.pet.ui.theme.StrokeBold
+import ru.finney.pet.ui.theme.StrokeThin
 import ru.finney.pet.ui.theme.FinneyYellow
 
 /**
@@ -201,38 +205,19 @@ private fun NameField(
     enabled: Boolean,
     onNameChange: (String) -> Unit,
 ) {
-    OutlinedTextField(
+    // Ошибка — и словом, и цветом рамки: цвет не единственный признак (ТЗ п. 3.6).
+    val message = when (error) {
+        PetNameError.BLANK -> "Впиши имя"
+        PetNameError.TOO_LONG -> "Не длиннее $maxLength букв"
+        null -> null
+    }
+    FinneyTextField(
         value = name,
         onValueChange = onNameChange,
-        placeholder = { Text("Например, Финни", style = MaterialTheme.typography.bodyLarge) },
+        placeholder = "Например, Финни",
         isError = error != null,
-        supportingText = {
-            // Ошибка — не только красной рамкой: текстом сказано, что именно не так (ТЗ п. 3.6).
-            when (error) {
-                PetNameError.BLANK -> Text("Придумай имя", style = MaterialTheme.typography.bodyMedium)
-                PetNameError.TOO_LONG -> Text(
-                    "Не длиннее $maxLength букв",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                null -> Unit
-            }
-        },
-        textStyle = MaterialTheme.typography.bodyLarge,
-        singleLine = true,
+        supportingText = message,
         enabled = enabled,
-        shape = RoundedCornerShape(20.dp),
-        colors = TextFieldDefaults.colors(
-            focusedContainerColor = FinneySand,
-            unfocusedContainerColor = FinneySand,
-            disabledContainerColor = FinneySand,
-            errorContainerColor = FinneySand,
-            focusedIndicatorColor = FinneyInk,
-            unfocusedIndicatorColor = FinneyInk,
-            errorIndicatorColor = FinneyPink,
-            focusedTextColor = FinneyInk,
-            unfocusedTextColor = FinneyInk,
-        ),
-        modifier = Modifier.fillMaxWidth(),
     )
 }
 
@@ -294,14 +279,14 @@ private fun CharacterCard(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
-            .clip(RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(RadiusCard))
             // Выбранная карточка отличается и заливкой, и толщиной рамки,
             // а не одним цветом (ТЗ п. 3.6).
             .background(if (isSelected) FinneyYellow else FinneySand)
             .border(
-                width = if (isSelected) 4.dp else 2.dp,
+                width = if (isSelected) StrokeBold else StrokeThin,
                 color = FinneyInk,
-                shape = RoundedCornerShape(24.dp),
+                shape = RoundedCornerShape(RadiusCard),
             )
             .selectable(
                 selected = isSelected,
@@ -352,7 +337,7 @@ private fun ColorSwatch(
             .size(64.dp)
             .clip(CircleShape)
             .background(color)
-            .border(if (selected) 5.dp else 2.dp, FinneyInk, CircleShape)
+            .border(if (selected) StrokeBold else StrokeThin, FinneyInk, CircleShape)
             .selectable(
                 selected = selected,
                 enabled = enabled,
@@ -383,7 +368,7 @@ private fun ChoiceChip(
             .clip(RoundedCornerShape(percent = 50))
             .background(if (selected) FinneyYellow else FinneySand)
             .border(
-                width = if (selected) 4.dp else 2.dp,
+                width = if (selected) StrokeBold else StrokeThin,
                 color = FinneyInk,
                 shape = RoundedCornerShape(percent = 50),
             )
@@ -405,7 +390,7 @@ private fun ChoiceChip(
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFFFDF0D5)
+@Preview(showBackground = true, backgroundColor = 0xFFFFEDCD)
 @Composable
 private fun PetSetupContentPreview() {
     FinneyTheme {
