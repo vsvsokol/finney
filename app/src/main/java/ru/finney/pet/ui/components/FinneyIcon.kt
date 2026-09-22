@@ -10,7 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -102,134 +102,119 @@ fun FinneyIcon(
     }
 }
 
-// Лампа: трапеция абажура, ножка и основание — как в эталоне.
+// Четыре значка ниже перерисованы по кадру кита: буквально по маске синих
+// пикселей внутри кнопок ряда «нормальное состояние». Прежние были нарисованы
+// по памяти и рядом с эталоном читались как другой набор — тоньше, мельче
+// и в других пропорциях.
+//
+// Общее у всех четырёх: рисунок занимает почти весь квадрат (в ките он лежит
+// на 0.27..0.80 кнопки, а сам значок — половина её ширины), формы плотные,
+// линии толстые. Тонких штрихов в ките нет вовсе.
+
+// Торшер: широкий абажур, короткая ножка, узкое основание.
+// В ките абажур втрое выше ножки — раньше было наоборот.
 private fun DrawScope.drawLamp(tint: Color) {
     val s = size.minDimension
     val shade = Path().apply {
-        moveTo(s * 0.30f, s * 0.52f)
-        lineTo(s * 0.70f, s * 0.52f)
-        lineTo(s * 0.60f, s * 0.22f)
-        lineTo(s * 0.40f, s * 0.22f)
+        moveTo(s * 0.28f, s * 0.04f)
+        lineTo(s * 0.72f, s * 0.04f)
+        lineTo(s * 0.93f, s * 0.66f)
+        lineTo(s * 0.07f, s * 0.66f)
         close()
     }
     drawPath(shade, tint)
-    drawRect(tint, Offset(s * 0.465f, s * 0.52f), Size(s * 0.07f, s * 0.22f))
-    drawRoundRectSolid(tint, s * 0.32f, s * 0.74f, s * 0.36f, s * 0.07f)
+    drawRect(tint, Offset(s * 0.43f, s * 0.66f), Size(s * 0.14f, s * 0.16f))
+    drawRoundRectSolid(tint, s * 0.28f, s * 0.80f, s * 0.44f, s * 0.16f)
 }
 
-// Вилка и нож.
+// Вилка и нож. В ките это две плотные фигуры, а не штрихи: у вилки три толстых
+// зубца на широкой голове, у ножа клинок со скруглённым верхом и своя ручка.
 private fun DrawScope.drawFood(tint: Color) {
     val s = size.minDimension
-    val stroke = s * 0.075f
 
-    // Вилка: три зубца и ножка.
     for (i in 0..2) {
-        val x = s * 0.24f + i * s * 0.085f
-        drawLine(tint, Offset(x, s * 0.18f), Offset(x, s * 0.40f), stroke, StrokeCap.Round)
+        val x = s * (0.15f + i * 0.15f)
+        drawLine(tint, Offset(x, s * 0.06f), Offset(x, s * 0.30f), s * 0.10f, StrokeCap.Round)
     }
-    drawLine(
-        tint,
-        Offset(s * 0.24f, s * 0.40f),
-        Offset(s * 0.41f, s * 0.40f),
-        stroke,
-        StrokeCap.Round,
-    )
-    drawLine(
-        tint,
-        Offset(s * 0.325f, s * 0.40f),
-        Offset(s * 0.325f, s * 0.82f),
-        stroke * 1.2f,
-        StrokeCap.Round,
-    )
+    drawRoundRectSolid(tint, s * 0.10f, s * 0.22f, s * 0.40f, s * 0.22f, radius = s * 0.10f)
+    drawRoundRectSolid(tint, s * 0.22f, s * 0.38f, s * 0.16f, s * 0.60f, radius = s * 0.08f)
 
-    // Нож: лезвие каплей и ручка.
     val blade = Path().apply {
-        moveTo(s * 0.68f, s * 0.18f)
-        quadraticTo(s * 0.80f, s * 0.34f, s * 0.71f, s * 0.52f)
-        lineTo(s * 0.64f, s * 0.52f)
-        lineTo(s * 0.64f, s * 0.24f)
-        close()
+        addRoundRect(
+            RoundRect(
+                left = s * 0.58f,
+                top = s * 0.04f,
+                right = s * 0.90f,
+                bottom = s * 0.56f,
+                // Скруглён только левый верхний угол: правая кромка клинка
+                // в ките прямая, и без этого фигура читается как ложка.
+                topLeftCornerRadius = CornerRadius(s * 0.30f),
+                topRightCornerRadius = CornerRadius(s * 0.06f),
+                bottomRightCornerRadius = CornerRadius.Zero,
+                bottomLeftCornerRadius = CornerRadius(s * 0.12f),
+            ),
+        )
     }
     drawPath(blade, tint)
-    drawLine(
-        tint,
-        Offset(s * 0.675f, s * 0.52f),
-        Offset(s * 0.675f, s * 0.82f),
-        stroke * 1.2f,
-        StrokeCap.Round,
-    )
+    drawRoundRectSolid(tint, s * 0.68f, s * 0.44f, s * 0.18f, s * 0.54f, radius = s * 0.09f)
 }
 
-// Ванна: чаша, ножки и кран.
+// Ванна: чаша с плоским верхом и скруглённым дном, кран-крюк слева, две ножки.
 private fun DrawScope.drawBath(tint: Color) {
     val s = size.minDimension
-    val stroke = s * 0.075f
 
-    // Кран сверху слева.
-    drawArc(
-        color = tint,
-        startAngle = 180f,
-        sweepAngle = 180f,
-        useCenter = false,
-        topLeft = Offset(s * 0.26f, s * 0.20f),
-        size = Size(s * 0.20f, s * 0.20f),
-        style = Stroke(width = stroke, cap = StrokeCap.Round),
-    )
-    drawLine(
-        tint,
-        Offset(s * 0.46f, s * 0.30f),
-        Offset(s * 0.46f, s * 0.44f),
-        stroke,
-        StrokeCap.Round,
-    )
-
-    // Чаша — полукруг со срезанным верхом.
-    val bowl = Path().apply {
-        addRect(Rect(Offset(s * 0.16f, s * 0.48f), Size(s * 0.68f, s * 0.26f)))
+    // Кран поднимается от левого края чаши и загибается над ней вправо.
+    val tap = Path().apply {
+        moveTo(s * 0.22f, s * 0.46f)
+        lineTo(s * 0.22f, s * 0.20f)
+        quadraticTo(s * 0.22f, s * 0.06f, s * 0.37f, s * 0.06f)
+        quadraticTo(s * 0.50f, s * 0.06f, s * 0.50f, s * 0.20f)
     }
-    val round = Path().apply {
-        addOval(Rect(Offset(s * 0.16f, s * 0.30f), Size(s * 0.68f, s * 0.62f)))
-    }
-    drawPath(Path().apply { op(bowl, round, PathOperation.Intersect) }, tint)
+    drawPath(tap, tint, style = Stroke(width = s * 0.13f, cap = StrokeCap.Round))
 
-    // Ножки.
-    drawRect(tint, Offset(s * 0.26f, s * 0.74f), Size(s * 0.06f, s * 0.10f))
-    drawRect(tint, Offset(s * 0.68f, s * 0.74f), Size(s * 0.06f, s * 0.10f))
+    val tub = Path().apply {
+        addRoundRect(
+            RoundRect(
+                left = s * 0.02f,
+                top = s * 0.45f,
+                right = s * 0.98f,
+                bottom = s * 0.82f,
+                topLeftCornerRadius = CornerRadius(s * 0.05f),
+                topRightCornerRadius = CornerRadius(s * 0.05f),
+                bottomRightCornerRadius = CornerRadius(s * 0.26f),
+                bottomLeftCornerRadius = CornerRadius(s * 0.26f),
+            ),
+        )
+    }
+    drawPath(tub, tint)
+
+    drawRect(tint, Offset(s * 0.24f, s * 0.78f), Size(s * 0.08f, s * 0.22f))
+    drawRect(tint, Offset(s * 0.68f, s * 0.78f), Size(s * 0.08f, s * 0.22f))
 }
 
-// Тележка: корзина, ручка и два колеса.
+// Тележка: наклонная ручка слева, корзина-трапеция, два колеса.
 private fun DrawScope.drawCart(tint: Color) {
     val s = size.minDimension
-    val stroke = s * 0.085f
 
-    // Ручка.
     drawLine(
         tint,
-        Offset(s * 0.14f, s * 0.22f),
-        Offset(s * 0.30f, s * 0.22f),
-        stroke,
+        Offset(s * 0.05f, s * 0.10f),
+        Offset(s * 0.24f, s * 0.32f),
+        s * 0.13f,
         StrokeCap.Round,
     )
 
-    // Корзина — трапеция.
     val basket = Path().apply {
-        moveTo(s * 0.28f, s * 0.30f)
-        lineTo(s * 0.88f, s * 0.30f)
-        lineTo(s * 0.76f, s * 0.60f)
-        lineTo(s * 0.38f, s * 0.60f)
+        moveTo(s * 0.16f, s * 0.30f)
+        lineTo(s * 0.98f, s * 0.30f)
+        lineTo(s * 0.84f, s * 0.74f)
+        lineTo(s * 0.28f, s * 0.74f)
         close()
     }
     drawPath(basket, tint)
-    drawLine(
-        tint,
-        Offset(s * 0.28f, s * 0.24f),
-        Offset(s * 0.40f, s * 0.62f),
-        stroke,
-        StrokeCap.Round,
-    )
 
-    drawCircle(tint, s * 0.075f, Offset(s * 0.46f, s * 0.76f))
-    drawCircle(tint, s * 0.075f, Offset(s * 0.70f, s * 0.76f))
+    drawCircle(tint, s * 0.10f, Offset(s * 0.33f, s * 0.89f))
+    drawCircle(tint, s * 0.10f, Offset(s * 0.74f, s * 0.89f))
 }
 
 // Динамик: квадрат с раструбом и две дуги звука.
@@ -310,7 +295,7 @@ private fun DrawScope.drawPiggy(tint: Color) {
     }
     val slot = Path().apply {
         addRoundRect(
-            androidx.compose.ui.geometry.RoundRect(
+            RoundRect(
                 left = s * 0.38f,
                 top = s * 0.48f,
                 right = s * 0.62f,

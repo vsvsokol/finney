@@ -97,23 +97,37 @@ fun CoinAmount(
     }
 }
 
-/** Уровень игрока — жёлтый кружок с цифрой, как в макете. */
+/**
+ * Уровень игрока — жёлтый кружок с цифрой, как в макете.
+ *
+ * [progress] — сколько пройдено до следующего уровня, 0..1. В ките вокруг
+ * значка нарисована ровно такая же дуга, как у кнопок потребностей, — это
+ * один и тот же [ProgressRing]. null — дуги нет: место под неё остаётся,
+ * чтобы значок не прыгал по размеру.
+ */
 @Composable
-fun LevelBadge(level: Int, modifier: Modifier = Modifier, size: Dp = 64.dp) {
-    Box(
-        modifier = modifier
-            .size(size)
-            .clip(CircleShape)
-            .background(FinneyYellow)
-            .border(size * FinneyStrokeRatio, FinneyInk, CircleShape)
-            .clearAndSetSemantics { contentDescription = "Уровень $level" },
-        contentAlignment = Alignment.Center,
-    ) {
-        OutlinedText(
-            text = level.toString(),
-            style = MaterialTheme.typography.headlineMedium,
-            textAlign = TextAlign.Center,
-        )
+fun LevelBadge(
+    level: Int,
+    modifier: Modifier = Modifier,
+    size: Dp = 64.dp,
+    progress: Float? = null,
+) {
+    ProgressRing(diameter = size, progress = progress, modifier = modifier) {
+        Box(
+            modifier = Modifier
+                .size(size)
+                .clip(CircleShape)
+                .background(FinneyYellow)
+                .border(size * FinneyStrokeRatio, FinneyInk, CircleShape)
+                .clearAndSetSemantics { contentDescription = "Уровень $level" },
+            contentAlignment = Alignment.Center,
+        ) {
+            OutlinedText(
+                text = level.toString(),
+                style = MaterialTheme.typography.headlineMedium,
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }
 
@@ -126,7 +140,7 @@ private fun MoneyPreview() {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             CoinAmount(amount = 120)
-            LevelBadge(level = 1)
+            LevelBadge(level = 1, progress = 0.6f)
         }
     }
 }

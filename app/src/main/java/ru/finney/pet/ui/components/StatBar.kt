@@ -54,15 +54,6 @@ private val OutlineWidth = StrokeRegular
 private const val LOW = 50
 
 /**
- * Высота лежачей капсулы в [StatPill].
- *
- * 26, а не 18: при 18 на обводку уходило по 3 сверху и снизу, внутри оставалось
- * 12, и заполнение, обрезанное капсулой, вырождалось в незаметную полоску —
- * на устройстве шкала читалась как пустая.
- */
-private val PillHeight = 26.dp
-
-/**
  * Вертикальная шкала 0..100.
  *
  * [label] — что за шкала: «сытость», «чистота», «настроение». Она же подпись
@@ -115,69 +106,9 @@ fun StatBar(
     }
 }
 
-/**
- * Компактная шкала: лежачая капсула со значком слева.
- *
- * Для главного экрана, где место занимает питомец, а не приборы. Три вертикальные
- * шкалы с подписями читались как панель управления и спорили с питомцем за
- * внимание; здесь то же самое умещается в узкую полосу над сценой.
- *
- * [icon] — значок вместо подписи: на главном экране роль шкалы понятна
- * по нему, а полное название уходит в TalkBack. По ТЗ п. 3.6 цвет остаётся
- * не единственным признаком: при низком значении рядом со значком загорается «!».
- */
-@Composable
-fun StatPill(
-    label: String,
-    icon: FinneyIcons,
-    value: Int,
-    modifier: Modifier = Modifier,
-) {
-    val clamped = value.coerceIn(0, 100)
-    val fraction by animateFloatAsState(clamped / 100f, label = "stat")
-    val isLow = clamped < LOW
-
-    Row(
-        modifier = modifier.semantics {
-            contentDescription = "$label $clamped из 100" + if (isLow) ", мало" else ""
-        },
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        // Значок и «!» — тот самый не-цветовой признак: и значок, и восклицательный
-        // знак видно, даже если цвета не различаются.
-        FinneyIcon(icon, size = 20.dp)
-        if (isLow) {
-            Text(
-                text = "!",
-                style = MaterialTheme.typography.labelLarge,
-                color = FinneyInk,
-            )
-        }
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .height(PillHeight)
-                .clip(CircleShape)
-                .background(FinneyYellow)
-                .border(OutlineWidth, FinneyInk, CircleShape)
-                // Отступ на обводку задаётся контейнеру: если навесить его на
-                // само заполнение, padding сначала срежет доступную ширину,
-                // и fillMaxWidth(fraction) посчитает долю уже от неё — полоса
-                // схлопывалась в ноль и шкала выглядела пустой.
-                .padding(OutlineWidth),
-            contentAlignment = Alignment.CenterStart,
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(fraction)
-                    .fillMaxHeight()
-                    .clip(CircleShape)
-                    .background(if (isLow) FinneyPink else FinneyPeach),
-            )
-        }
-    }
-}
+// Лежачая капсула со значком (`StatPill`) отсюда убрана: она делалась под
+// полосу шкал над главным экраном, а по киту сытость и чистота живут кольцами
+// вокруг кнопок комнат (`FinneyNeedButton`). Других мест у неё не было.
 
 /**
  * Шкала счастья из эталона: вертикальная капсула с кружком-«лицом» у основания.

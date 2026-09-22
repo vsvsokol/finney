@@ -2,12 +2,20 @@ package ru.finney.pet.ui.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import android.content.pm.ApplicationInfo
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.remember
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -24,12 +32,10 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -46,7 +52,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -64,24 +70,46 @@ import ru.finney.pet.ui.components.FinneyButton
 import ru.finney.pet.ui.components.FinneyIcon
 import ru.finney.pet.ui.components.FinneyIconButton
 import ru.finney.pet.ui.components.FinneyIcons
-import ru.finney.pet.ui.components.FinneyScreen
 import ru.finney.pet.ui.components.LevelBadge
 import ru.finney.pet.ui.components.OutlinedText
-import ru.finney.pet.ui.components.StatPill
+import ru.finney.pet.ui.components.FinneyNeedButton
+import ru.finney.pet.ui.components.HappinessBar
 import ru.finney.pet.ui.pet.PetMood
 import ru.finney.pet.ui.pet.PetView
 import ru.finney.pet.ui.pet.rememberPoseProvider
 import ru.finney.pet.ui.pet.rememberPetAnimation
+import ru.finney.pet.ui.room.CareBlock
+import ru.finney.pet.ui.room.CareOption
+import ru.finney.pet.ui.room.CarePanel
+import ru.finney.pet.ui.room.RoomScene
+import ru.finney.pet.ui.room.RoomSpot
 import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneySand
 import ru.finney.pet.ui.theme.RadiusField
 import ru.finney.pet.ui.theme.StrokeThin
 import ru.finney.pet.ui.theme.FinneyTheme
 
-// Главный экран по каркасу 1:275: сверху деньги, уровень и служебные кнопки,
-// посередине питомец со шкалами, снизу ряд действий. Всё, что требует ТЗ п. 2.5.3,
-// видно сразу и без прокрутки: середина растягивается по остатку высоты,
-// поэтому на экране 640 dp ничего не срезается.
+// Главный экран по макету main_screen_layout: сверху деньги, уровень и «бургер»,
+// слева по центру шкала настроения, внизу три кнопки комнат. Больше в макете
+// на главном ничего нет — ни имени, ни номера периода, ни подсказки про нужное,
+// ни отдельных полос сытости и чистоты: эти две переехали в кольца кнопок.
+//
+// Две строки макет не предусматривает, а ТЗ п. 2.5.3 требует: копилка
+// и активное задание. Они стоят узкими плашками в кремовой полосе над комнатой,
+// где пустая стена, и ничего собой не закрывают. Расхождение с макетом
+// намеренное и записано в docs/requirements-matrix.md.
+//
+// Фоном лежит комната (ui/room). Предмет в ней ровно один, и его меняют те же
+// нижние кнопки: комната одна, а стол, ванна и пустой зал — её состояния.
+// Уход происходит там же, где живёт питомец, — ребёнок не уходит в меню, чтобы
+// покормить. Интерфейс плавает поверх комнаты отдельным пластом: у комнаты
+// обводка чёрная, у кита FinneyInk, и сливаться им не положено.
+
+/**
+ * На сколько шкала настроения заходит в поле экрана: от края остаётся 6 dp
+ * вместо общих 16. В макете она стоит почти вплотную к краю.
+ */
+private val HappinessEdgeShift: Dp = 10.dp
 
 @Composable
 fun HomeScreen(
@@ -126,6 +154,7 @@ fun HomeScreen(
             onOpenPetLab = onOpenPetLab,
             onOpenOnboarding = onOpenOnboarding,
             onClosePeriod = viewModel::closePeriod,
+            onBuy = viewModel::buy,
         )
     }
 }
@@ -144,10 +173,89 @@ private fun HomeContent(
     onOpenPetLab: () -> Unit,
     onOpenOnboarding: () -> Unit,
     onClosePeriod: () -> Unit,
+    onBuy: (itemId: String) -> Unit,
 ) {
     var menuOpen by rememberSaveable { mutableStateOf(false) }
 
-    FinneyScreen(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    // Отладочная сборка — та, что ставится как ru.finney.pet.debug. Флаг читается
+    // из манифеста, а не из BuildConfig: генерация BuildConfig в модуле выключена,
+    // а включать её — правка в build.gradle.kts, не в этой зоне.
+    val context = LocalContext.current
+    val isDebuggable = remember(context) {
+        context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
+    }
+
+    // Что стоит в комнате. Живёт на экране, а не в игре: это взгляд ребёнка на
+    // комнату, а не событие в правилах.
+    var spot by rememberSaveable { mutableStateOf(RoomSpot.LIVING) }
+
+    // Какая панель ухода открыта и что в ней выбрано. Выбор живёт на экране,
+    // а не в игре: пока не нажали «Купить», ничего не произошло.
+    var care by rememberSaveable { mutableStateOf<CareTarget?>(null) }
+    var picked by rememberSaveable { mutableStateOf<String?>(null) }
+
+    fun openCare(target: CareTarget) {
+        care = target
+        picked = null
+    }
+
+    // Кнопка внизу сначала показывает комнату, и только повторное нажатие
+    // открывает выбор: по макету её дело — «появляется стол», «появляется ванна».
+    // Ребёнок сперва видит, куда попал, и лишь потом тратит деньги.
+    fun goTo(next: RoomSpot, target: CareTarget) {
+        if (spot == next) openCare(target) else spot = next
+    }
+
+    // FinneyScreen тут не подходит: он заливает фон кремовым и сам растит колонку,
+    // а под интерфейсом должна быть видна комната. Свой корень — ровно поэтому,
+    // сам FinneyScreen не трогаем, на нём держатся пять других экранов.
+    Box(modifier = Modifier.fillMaxSize()) {
+
+        RoomScene(
+            spot = spot,
+            modifier = Modifier.fillMaxSize(),
+            onTapItem = {
+                when (spot) {
+                    RoomSpot.KITCHEN -> openCare(CareTarget.FOOD)
+                    RoomSpot.BATH -> openCare(CareTarget.BATH)
+                    // Зал пока пустой: свет и сон — отдельная работа после сдачи.
+                    RoomSpot.LIVING -> Unit
+                }
+            },
+        ) {
+            val animation = rememberPetAnimation()
+            // Нажатие — питомец подпрыгивает: это игра, а не меню. Черновик
+            // анимаций, который раньше открывался здесь же, ушёл на долгое
+            // нажатие и только в отладочной сборке — ребёнку он не нужен,
+            // а команде по-прежнему под рукой.
+            //
+            // Подсветку убираем: у питомца нет прямоугольной формы, и ripple
+            // лёг бы квадратом вокруг.
+            PetView(
+                character = state.appearance.character,
+                mood = state.emotion.toMood(),
+                pose = rememberPoseProvider(animation),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .combinedClickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClickLabel = "Погладить питомца",
+                        onLongClick = if (isDebuggable) onOpenPetLab else null,
+                        onLongClickLabel = if (isDebuggable) "Черновик анимаций" else null,
+                        onClick = animation::playJoy,
+                    ),
+            )
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .systemBarsPadding()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
 
         // ---------- Верх: деньги-магазин, уровень, меню ----------
         // Три слота в ряд: слева деньги, по центру уровень, справа «бургер».
@@ -165,7 +273,7 @@ private fun HomeContent(
                 MoneyButton(balance = state.balance, onClick = onOpenShop)
             }
 
-            LevelBadge(level = state.level, size = 56.dp)
+            LevelBadge(level = state.level, size = 56.dp, progress = state.levelProgress)
 
             Row(
                 modifier = Modifier.weight(1f),
@@ -206,73 +314,166 @@ private fun HomeContent(
             }
         }
 
-        // Шкалы — отдельной полосой над сценой, а не поверх неё: лёжа на питомце
-        // они перекрывали ему лицо, а подложки у них нет.
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            StatPill(label = "сытость", icon = FinneyIcons.Food, value = state.stats.satiety)
-            StatPill(label = "чистота", icon = FinneyIcons.Bath, value = state.stats.hygiene)
-            StatPill(label = "радость", icon = FinneyIcons.Star, value = state.stats.mood)
+        // Копилка и активное задание — то, чего макет на главном не предусмотрел,
+        // а ТЗ п. 2.5.3 требует видеть сразу. Обе плашки умещаются в одну строку
+        // и лежат в кремовой полосе над комнатой: строкой ниже начинается абажур
+        // лампы, и второй ряд его бы срезал. Сытость, чистота и настроение сюда
+        // не попадают — они переехали в кольца кнопок и в шкалу слева.
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            InfoChip(
+                icon = FinneyIcons.Piggy,
+                text = state.goal
+                    ?.let { "${it.goal.label}: ${it.saved} из ${it.goal.price}" }
+                    ?: "Копилка: ${state.totalSavings}",
+                action = "Копилка и цель",
+                onClick = onOpenGoals,
+                modifier = Modifier.weight(1f),
+            )
+
+            // Слово «задание» в плашку не влезает — его держит значок звезды
+            // и подпись для TalkBack.
+            state.nextTask?.let { task ->
+                InfoChip(
+                    icon = FinneyIcons.Star,
+                    text = task.title,
+                    action = "Задание: ${task.title}",
+                    onClick = { onOpenTask(task.id) },
+                    modifier = Modifier.weight(1f),
+                )
+            }
         }
 
-        // ---------- Середина: сцена питомца ----------
-        // Питомец занимает всю свободную высоту и стоит по центру. Он здесь главный,
-        // а не иллюстрация при показаниях приборов: шкалы и подпись уведены к краям
-        // сцены, чтобы не спорить с ним за внимание.
-        Box(
+        // ---------- Середина: сама комната ----------
+        // Дырка в колонке: сквозь неё видно питомца и обстановку, которые рисует
+        // RoomScene под интерфейсом. Нажатия проходят насквозь — пустой Box
+        // их не ловит.
+        //
+        // Единственное, что здесь лежит, — шкала настроения у левого края:
+        // в макете на этом месте подписано «тут только шкала настроения»,
+        // и нарисована она там узкой и длинной.
+        //
+        // Высота — доля свободного места, а не число: на 360 dp и на 412 dp
+        // середина экрана разная, и шкала должна тянуться вместе с ней. К низу
+        // не опускается: на 0.55 кружок-лицо заканчивается выше борта ванны.
+        //
+        // К краю шкала прижата сдвигом, а не своими отступами колонки: поля
+        // экрана в 16 dp нужны кнопкам и плашкам, а шкале они только мешали —
+        // она отъезжала к питомцу.
+        BoxWithConstraints(
             modifier = Modifier.fillMaxWidth().weight(1f),
-            contentAlignment = Alignment.Center,
+            contentAlignment = Alignment.TopStart,
         ) {
-            val animation = rememberPetAnimation()
-            // Питомец квадратный и рисуется от «земли», поэтому на всю ширину
-            // он вылезает за низ сцены и налезает на подпись. Ограничиваем по
-            // высоте: PetView сам держит пропорции внутри (ui/pet/ — зона @vsvsokol,
-            // трогаем только то, что отдаём ему снаружи).
-            // Нажатие на самого питомца открывает черновик анимаций — отдельная
-            // кнопка внизу под это больше не нужна. Подсветку убираем: у питомца
-            // нет прямоугольной формы, и ripple лёг бы квадратом вокруг него.
-            PetView(
-                character = state.appearance.character,
-                mood = state.emotion.toMood(),
-                pose = rememberPoseProvider(animation),
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClickLabel = "Анимации питомца",
-                        onClick = onOpenPetLab,
-                    ),
+            val barWidth = 36.dp
+            HappinessBar(
+                value = state.stats.mood,
+                // Кружок-лицо выступает под капсулой на ширину шкалы — вычитаем.
+                height = maxHeight * 0.55f - barWidth,
+                width = barWidth,
+                modifier = Modifier.offset(x = -HappinessEdgeShift),
             )
         }
 
-        // Имя и период — строкой под сценой. Раньше подпись лежала внутри сцены
-        // по нижнему краю и налезала питомцу на ноги.
-        Text(
-            text = "${state.petName} · период ${state.periodNumber}",
-            style = MaterialTheme.typography.titleMedium,
-            color = FinneyInk,
-        )
-
-        // Цель и подсказка — то, ради чего копят (ТЗ п. 2.5.3).
-        state.goal?.let { goal ->
-            InfoStrip(text = "${goal.goal.label}: ${goal.saved} из ${goal.goal.price}")
-        }
-        state.needsHint?.takeIf { it > 0 }?.let {
-            InfoStrip(text = "На нужное понадобится $it")
-        }
-
-        // ---------- Низ: действия ----------
-        // Кружки крупные и без подписей: ряд стал полосой действий, как в играх
-        // про питомцев, а не пятью пунктами меню. Название ушло в TalkBack.
+        // ---------- Низ: комнаты ----------
+        // Три кнопки из макета. Каждая переключает комнату, а кольцо вокруг
+        // показывает потребность, которую в этой комнате закрывают, — так они
+        // нарисованы в ките («опускание/поднятие шкал потребностей»).
+        //
+        // У зала кольца нет: отдельной шкалы сна в домене не существует,
+        // а рисовать пустое кольцо ради симметрии — врать про данные.
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
-            ActionButton(label = "Зал", icon = FinneyIcons.Lamp, onClick = onOpenGoals)
-            ActionButton(label = "Кухня", icon = FinneyIcons.Food, onClick = onOpenShop)
-            ActionButton(label = "Ванная", icon = FinneyIcons.Bath, onClick = onOpenProgress)
+            FinneyNeedButton(
+                icon = FinneyIcons.Lamp,
+                label = "Зал и сон",
+                onClick = { spot = RoomSpot.LIVING },
+                selected = spot == RoomSpot.LIVING,
+            )
+            FinneyNeedButton(
+                icon = FinneyIcons.Food,
+                label = "Покормить",
+                onClick = { goTo(RoomSpot.KITCHEN, CareTarget.FOOD) },
+                value = state.stats.satiety,
+                selected = spot == RoomSpot.KITCHEN,
+            )
+            FinneyNeedButton(
+                icon = FinneyIcons.Bath,
+                label = "Помыть",
+                onClick = { goTo(RoomSpot.BATH, CareTarget.BATH) },
+                value = state.stats.hygiene,
+                selected = spot == RoomSpot.BATH,
+            )
         }
 
+        }
+
+        // Панель ухода поверх всего: пока выбирают, комната остаётся видна,
+        // и понятно, к чему относится выбор.
+        //
+        // Под панелью — полупрозрачная подложка. Она и приглушает комнату,
+        // чтобы заголовок панели не наезжал на плашки, и ловит нажатия: без неё
+        // сквозь панель нажимались кнопки комнат, а нажатие мимо панели ничего
+        // не делало. Теперь мимо — это «закрыть».
+        care?.let { target ->
+            val previews = when (target) {
+                CareTarget.FOOD -> state.food
+                CareTarget.BATH -> state.care
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(FinneyInk.copy(alpha = 0.45f))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClickLabel = "Закрыть",
+                        onClick = { care = null; picked = null },
+                    )
+                    .systemBarsPadding()
+                    .padding(16.dp),
+                // Панель прижата к низу, а не по центру: её заголовок висит
+                // над рамкой и по центру попадал ровно на плашки копилки
+                // и задания. Заодно сверху остаётся видна комната — понятно,
+                // кого кормят.
+                contentAlignment = Alignment.BottomCenter,
+            ) {
+                CarePanel(
+                    // Нажатия по самой панели гасятся здесь: иначе попадание
+                    // между карточками уходило бы на подложку и закрывало панель.
+                    // Не clickable: это не кнопка, и TalkBack не должен звать её
+                    // нажимаемой.
+                    modifier = Modifier.pointerInput(Unit) { detectTapGestures { } },
+                    title = target.title,
+                    // До подтверждения плана домен покупку не пропустит
+                    // (Rejection.PlanNotConfirmed). Раньше кнопка «Купить»
+                    // при этом молча закрывала панель и ничего не делала.
+                    block = if (state.phase == PeriodPhase.ACTIVE) {
+                        null
+                    } else {
+                        CareBlock(
+                            reason = "Сначала распредели деньги в плане расходов — " +
+                                "после этого можно покупать",
+                            actionLabel = "К плану расходов",
+                            onAction = onOpenBudget,
+                        )
+                    },
+                    options = previews.map {
+                        CareOption(it.item, it, isSelected = it.item.id == picked)
+                    },
+                    onPick = { picked = it },
+                    onConfirm = { itemId ->
+                        onBuy(itemId)
+                        care = null
+                        picked = null
+                    },
+                    onDismiss = { care = null; picked = null },
+                )
+            }
+        }
     }
 }
 
@@ -392,37 +593,43 @@ private fun Modifier.moneyButtonFill(pressed: Boolean): Modifier = drawBehind {
 }
 
 /**
- * Кнопка нижнего ряда: крупный кружок со значком, без подписи.
+ * Плашка-кнопка с фактом: копилка, активное задание.
  *
- * Подпись убрана намеренно: пять кружков с текстом под каждым читались как меню
- * приложения. [label] никуда не делся — он уходит в TalkBack, так что действие
- * по-прежнему называется словами, а не только рисунком.
+ * Значок слева обязателен: по ТЗ п. 3.6 одним цветом ничего не сообщают,
+ * и плашки должны отличаться друг от друга не только словами. Высота — от
+ * 48 dp, потому что по плашке нажимают.
  *
- * Значки рисуются кодом ([FinneyIcon]): в эталоне они плоские и одного цвета
- * с обводкой, а стоявшие тут раньше эмодзи были многоцветными и выбивались.
+ * [action] — что произойдёт при нажатии; уходит в TalkBack вместо [text],
+ * который сам по себе действия не называет.
  */
 @Composable
-private fun ActionButton(label: String, icon: FinneyIcons, onClick: () -> Unit) {
-    FinneyIconButton(onClick = onClick, contentDescription = label, size = 64.dp) {
-        FinneyIcon(icon, size = 32.dp)
-    }
-}
-
-/** Узкая полоса с фактом: цель, подсказка. */
-@Composable
-private fun InfoStrip(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.bodyLarge,
-        color = FinneyInk,
-        textAlign = TextAlign.Center,
-        modifier = Modifier
-            .fillMaxWidth()
+private fun InfoChip(
+    icon: FinneyIcons,
+    text: String,
+    action: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
             .clip(RoundedCornerShape(RadiusField))
             .background(FinneySand)
             .border(StrokeThin, FinneyInk, RoundedCornerShape(RadiusField))
+            .clickable(onClickLabel = action, onClick = onClick)
+            .defaultMinSize(minHeight = 48.dp)
             .padding(horizontal = 12.dp, vertical = 8.dp),
-    )
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        FinneyIcon(icon, size = 22.dp)
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = FinneyInk,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
 }
 
 /**
@@ -448,6 +655,7 @@ private fun HomeContentPreview() {
                 stats = PetStats(30, 40, 50),
                 emotion = Emotion.CALM,
                 level = 1,
+                levelProgress = 0.4f,
                 stage = 1,
                 balance = 50,
                 totalSavings = 0,
@@ -456,10 +664,12 @@ private fun HomeContentPreview() {
                 phase = PeriodPhase.PLANNING,
                 needsHint = 40,
                 nextTask = null,
+                food = emptyList(),
+                care = emptyList(),
             ),
             onOpenBudget = {}, onOpenShop = {}, onOpenGoals = {}, onOpenTasks = {}, onOpenTask = {},
             onOpenProgress = {}, onOpenAdult = {}, onOpenHelp = {}, onOpenPetLab = {}, onOpenOnboarding = {},
-            onClosePeriod = {},
+            onClosePeriod = {}, onBuy = {},
         )
     }
 }

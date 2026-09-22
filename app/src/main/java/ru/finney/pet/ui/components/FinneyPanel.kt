@@ -3,7 +3,6 @@ package ru.finney.pet.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -27,17 +26,20 @@ import ru.finney.pet.ui.theme.StrokeBold
 // Так нарисованы «Условия», «История», «Магазин», «Настройки» — один компонент
 // на все диалоги и разделы.
 //
-// Ключевая деталь, снятая с эталона: заголовок **висит поверх верхнего края**,
-// а рамка под ним идёт **сплошной**. Раньше здесь была кремовая подложка,
-// разрывавшая рамку, — в макете разрыва нет, и панель читается как цельная
-// коробка с наклейкой сверху.
+// Заголовок стоит **над рамкой, с зазором**, а не на ней. В кадре кита рамка
+// проходит через середину букв, но на устройстве при кегле 28 это читалось
+// иначе: буквы садились нижним краем ровно на линию (замер — рамка на 0.92
+// высоты букв), и заголовок выглядел придавленным. Решено дать ему воздух снизу.
 //
-// Второе: текст внутри панели в эталоне **без контура**, цветом ink. Контур
-// только у заголовка. Не заворачивать содержимое в OutlinedText — надписи
-// станут нечитаемыми в мелком кегле.
+// Рамка по-прежнему **сплошная**: кремовой подложки, разрывающей линию,
+// здесь нет и не было.
+//
+// Текст внутри панели в эталоне **без контура**, цветом ink. Контур только
+// у заголовка. Не заворачивать содержимое в OutlinedText — надписи станут
+// нечитаемыми в мелком кегле.
 
 /**
- * Карточка с заголовком поверх рамки.
+ * Карточка с заголовком над рамкой.
  *
  * [onClose] — если задан, внизу появится кнопка «Закрыть»: во всех четырёх
  * панелях эталона она есть, и без неё диалог не закрыть с сенсорного экрана.
@@ -50,19 +52,21 @@ fun FinneyPanel(
     closeText: String = "Закрыть",
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    // Заголовок налезает на рамку примерно наполовину своей высоты. Отступ сверху
-    // отдан ему, поэтому содержимое панели начинается ниже и под него не подлезает.
-    val titleOverlap = 22.dp
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        // Отдельного зазора нет намеренно: у Glina межстрочный интервал крупнее
+        // обычного (см. Type.kt), и буквы занимают верхние 60% строки. Нижняя
+        // часть строки и есть зазор до рамки — около 13 dp, и он растёт вместе
+        // с кеглем, если в системе включён крупный шрифт. Постоянный отступ
+        // в dp при крупном шрифте снова посадил бы буквы на линию.
+        OutlinedText(title, style = MaterialTheme.typography.headlineMedium)
 
-    Box(modifier = modifier, contentAlignment = Alignment.TopCenter) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = titleOverlap)
                 .clip(RoundedCornerShape(RadiusPanel))
                 .background(FinneyCream)
                 .border(StrokeBold, FinneyInk, RoundedCornerShape(RadiusPanel))
-                .padding(start = 20.dp, end = 20.dp, top = titleOverlap + 8.dp, bottom = 20.dp),
+                .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             content()
@@ -76,11 +80,6 @@ fun FinneyPanel(
                 )
             }
         }
-
-        // Заголовок поверх всего: рисуется последним, поэтому ложится на рамку,
-        // а не под неё. Собственной подложки у него нет — контур и так отделяет
-        // буквы от линии рамки, как в эталоне.
-        OutlinedText(title, style = MaterialTheme.typography.headlineMedium)
     }
 }
 
