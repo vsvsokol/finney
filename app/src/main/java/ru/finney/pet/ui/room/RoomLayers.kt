@@ -15,11 +15,15 @@ import ru.finney.pet.R
 data class RelRect(val left: Float, val top: Float, val right: Float, val bottom: Float) {
     val width: Float get() = right - left
     val height: Float get() = bottom - top
+
+    fun shiftedX(dx: Float) = RelRect(left + dx, top, right + dx, bottom)
 }
 
 /** Слой комнаты: картинка и место, где она лежит на холсте. */
 @Immutable
-data class RoomLayer(@DrawableRes val image: Int, val rect: RelRect)
+data class RoomLayer(@DrawableRes val image: Int, val rect: RelRect) {
+    fun shiftedX(dx: Float) = copy(rect = rect.shiftedX(dx))
+}
 
 /**
  * Что сейчас стоит в комнате.
@@ -65,7 +69,8 @@ object Room {
     const val ROOM_AXIS_X = 0.508f
 
     /**
-     * Левее этой доли холста кадр не срезает: это левый борт ванны.
+     * Левее этой доли холста кадр не срезает: это левый борт ванны в экспорте
+     * (после [BATH_SHIFT] он правее, и слева от ванны виден кусок пола).
      *
      * Холст заполняет экран по высоте, и на телефонах от его ширины видно
      * 0.75–0.81 — по оси комнаты ([ROOM_AXIS_X]) слева не хватает места.
@@ -83,15 +88,31 @@ object Room {
      */
     const val FLOOR_TOP = 0.4383f
 
+    /**
+     * Насколько ванна с пеной стоит правее, чем в экспорте, — доля ширины холста.
+     *
+     * Питомец сидит в ванне, и в экспорте она стояла так далеко влево, что
+     * он оказывался заметно левее, чем в зале. Сдвиг — сколько позволяет
+     * правый край экрана: на самых узких телефонах видно до 0.81 холста, а
+     * пена справа доходит до 0.787. Сдвигается и модель ванны в Solids.Bath,
+     * иначе тень осталась бы на старом месте.
+     *
+     * Числа слоёв ниже — как их печатает pack_room.py, сдвиг добавляется
+     * к ним отдельно: после нового экспорта не забыть `.shiftedX(BATH_SHIFT)`.
+     */
+    const val BATH_SHIFT = 0.024f
+
     val Back = RoomLayer(R.drawable.room_back, RelRect(0.0000f, 0.0000f, 1.0000f, 1.0000f))
-    val WindowView = RoomLayer(R.drawable.room_window_view, RelRect(0.4278f, 0.0854f, 0.8806f, 0.3542f))
     val WindowUfo = RoomLayer(R.drawable.room_window_ufo, RelRect(0.4924f, 0.2525f, 0.5979f, 0.3017f))
     val WindowFrame = RoomLayer(R.drawable.room_window_frame, RelRect(0.3500f, 0.0312f, 0.9792f, 0.3675f))
     val Lamp = RoomLayer(R.drawable.room_lamp, RelRect(0.0326f, 0.0408f, 0.2729f, 0.5262f))
     val Table = RoomLayer(R.drawable.room_table, RelRect(0.0965f, 0.5975f, 0.7757f, 0.8087f))
-    val Bath = RoomLayer(R.drawable.room_bath, RelRect(0.0611f, 0.6192f, 0.7715f, 0.8433f))
-    val BathFoamBack = RoomLayer(R.drawable.room_bath_foam_back, RelRect(0.0972f, 0.5271f, 0.7069f, 0.6671f))
-    val BathFoamFront = RoomLayer(R.drawable.room_bath_foam_front, RelRect(0.4049f, 0.5754f, 0.7868f, 0.6587f))
+    val Bath = RoomLayer(R.drawable.room_bath, RelRect(0.0611f, 0.6192f, 0.7715f, 0.8433f)).shiftedX(BATH_SHIFT)
+    val BathFoamBack = RoomLayer(R.drawable.room_bath_foam_back, RelRect(0.0972f, 0.5271f, 0.7069f, 0.6671f)).shiftedX(BATH_SHIFT)
+    val BathFoamFront = RoomLayer(R.drawable.room_bath_foam_front, RelRect(0.4049f, 0.5754f, 0.7868f, 0.6587f)).shiftedX(BATH_SHIFT)
+
+    /** Полоса неба, стыкуется сама с собой; здесь — где она стоит, пока не сдвинулась. */
+    val WindowSky = RoomLayer(R.drawable.room_window_sky, RelRect(0.4583f, 0.0854f, 0.8611f, 0.3542f))
 
     /**
      * Сторона квадрата питомца — доля ширины холста.
@@ -128,11 +149,21 @@ object Room {
         RoomSpot.BATH -> 0.403f
     }
 
-    /** Середина питомца по горизонтали — доля ширины холста. */
+    /**
+     * Середина питомца по горизонтали — доля ширины холста.
+     *
+     * Питомец стоит как можно ближе к одному месту во всех комнатах, чтобы
+     * при переключении не скакал по экрану. В зале — на оси комнаты, а стол
+     * и ванна стоят левее, и там он встаёт настолько близко к оси, насколько
+     * позволяют их правые края: самый широкий силуэт (Рогатик, до 0.99
+     * квадрата) не должен вылезать за край стола (0.7757) и за борт ванны
+     * (0.7715 в экспорте). Проверено по пикселям всех пяти питомцев: 0.46
+     * уже выходит за борт. В ванне к этому добавляется её сдвиг [BATH_SHIFT].
+     */
     private fun petCentre(spot: RoomSpot): Float = when (spot) {
         RoomSpot.LIVING -> ROOM_AXIS_X
-        RoomSpot.KITCHEN -> 0.436f // середина стола: 0.0965..0.7757
-        RoomSpot.BATH -> 0.416f // середина чаши: 0.0611..0.7715
+        RoomSpot.KITCHEN -> 0.453f
+        RoomSpot.BATH -> 0.453f + BATH_SHIFT
     }
 
     /**

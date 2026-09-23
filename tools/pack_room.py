@@ -56,7 +56,6 @@ TARGET_WIDTH = 1080
 # питомец садится между ними, поэтому в именах back и front, а не 1 и 2.
 LAYERS = {
     "room_backrooms": "room_back",
-    "window_view": "room_window_view",
     "window_view_ufo": "room_window_ufo",
     "window_frame": "room_window_frame",
     "lamp": "room_lamp",
@@ -97,12 +96,53 @@ def pack(source: str, target: str) -> tuple[str, tuple[float, float, float, floa
     return target, rel, out.stat().st_size
 
 
+# Звёздное небо за окном медленно плывёт (RoomScene.kt, WindowSky), поэтому ему
+# нужна полоса, которая стыкуется сама с собой. window_view — не такая полоса:
+# это одна картинка с неровным рисованным краем. Но фон у неба ровный
+# (#261F46), и если резать по столбцам без звёзд, левый край полосы совпадает
+# с правым пиксель в пиксель — шва на стыке нет. Неровный край и прозрачные
+# углы заливаются тем же фоном: их всё равно закрывает рама.
+#
+# Столбцы подобраны по экспорту: звёзды занимают 693..1210, края полосы
+# отступают от них на 33 и 30 пикселей — примерно как звёзды друг от друга,
+# и на стыке не видно ни пустой полосы, ни тесноты.
+SKY_SOURCE = "window_view"
+SKY_TARGET = "room_window_sky"
+SKY_COLOR = (0x26, 0x1F, 0x46)
+SKY_COLUMNS = (660, 1240)
+
+
+def pack_sky() -> tuple[str, tuple[float, float, float, float], int]:
+    path = next(SRC.glob(f"{SKY_SOURCE}.[pP][nN][gG]"))
+    image = Image.open(path).convert("RGBA")
+    if image.size != CANVAS:
+        raise SystemExit(f"{path.name}: холст {image.size}, а слои комнаты ждут {CANVAS}")
+
+    top, bottom = image.getbbox()[1::2]
+    left, right = SKY_COLUMNS
+    strip = image.crop((left, top, right, bottom))
+    for x in (0, strip.width - 1):
+        column = [strip.getpixel((x, y)) for y in range(strip.height)]
+        if any(p[3] > ALPHA_FLOOR and p[:3] != SKY_COLOR for p in column):
+            raise SystemExit(f"{path.name}: на краю полосы неба ({left + x}) звезда — на стыке будет шов")
+
+    flat = Image.new("RGBA", strip.size, SKY_COLOR + (255,))
+    flat.alpha_composite(strip)
+    scale = TARGET_WIDTH / CANVAS[0]
+    flat = flat.convert("RGB").resize((round(strip.width * scale), round(strip.height * scale)), Image.LANCZOS)
+
+    out = RES / f"{SKY_TARGET}.webp"
+    flat.save(out, "WEBP", lossless=True, method=6)
+    rel = (left / CANVAS[0], top / CANVAS[1], right / CANVAS[0], bottom / CANVAS[1])
+    return SKY_TARGET, rel, out.stat().st_size
+
+
 def main() -> None:
     # Git Bash на Windows отдаёт stdout в cp1251, и кириллица в выводе бьётся.
     sys.stdout.reconfigure(encoding="utf-8")
 
     RES.mkdir(parents=True, exist_ok=True)
-    packed = [pack(source, target) for source, target in LAYERS.items()]
+    packed = [pack(source, target) for source, target in LAYERS.items()] + [pack_sky()]
 
     total_disk = sum(size for _, _, size in packed)
     print(f"Упаковано {len(packed)} слоёв, {total_disk // 1024} КБ на диске\n")
