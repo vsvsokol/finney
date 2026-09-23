@@ -34,10 +34,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -59,11 +65,21 @@ import kotlin.random.Random
 // Панели и кнопки плавают поверх и намеренно не сливаются с обстановкой.
 
 /** Как питомец стоит на полу: см. [Footing]. Ступни на 0.87 квадрата. Мебель — в [Solids]. */
-private val PetFooting = Footing(feetX = 0.5f, feetY = 0.87f, footprint = 0.45f)
+private val PetFooting = Footing(feetX = 0.5f, feetY = 0.87f)
 
 /** Сколько комната дышит: пена колышется в этих пределах от своего размера. */
 private const val FOAM_SWELL = 0.02f
 private const val FOAM_PERIOD_MS = 3400
+
+/**
+ * За сколько небо за окном сдвигается на ширину своей полосы (около 215 dp
+ * на телефоне), то есть примерно 2 dp в секунду. Быстрее — и небо уже
+ * «едет» и отвлекает, медленнее — движения не заметно вовсе.
+ */
+private const val SKY_LOOP_MS = 120_000
+
+/** Фон неба в экспорте, им же залиты края полосы. */
+private val SkyColor = Color(0xFF261F46)
 
 /**
  * Паузы между пролётами НЛО, мс. Первая короткая — чтобы ребёнок успел его
@@ -221,25 +237,55 @@ private fun Pet(
 }
 
 /**
- * Окно: вид, НЛО, рама.
+ * Окно: небо, НЛО, рама.
  *
- * Рама шире вида (0.350..0.979 против 0.428..0.881) и кладётся последней —
- * она перекрывает его края, и стык не виден. НЛО летит между ними, обрезанный
- * проёмом: за рамой ему делать нечего.
+ * Рама шире проёма (0.350..0.979 против 0.428..0.881) и кладётся последней —
+ * она перекрывает его края, и стык не виден. Небо и НЛО обрезаны проёмом:
+ * за рамой им делать нечего.
+ *
+ * Небо медленно плывёт влево — полоса [Room.WindowSky] повторяется встык и
+ * сдвигается на свою ширину за [SKY_LOOP_MS]. Камеры в комнате нет, поэтому
+ * движение идёт от времени. Края полосы — ровный фон неба (см. pack_room.py),
+ * так что на стыке шва нет, а в конце круга сдвиг ровно на ширину полосы,
+ * и перескок в начало не виден.
  *
  * Между пролётами НЛО не рисуется вовсе, а не ждёт за краем: раньше оно
  * стояло там всю паузу, и на экране торчал его обрезанный край.
  */
 @Composable
 private fun Window(canvasW: Dp, canvasH: Dp, ufo: UfoState) {
-    Layer(Room.WindowView, canvasW, canvasH)
-
     val hole = Room.WindowHole
+    val sky = ImageBitmap.imageResource(Room.WindowSky.image)
+    val drift by rememberInfiniteTransition(label = "sky").animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(SKY_LOOP_MS, easing = LinearEasing)),
+        label = "drift",
+    )
+
     Box(
         modifier = Modifier
             .offset(canvasW * hole.left, canvasH * hole.top)
             .requiredSize(canvasW * hole.width, canvasH * hole.height)
-            .clipToBounds(),
+            .clipToBounds()
+            // Сдвиг читается только на отрисовке: небо плывёт, не пересобирая окно.
+            .drawBehind {
+                drawRect(SkyColor)
+                val strip = Room.WindowSky.rect
+                val tileW = size.width * strip.width / hole.width
+                val tileH = size.height * strip.height / hole.height
+                val top = size.height * (strip.top - hole.top) / hole.height
+                var x = size.width * (strip.left - hole.left) / hole.width - drift * tileW
+                while (x > 0f) x -= tileW
+                // Сдвиг дробный, и полоса рисуется масштабом, а не в целых
+                // пикселях: иначе на такой скорости небо ползло бы рывками.
+                while (x < size.width) {
+                    translate(x, top) {
+                        scale(tileW / sky.width, tileH / sky.height, pivot = Offset.Zero) { drawImage(sky) }
+                    }
+                    x += tileW
+                }
+            },
     ) {
         LaunchedEffect(ufo) { ufo.fly() }
 

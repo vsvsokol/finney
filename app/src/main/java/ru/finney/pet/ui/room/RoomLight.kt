@@ -94,15 +94,23 @@ private const val LAMP_BREATH_MS = 3000
  */
 private const val SHADOW_DEPTH = 0.85f
 
-/** Размытие тени, доля высоты предмета: резкий край читался бы как вырезанная бумага. */
-private const val SHADOW_BLUR = 0.02f
+/**
+ * Размытие тени, доля высоты предмета: резкий край читался бы как вырезанная
+ * бумага. При 0.02 в четвертном разрешении край шёл ступеньками, а тени
+ * торшера и окна там, где ложатся друг на друга, выглядели двумя наклейками
+ * одна на другой. Мягкий край их сливает.
+ */
+private const val SHADOW_BLUR = 0.05f
 
 /**
- * Пятно у ступней: сюда не доходит даже рассеянный свет. Затемняет карту света,
- * а не красит пол, поэтому пол под ногами темнеет в своём же цвете.
+ * След мебели на полу: сюда не доходит даже рассеянный свет. Затемняет карту
+ * света, а не красит пол, поэтому пол под столом темнеет в своём же цвете.
+ *
+ * У питомца такого пятна нет: овал под ступнями читался как отдельный
+ * тёмный круг поверх настоящих теней, а ступни и так держат тени торшера
+ * и окна — обе начинаются от них.
  */
 private const val CONTACT_ALPHA = 0.35f
-private const val CONTACT_HEIGHT = 0.07f
 
 /**
  * Во сколько раз свет и тени мельче экрана.
@@ -140,10 +148,14 @@ private object Lighting {
     const val SHADE_Y = 0.092f
 
     /**
-     * Докуда достаёт свет торшера, доля ширины холста. Край задевает питомца
-     * в зале: слева он тёплый, справа холодный от окна, и объём читается.
+     * Докуда достаёт свет торшера, доля ширины холста.
+     *
+     * Ступни питомца в зале — в 0.99 ширины от шара. При 0.9 свет до них не
+     * доходил, и тени от торшера не было видно вовсе: тень — это свет,
+     * вырезанный из пола, а вырезать было нечего. Оставалась одна тень, от
+     * окна, и падала она влево, будто торшера в комнате нет.
      */
-    const val LAMP_REACH = 0.9f
+    const val LAMP_REACH = 1.5f
     const val BLOOM_RADIUS = 0.16f
 
     /** Круг света у подставки, сплющенный перспективой пола. От него же падают тени торшера. */
@@ -260,7 +272,6 @@ internal data class Glow(
 internal data class Footing(
     val feetX: Float,
     val feetY: Float,
-    val footprint: Float,
 )
 
 /**
@@ -618,10 +629,7 @@ private fun Path.addHull(points: List<Offset>, canvas: Size) {
     close()
 }
 
-/**
- * Затемнение карты света под предметом: пол темнеет, но остаётся своего цвета.
- * У мебели — весь её след на полу, у питомца — пятно у ступней.
- */
+/** Затемнение карты света под мебелью: пол темнеет, но остаётся своего цвета. */
 private fun DrawScope.drawContact(occluder: Occluder, canvas: Size) {
     val shown = occluder.visibility().coerceIn(0f, 1f)
     if (shown <= 0f) return
@@ -640,29 +648,6 @@ private fun DrawScope.drawContact(occluder: Occluder, canvas: Size) {
         return
     }
 
-    val footing = occluder.footing ?: return
-    scale(1f / LIGHT_SCALE, pivot = Offset.Zero) { drawFootContact(occluder.place, footing, canvas, shown) }
-}
-
-private fun DrawScope.drawFootContact(place: RelRect, footing: Footing, canvas: Size, shown: Float) {
-    val feet = Offset(
-        canvas.width * (place.left + place.width * footing.feetX),
-        canvas.height * (place.top + place.height * footing.feetY),
-    )
-    val radius = canvas.width * place.width * footing.footprint / 2f
-    val squash = canvas.height * place.height * CONTACT_HEIGHT / (radius * 2f)
-    scale(scaleX = 1f, scaleY = squash, pivot = feet) {
-        drawCircle(
-            Brush.radialGradient(
-                0f to Color.Black.copy(alpha = CONTACT_ALPHA * shown),
-                1f to Color.Transparent,
-                center = feet,
-                radius = radius,
-            ),
-            radius = radius,
-            center = feet,
-        )
-    }
 }
 
 /**

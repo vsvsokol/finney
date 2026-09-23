@@ -146,6 +146,7 @@ internal object Solids {
      *
      * Ножки встают на пол на 2010, передний борт посередине — 1590, дно
      * чаши — 1960, край к краю борт от 145 до 1075, дно от 360 до 870.
+     * Вся модель сдвинута вправо вместе с картинкой, на [Room.BATH_SHIFT].
      * Глубины ванны на картинке нет — она видна только спереди, поэтому
      * взята как у настоящей: вдвое меньше длины.
      */
@@ -156,7 +157,7 @@ internal object Solids {
         val rim = (feet - 1590f / 2400f) / k
         val bottom = (feet - 1960f / 2400f) / k
 
-        val centreX = (610f / 1440f - Room.ROOM_AXIS_X) * Room.CANVAS_RATIO / k
+        val centreX = (610f / 1440f + Room.BATH_SHIFT - Room.ROOM_AXIS_X) * Room.CANVAS_RATIO / k
         val rimLength = 465f / 1440f * Room.CANVAS_RATIO / k
         val bottomLength = 255f / 1440f * Room.CANVAS_RATIO / k
         // Глубина в долях z: половина длины, пересчитанная по расстоянию до
