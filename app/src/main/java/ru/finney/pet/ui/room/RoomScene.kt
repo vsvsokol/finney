@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
@@ -28,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.TransformOrigin
@@ -75,9 +77,9 @@ private val UfoPauseMs = 20_000L..45_000L
  * круглые формы поплыли бы и обводка порвалась. Раньше холст вписывался по
  * ширине, и сверху оставалась кремовая полоса почти в четверть экрана.
  *
- * По горизонтали кадр не по центру, а вокруг [Room.FOCUS_X]: слева торшер,
- * который понадобится для света, справа питомец на оси комнаты, а срезается
- * край занавески.
+ * По горизонтали кадр стоит на оси комнаты [Room.ROOM_AXIS_X], но не дальше
+ * [Room.FRAME_MIN_LEFT]: слева торшер, который понадобится для света, и ванна,
+ * а срезается край занавески.
  * Если экран шире холста (планшет), холст подгоняется по ширине и срезается
  * сверху — пол, стол и ванна нужны целиком, а верх стены пустой.
  *
@@ -99,14 +101,26 @@ fun RoomScene(
         val canvasW = maxOf(maxWidth, maxHeight * Room.CANVAS_RATIO)
         val canvasH = canvasW / Room.CANVAS_RATIO
 
-        // FOCUS_X встаёт в середину экрана, но холст не отъезжает от края:
-        // пустой полосы сбоку быть не должно ни на каком экране.
-        val shiftX = (maxWidth / 2 - canvasW * Room.FOCUS_X).coerceIn(maxWidth - canvasW, 0.dp)
+        // Ось комнаты встаёт в середину экрана, но левее FRAME_MIN_LEFT кадр не
+        // уходит, и холст не отъезжает от края: пустой полосы сбоку быть
+        // не должно ни на каком экране.
+        val shiftX = (maxWidth / 2 - canvasW * Room.ROOM_AXIS_X).coerceIn(
+            minimumValue = maxOf(maxWidth - canvasW, -canvasW * Room.FRAME_MIN_LEFT),
+            maximumValue = 0.dp,
+        )
         // Низ холста — к низу экрана. На телефоне холст ровно в высоту экрана,
         // и сдвиг нулевой; выше экрана он бывает только на широких экранах.
         val shiftY = maxHeight - canvasH
 
-        Box(modifier = Modifier.offset(shiftX, shiftY).requiredSize(canvasW, canvasH)) {
+        // wrapContentSize обязателен: холст больше экрана, и requiredSize без него
+        // центрирует его в родителе — комната уезжала влево ещё на полразницы
+        // ширин (около 40 dp) мимо shiftX, и торшер срезало наполовину.
+        Box(
+            modifier = Modifier
+                .wrapContentSize(Alignment.TopStart, unbounded = true)
+                .offset(shiftX, shiftY)
+                .requiredSize(canvasW, canvasH),
+        ) {
             Layer(Room.Back, canvasW, canvasH)
 
             Window(canvasW, canvasH)

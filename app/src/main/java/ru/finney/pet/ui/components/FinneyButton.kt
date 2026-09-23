@@ -87,6 +87,17 @@ private const val FaceCornerXFraction = 0.5f - FinneyStrokeRatio
 /** Полуось скругления низа по вертикали — доля высоты кнопки: 40 из 120. */
 private const val FaceCornerYFraction = BottomBandFraction + FinneyStrokeRatio
 
+// У круглой кнопки фигура та же, только низ жёлтого ниже. Промерено по кружку
+// кита (диаметр 155): низ жёлтого по столбцам в 0, 20, 40, 50, 60 от центра —
+// 124.5, 122, 113.5, 106.5, 96.5 от верха. Это половина эллипса во всю ширину
+// заливки с вертикальной полуосью 51.7, то есть 0.334 диаметра — то же
+// скругление, что у «стадиона» (FaceCornerYFraction = 1/3). Прежний «серп»
+// рисовал персиковый овал, выгнутый вверх куполом, — ровно наоборот эталону,
+// где граница прогибается вниз, а персиковое поднимается по краям.
+
+/** Где кончается жёлтое у круглой кнопки — доля диаметра: 124.5 из 155. */
+private const val RoundFaceBottomFraction = 0.803f
+
 // Блик — наклонённый эллипс, а не круг: в эталоне он лежит вдоль скругления угла.
 // Всё в долях высоты кнопки. Размеры получены как bbox чисто белых пикселей
 // в Frame 3.png: 34 × 24 при высоте 120 с отступом 29 / 24 от левого верхнего угла.
@@ -365,11 +376,10 @@ fun FinneyNeedButton(
  * Обе пары цветов идут по палитре: в покое жёлтый на персиковом (кнопка —
  * это «деньги и награда»), под пальцем всё сдвигается на шаг в тёплое.
  *
- * [round] — кнопка круглая. У «стадиона» полоса посередине прямая и по краям
- * загибается вверх (см. [FaceCornerXFraction]), у круглой это **серп
- * с выпуклой верхней границей**: в эталоне видно, что персиковая область
- * у кружка глубже всего по центру и сходит на нет к краям. Прямая полоса
- * на круге выглядит как ошибка отрисовки.
+ * [round] — кнопка круглая. Полоса у обеих по краям загибается вверх вдоль
+ * скругления (см. [FaceCornerXFraction]); у «стадиона» между скруглениями
+ * она прямая, у круга прямого участка нет, и граница — сплошная дуга,
+ * прогнутая вниз. Круглая отличается только тем, где кончается жёлтое.
  *
  * [glare] — рисовать ли блик. Кнопка денег на главном рисовалась без него,
  * и это так и оставлено: её в ките нет, она только собрана по его правилам.
@@ -388,48 +398,32 @@ internal fun Modifier.buttonFill(
     val face = if (pressed) FinneyPeach else FinneyYellow
     val band = if (pressed) FinneyPink else FinneyPeach
 
-    if (round) {
-        drawRect(face)
-        // Серп: широкий плоский овал, чья верхняя дуга проходит по границе
-        // BottomBandFraction в центре кнопки и поднимается к краям. Всё, что
-        // вышло за круг, срезает clip.
-        //
-        // Овал намеренно шире кнопки: если взять его по ширине круга, дуга у
-        // краёв уходит слишком высоко и персикового становится больше половины,
-        // а в эталоне он занимает примерно нижнюю четверть.
-        val top = size.height * (1f - BottomBandFraction)
-        val overhang = size.width * 0.9f
-        drawOval(
-            color = band,
-            topLeft = Offset(-overhang, top),
-            size = Size(size.width + overhang * 2f, (size.height - top) * 2.4f),
-        )
-    } else {
-        // Полоса лежит подо всей кнопкой, а верхний цвет кладётся поверх
-        // фигурой со скруглённым низом. Сбоку фигура идёт по краю заливки
-        // (от обводки), верх её не важен — его срезает clip.
-        drawRect(band)
-        val outline = size.height * FinneyStrokeRatio
-        val corner = CornerRadius(
-            x = size.height * FaceCornerXFraction,
-            y = size.height * FaceCornerYFraction,
-        )
-        drawPath(
-            path = Path().apply {
-                addRoundRect(
-                    RoundRect(
-                        left = outline,
-                        top = -size.height,
-                        right = size.width - outline,
-                        bottom = size.height * (1f - BottomBandFraction),
-                        bottomLeftCornerRadius = corner,
-                        bottomRightCornerRadius = corner,
-                    ),
-                )
-            },
-            color = face,
-        )
-    }
+    // Полоса лежит подо всей кнопкой, а верхний цвет кладётся поверх
+    // фигурой со скруглённым низом. Сбоку фигура идёт по краю заливки
+    // (от обводки), верх её не важен — его срезает clip. У круга ширина
+    // фигуры ровно вдвое больше полуоси, и скругления смыкаются в одну дугу.
+    drawRect(band)
+    val outline = size.height * FinneyStrokeRatio
+    val corner = CornerRadius(
+        x = size.height * FaceCornerXFraction,
+        y = size.height * FaceCornerYFraction,
+    )
+    val faceBottom = if (round) RoundFaceBottomFraction else 1f - BottomBandFraction
+    drawPath(
+        path = Path().apply {
+            addRoundRect(
+                RoundRect(
+                    left = outline,
+                    top = -size.height,
+                    right = size.width - outline,
+                    bottom = size.height * faceBottom,
+                    bottomLeftCornerRadius = corner,
+                    bottomRightCornerRadius = corner,
+                ),
+            )
+        },
+        color = face,
+    )
 
     // Блик. Доли высоты кнопки, но у круглой они свои: в ките её блик мельче
     // и сидит ближе к краю.
@@ -451,7 +445,6 @@ internal fun Modifier.buttonFill(
     }
 
     // Обводка по краю. Толщина — 1/12 высоты, как промерено в эталоне.
-    val outline = size.height * FinneyStrokeRatio
     if (round) {
         drawCircle(
             color = FinneyInk,
