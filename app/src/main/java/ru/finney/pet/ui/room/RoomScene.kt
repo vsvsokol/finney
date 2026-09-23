@@ -1,6 +1,5 @@
 package ru.finney.pet.ui.room
 
-import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -11,6 +10,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -24,14 +24,17 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -54,6 +57,9 @@ import kotlin.random.Random
 //
 // Обводка у комнаты чёрная, а не FinneyInk: это отдельный пласт от интерфейса.
 // Панели и кнопки плавают поверх и намеренно не сливаются с обстановкой.
+
+/** Как питомец стоит на полу: см. [Footing]. Ступни на 0.87 квадрата. Мебель — в [Solids]. */
+private val PetFooting = Footing(feetX = 0.5f, feetY = 0.87f, footprint = 0.45f)
 
 /** Сколько комната дышит: пена колышется в этих пределах от своего размера. */
 private const val FOAM_SWELL = 0.02f
@@ -86,6 +92,11 @@ private val UfoPauseMs = 20_000L..45_000L
  * Предмет в комнате ровно один — тот, что выбран в [spot]. Стены, окно и лампа
  * общие для всех комнат и не перерисовываются при переключении.
  *
+ * В комнате ночь (см. RoomLight.kt): светят торшер, окно и пролетающее НЛО.
+ * Стены и пол освещаются одним слоем, питомец и мебель — каждый своим,
+ * и у каждого своя тень.
+ *
+ * @param lampOn горит ли торшер. Выключателя пока нет, и торшер горит всегда.
  * @param pet встаёт туда, где ему положено быть в текущей комнате.
  * @param onTapItem нажатие по самому предмету: тому же, что делает нижняя кнопка.
  */
@@ -93,9 +104,13 @@ private val UfoPauseMs = 20_000L..45_000L
 fun RoomScene(
     spot: RoomSpot,
     modifier: Modifier = Modifier,
+    lampOn: Boolean = true,
     onTapItem: (() -> Unit)? = null,
     pet: @Composable BoxScope.() -> Unit = {},
 ) {
+    val ufo = remember { UfoState() }
+    val lighting = rememberRoomLighting(lampOn, ufo::light)
+
     BoxWithConstraints(modifier = modifier.clipToBounds().background(FinneyCream)) {
         // Масштаб «накрыть экран»: холст не меньше экрана ни по одной стороне.
         val canvasW = maxOf(maxWidth, maxHeight * Room.CANVAS_RATIO)
@@ -121,40 +136,58 @@ fun RoomScene(
                 .offset(shiftX, shiftY)
                 .requiredSize(canvasW, canvasH),
         ) {
-            Layer(Room.Back, canvasW, canvasH)
-
-            Window(canvasW, canvasH)
-            Layer(Room.Lamp, canvasW, canvasH)
+            Box(modifier = Modifier.fillMaxSize().roomLight(lighting)) {
+                Layer(Room.Back, canvasW, canvasH)
+                Window(canvasW, canvasH, ufo)
+                Layer(Room.Lamp, canvasW, canvasH)
+            }
 
             // Предмет не подменяется мгновенно: ребёнок нажал кнопку внизу, и
             // комната должна успеть показать, что изменилась. Питомец внутри
             // перехода, поэтому он переезжает вместе с обстановкой.
-            Crossfade(targetState = spot, label = "spot") { current ->
-                Box(modifier = Modifier.fillMaxSize()) {
-                    val ground = Room.petGround(current)
+            //
+            // Переход свой, а не Crossfade: прозрачность предмета нужна ещё и его
+            // тени, а Crossfade её наружу не отдаёт. Тени лежат в свете пола, и
+            // с Crossfade старая держалась в полную силу, пока предмет гас, а потом
+            // пропадала рывком; новая так же рывком появлялась.
+            val transition = updateTransition(targetState = spot, label = "spot")
+            for (current in RoomSpot.entries) {
+                val shown = transition.animateFloat(
+                    transitionSpec = { tween() },
+                    label = "shown",
+                ) { if (it == current) 1f else 0f }
+                if (current != transition.currentState && current != transition.targetState) continue
 
-                    when (current) {
-                        RoomSpot.LIVING -> Pet(ground, canvasW, canvasH, pet)
+                val visibility = { shown.value }
+                key(current) {
+                    Box(modifier = Modifier.fillMaxSize().graphicsLayer { alpha = shown.value }) {
+                        val ground = Room.petGround(current)
 
-                        // Питомец рисуется раньше стола: столешница перекрывает
-                        // ему низ, и получается, что он сидит за столом, а не на нём.
-                        RoomSpot.KITCHEN -> {
-                            Pet(ground, canvasW, canvasH, pet)
-                            Layer(Room.Table, canvasW, canvasH)
-                            TapZone(Room.Table.rect, canvasW, canvasH, "Покормить", onTapItem)
-                        }
+                        // Тень у питомца только в зале: за столом и в ванне она
+                        // упала бы на мебель, а мебель пола не знает.
+                        when (current) {
+                            RoomSpot.LIVING -> Pet(ground, canvasW, canvasH, lighting, PetFooting, visibility, pet)
 
-                        // Питомец сидит в ванне, а не перед ней, поэтому чаша
-                        // рисуется поверх него: она непрозрачна ниже 0.664
-                        // и прячет всё, что должно быть под водой. Пена заходит
-                        // выше борта (0.527 против 0.619) и делится на две:
-                        // задняя за питомцем, передняя перед ним.
-                        RoomSpot.BATH -> {
-                            Foam(Room.BathFoamBack, canvasW, canvasH, phase = 0f)
-                            Pet(ground, canvasW, canvasH, pet)
-                            Layer(Room.Bath, canvasW, canvasH)
-                            Foam(Room.BathFoamFront, canvasW, canvasH, phase = 0.5f)
-                            TapZone(Room.Bath.rect, canvasW, canvasH, "Помыть", onTapItem)
+                            // Питомец рисуется раньше стола: столешница перекрывает
+                            // ему низ, и получается, что он сидит за столом, а не на нём.
+                            RoomSpot.KITCHEN -> {
+                                Pet(ground, canvasW, canvasH, lighting, footing = null, visibility, pet)
+                                LitLayer(Room.Table, canvasW, canvasH, lighting, Solids.Table, visibility)
+                                TapZone(Room.Table.rect, canvasW, canvasH, "Покормить", onTapItem)
+                            }
+
+                            // Питомец сидит в ванне, а не перед ней, поэтому чаша
+                            // рисуется поверх него: она непрозрачна ниже 0.664
+                            // и прячет всё, что должно быть под водой. Пена заходит
+                            // выше борта (0.527 против 0.619) и делится на две:
+                            // задняя за питомцем, передняя перед ним.
+                            RoomSpot.BATH -> {
+                                Foam(Room.BathFoamBack, canvasW, canvasH, lighting, phase = 0f)
+                                Pet(ground, canvasW, canvasH, lighting, footing = null, visibility, pet)
+                                LitLayer(Room.Bath, canvasW, canvasH, lighting, Solids.Bath, visibility)
+                                Foam(Room.BathFoamFront, canvasW, canvasH, lighting, phase = 0.5f)
+                                TapZone(Room.Bath.rect, canvasW, canvasH, "Помыть", onTapItem)
+                            }
                         }
                     }
                 }
@@ -169,9 +202,17 @@ private fun Pet(
     ground: RelRect,
     canvasW: Dp,
     canvasH: Dp,
+    lighting: RoomLighting,
+    footing: Footing?,
+    visibility: () -> Float,
     pet: @Composable BoxScope.() -> Unit,
 ) {
-    Box(
+    LitBody(
+        lighting = lighting,
+        place = ground,
+        footing = footing,
+        visibility = visibility,
+        pad = PET_PAD,
         modifier = Modifier
             .offset(canvasW * ground.left, canvasH * ground.top)
             .requiredSize(canvasW * ground.width),
@@ -190,7 +231,7 @@ private fun Pet(
  * стояло там всю паузу, и на экране торчал его обрезанный край.
  */
 @Composable
-private fun Window(canvasW: Dp, canvasH: Dp) {
+private fun Window(canvasW: Dp, canvasH: Dp, ufo: UfoState) {
     Layer(Room.WindowView, canvasW, canvasH)
 
     val hole = Room.WindowHole
@@ -200,44 +241,23 @@ private fun Window(canvasW: Dp, canvasH: Dp) {
             .requiredSize(canvasW * hole.width, canvasH * hole.height)
             .clipToBounds(),
     ) {
-        var flight by remember { mutableStateOf<UfoFlight?>(null) }
-        val progress = remember { Animatable(0f) }
+        LaunchedEffect(ufo) { ufo.fly() }
 
-        LaunchedEffect(Unit) {
-            var pause = UfoFirstPauseMs
-            while (true) {
-                delay(Random.nextLong(pause.first, pause.last))
-                val next = Random.nextUfoFlight()
-                flight = next
-                progress.snapTo(0f)
-                progress.animateTo(1f, tween(next.durationMs, easing = LinearEasing))
-                flight = null
-                pause = UfoPauseMs
-            }
-        }
-
-        val ufo = Room.WindowUfo.rect
-        flight?.let { current ->
+        val size = Room.WindowUfo.rect
+        ufo.flight?.let { current ->
             Image(
                 painter = painterResource(Room.WindowUfo.image),
                 contentDescription = null,
                 contentScale = ContentScale.FillBounds,
                 modifier = Modifier
-                    .requiredSize(canvasW * ufo.width, canvasH * ufo.height)
+                    .requiredSize(canvasW * size.width, canvasH * size.height)
                     // Прогресс читается только здесь, на отрисовке: кадры пролёта
                     // двигают готовую картинку и не пересобирают окно.
                     .graphicsLayer {
-                        val t = progress.value
-                        val holeW = (canvasW * hole.width).toPx()
-                        val holeH = (canvasH * hole.height).toPx()
-
-                        // Путь от «целиком за одним краем проёма» до «целиком
-                        // за другим»: пролёт кончается, только когда НЛО ушло
-                        // из окна полностью, и не обрывается на полпути.
-                        val along = current.along(t)
-                        val x = -size.width + along * (holeW + size.width)
-                        translationX = if (current.fromLeft) x else holeW - size.width - x
-                        translationY = current.height(t) * (holeH - size.height)
+                        val t = ufo.progress.value
+                        val corner = ufo.corner(current, t)
+                        translationX = corner.x * canvasW.toPx()
+                        translationY = corner.y * canvasH.toPx()
                         rotationZ = current.tilt(t)
                     },
             )
@@ -245,6 +265,66 @@ private fun Window(canvasW: Dp, canvasH: Dp) {
     }
 
     Layer(Room.WindowFrame, canvasW, canvasH)
+}
+
+/**
+ * НЛО за окном: пролёты и где оно сейчас.
+ *
+ * Живёт в сцене, а не в окне: где НЛО, нужно ещё и свету — пролетая,
+ * оно подсвечивает комнату зелёным, и тень питомца поворачивается за ним.
+ */
+@Stable
+private class UfoState {
+    var flight by mutableStateOf<UfoFlight?>(null)
+        private set
+    val progress = Animatable(0f)
+
+    suspend fun fly() {
+        var pause = UfoFirstPauseMs
+        while (true) {
+            delay(Random.nextLong(pause.first, pause.last))
+            val next = Random.nextUfoFlight()
+            flight = next
+            progress.snapTo(0f)
+            progress.animateTo(1f, tween(next.durationMs, easing = LinearEasing))
+            flight = null
+            pause = UfoPauseMs
+        }
+    }
+
+    /**
+     * Левый верхний угол НЛО относительно проёма, в долях холста.
+     *
+     * Путь от «целиком за одним краем проёма» до «целиком за другим»: пролёт
+     * кончается, только когда НЛО ушло из окна полностью, и не обрывается
+     * на полпути.
+     */
+    fun corner(current: UfoFlight, t: Float): Offset {
+        val hole = Room.WindowHole
+        val ufo = Room.WindowUfo.rect
+        val x = -ufo.width + current.along(t) * (hole.width + ufo.width)
+        return Offset(
+            x = if (current.fromLeft) x else hole.width - ufo.width - x,
+            y = current.height(t) * (hole.height - ufo.height),
+        )
+    }
+
+    /** Середина НЛО в долях холста и насколько оно в проёме; null — пролёта нет. */
+    fun light(): Pair<Offset, Float>? {
+        val current = flight ?: return null
+        val hole = Room.WindowHole
+        val ufo = Room.WindowUfo.rect
+        val corner = corner(current, progress.value)
+        val centre = Offset(
+            hole.left + corner.x + ufo.width / 2f,
+            hole.top + corner.y + ufo.height / 2f,
+        )
+        // Свет входит в комнату через стекло: пока НЛО за рамой, комнату
+        // оно не освещает, и зелёный не вспыхивает из ниоткуда.
+        val presence = ((centre.x - hole.left) / ufo.width).coerceIn(0f, 1f) *
+            ((hole.right - centre.x) / ufo.width).coerceIn(0f, 1f)
+        return centre to presence
+    }
 }
 
 /**
@@ -341,7 +421,7 @@ private fun Random.between(from: Float, until: Float): Float = from + nextFloat(
 
 /** Пена тихо колышется. Слои дышат в противофазе, иначе движение читается как рывок всей ванны. */
 @Composable
-private fun Foam(layer: RoomLayer, canvasW: Dp, canvasH: Dp, phase: Float) {
+private fun Foam(layer: RoomLayer, canvasW: Dp, canvasH: Dp, lighting: RoomLighting, phase: Float) {
     val breath = rememberInfiniteTransition(label = "foam")
     val swell by breath.animateFloat(
         initialValue = -FOAM_SWELL,
@@ -354,22 +434,61 @@ private fun Foam(layer: RoomLayer, canvasW: Dp, canvasH: Dp, phase: Float) {
         label = "swell",
     )
 
-    Image(
-        painter = painterResource(layer.image),
-        contentDescription = null,
-        contentScale = ContentScale.FillBounds,
+    LitBody(
+        lighting = lighting,
+        place = layer.rect,
+        footing = null,
+        // Пена на вдохе растёт на FOAM_SWELL — запас ровно под это.
+        pad = FOAM_SWELL * 2f,
         modifier = Modifier
             .offset(canvasW * layer.rect.left, canvasH * layer.rect.top)
-            .requiredSize(canvasW * layer.rect.width, canvasH * layer.rect.height)
-            // Масштаб читается внутри graphicsLayer, чтобы кадры анимации не
-            // пересобирали слой — тот же приём, что у позы питомца.
-            .graphicsLayer {
-                scaleX = 1f + swell
-                scaleY = 1f + swell
-                // Пена растёт от низа: верх её края должен гулять, а посадка в ванну — нет.
-                transformOrigin = TransformOrigin(0.5f, 1f)
-            },
-    )
+            .requiredSize(canvasW * layer.rect.width, canvasH * layer.rect.height),
+    ) {
+        Image(
+            painter = painterResource(layer.image),
+            contentDescription = null,
+            contentScale = ContentScale.FillBounds,
+            modifier = Modifier
+                .fillMaxSize()
+                // Масштаб читается внутри graphicsLayer, чтобы кадры анимации не
+                // пересобирали слой — тот же приём, что у позы питомца.
+                .graphicsLayer {
+                    scaleX = 1f + swell
+                    scaleY = 1f + swell
+                    // Пена растёт от низа: верх её края должен гулять, а посадка в ванну — нет.
+                    transformOrigin = TransformOrigin(0.5f, 1f)
+                },
+        )
+    }
+}
+
+/** Мебель: освещается там, где стоит, и отбрасывает тень на пол. */
+@Composable
+private fun LitLayer(
+    layer: RoomLayer,
+    canvasW: Dp,
+    canvasH: Dp,
+    lighting: RoomLighting,
+    solid: Solid,
+    visibility: () -> Float,
+) {
+    LitBody(
+        lighting = lighting,
+        place = layer.rect,
+        footing = null,
+        solid = solid,
+        visibility = visibility,
+        modifier = Modifier
+            .offset(canvasW * layer.rect.left, canvasH * layer.rect.top)
+            .requiredSize(canvasW * layer.rect.width, canvasH * layer.rect.height),
+    ) {
+        Image(
+            painter = painterResource(layer.image),
+            contentDescription = null,
+            contentScale = ContentScale.FillBounds,
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
 }
 
 @Composable
@@ -424,5 +543,13 @@ private fun RoomSceneBathPreview() {
 private fun RoomSceneLivingPreview() {
     FinneyTheme {
         RoomScene(spot = RoomSpot.LIVING, modifier = Modifier.size(412.dp, 892.dp))
+    }
+}
+
+@Preview(widthDp = 412, heightDp = 892)
+@Composable
+private fun RoomSceneLampOffPreview() {
+    FinneyTheme {
+        RoomScene(spot = RoomSpot.LIVING, lampOn = false, modifier = Modifier.size(412.dp, 892.dp))
     }
 }
