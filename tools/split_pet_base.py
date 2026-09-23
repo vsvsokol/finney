@@ -24,7 +24,9 @@ PNG в ресурсы не кладём: те же картинки в WebP бе
 Файлы стадий роста (_middle, _big) и туловище остаются только в design/exports:
 код их пока не рисует, в APK им делать нечего.
 
-Запуск из корня репозитория (нужен Pillow: pip install Pillow):
+Здесь же собираются слои моргания — см. [blink] — и открытого рта — см. [mouth].
+
+Запуск из корня репозитория (нужны Pillow и scipy: pip install Pillow scipy):
     python tools/split_pet_base.py
 
 Перезапускать после каждого нового экспорта от дизайнера.
@@ -32,7 +34,9 @@ PNG в ресурсы не кладём: те же картинки в WebP бе
 
 from pathlib import Path
 
+import numpy as np
 from PIL import Image, ImageMath
+from scipy import ndimage
 
 SRC = Path("design/exports/pet")
 RES = Path("app/src/main/res/drawable-nodpi")
@@ -123,11 +127,128 @@ def check_seamless(base: Image.Image, limbs: Image.Image, src: Image.Image, pet:
         raise SystemExit(f"{pet} {state}: силуэт разошёлся с оригиналом на {worst} из 255 — шов по контуру")
 
 
+# Маска моргания в пикселях слоя (SIDE): до BLINK_CORE от глаз — сплошная, дальше
+# за BLINK_FEATHER сходит на нет. Ядро Lanczos при уменьшении размазывает разницу
+# глаз пиксели на три, сплошная часть это накрывает, а растушёвка лежит там, где
+# открытые и закрытые глаза уже совпадают до бита.
+BLINK_CORE = 4
+BLINK_FEATHER = 4
+# Столько же отступаем от рта: он в моргании остаётся от настроения.
+BLINK_MOUTH_GAP = 3
+
+
+def blink(pet: str) -> None:
+    """Слой моргания: закрытые глаза из сна, положенные поверх открытых.
+
+    Отдельных слоёв глаз дизайнеры не присылают, а у Пушистика нет и слоя лица.
+    Зато открытые и закрытые глаза уже есть в состояниях: sleep отличается от happy
+    только глазами и ртом. Разница этих двух кадров и есть маска глаз — рот из неё
+    выкидываем, пусть во время моргания остаётся от текущего настроения.
+
+    Слой на каждое настроение свой, потому что брови грусти и грязь лежат поверх глаз:
+    там, где настроение отличается от happy, в слое остаётся пиксель настроения,
+    а в остальной маске — пиксель сна.
+
+    Маска накладывается на уже уменьшенные кадры, а не уменьшается вместе с ними.
+    Жёсткий край альфы Lanczos раскачивает: у почти прозрачных пикселей цвет после
+    обратного деления на альфу уходит в белое, и на каждом моргании вокруг глаз
+    вспыхивал светлый контур маски.
+    """
+    full = {state: load(pet, state) for state in STATES}
+    changed = np.abs(pixels(full["happy"]) - pixels(full["sleep"])).max(axis=2) > 0
+
+    # Разница распадается на три пятна: два глаза и рот. Каждый глаз нарисован
+    # несколькими штрихами, поэтому пятна ищем по чуть расширенной разнице. Рот
+    # отделять по столбцам нельзя: у Звёздочки он заходит под глаз по горизонтали.
+    parts, count = ndimage.label(ndimage.binary_dilation(changed, iterations=12))
+    if count != 3:
+        raise SystemExit(f"{pet}: ждали глаз, глаз и рот — нашлось {count} частей лица")
+    sizes = ndimage.sum(changed, parts, range(1, count + 1))
+    eyes = np.isin(parts, np.argsort(sizes)[-2:] + 1) & changed
+    mouth = changed & ~eyes
+
+    to_eyes = ndimage.distance_transform_edt(~shrink_mask(eyes))
+    to_mouth = ndimage.distance_transform_edt(~shrink_mask(mouth))
+    mask = np.clip((BLINK_CORE + BLINK_FEATHER - to_eyes) / BLINK_FEATHER, 0.0, 1.0)
+    mask *= np.clip((to_mouth - BLINK_MOUTH_GAP) / BLINK_MOUTH_GAP, 0.0, 1.0)
+
+    # Полоса глаз по высоте — в её пределах в PetSkin опускается веко (eyesTop, eyesBottom).
+    rows = np.flatnonzero((mask > 0).any(axis=1))
+    print(f"{pet}: глаза по высоте {rows[0]}..{rows[-1] + 1} из {SIDE}")
+
+    frames = {state: pixels(shrink(image)) for state, image in full.items()}
+    for state in ("happy", "sad", "dirty"):
+        mood = frames[state]
+        own = np.abs(mood - frames["happy"]).max(axis=2) > 0
+        layer = np.where(own[..., None], mood, frames["sleep"])
+        layer[..., 3] = np.rint(layer[..., 3] * mask)
+        save(Image.fromarray(layer.astype(np.uint8), "RGBA"), pet, f"blink_{state}")
+
+
+# Маска рта в пикселях слоя: сплошная до MOUTH_CORE от любого из ртов, дальше
+# за MOUTH_FEATHER сходит на нет. Запас нужен небольшой: слой при еде растягивают,
+# а до линии подбородка у Пушистика от рта всего пикселей пять.
+MOUTH_CORE = 2
+MOUTH_FEATHER = 2
+
+
+def mouth(pet: str) -> None:
+    """Слой открытого рта: рот из сна поверх рта любого настроения.
+
+    Рисованного «рта для еды» у дизайнеров нет, но во сне у всех пятерых рот
+    приоткрыт — его и берём. Вокруг рта лицо залито ровно, поэтому пиксели сна
+    в маске закрывают улыбку или грустную дугу без шва. Маска — все рты сразу:
+    разница с кадром сна у happy, sad и dirty около рта.
+
+    Слой один на питомца, а не на настроение: под маской в нём только кожа
+    и рот, а они у настроений общие. Центр рта печатается — это точка, куда
+    летит еда, и центр растяжения рта (mouthX, mouthY в PetSkin).
+    """
+    full = {state: load(pet, state) for state in STATES}
+    sleep = pixels(full["sleep"])
+    changed = np.abs(pixels(full["happy"]) - sleep).max(axis=2) > 0
+    parts, count = ndimage.label(ndimage.binary_dilation(changed, iterations=12))
+    sizes = ndimage.sum(changed, parts, range(1, count + 1))
+    near_mouth = parts == np.argmin(sizes) + 1
+
+    mouths = np.zeros_like(changed)
+    for state in ("happy", "sad", "dirty"):
+        mouths |= np.abs(pixels(full[state]) - sleep).max(axis=2) > 0
+    mouths &= near_mouth
+
+    ys, xs = np.nonzero(mouths & changed)
+    side = full["sleep"].size[0]
+    print(f"{pet}: рот в ({(xs.min() + xs.max()) / 2 / side:.4f}, {(ys.min() + ys.max()) / 2 / side:.4f})")
+
+    to_mouth = ndimage.distance_transform_edt(~shrink_mask(mouths))
+    mask = np.clip((MOUTH_CORE + MOUTH_FEATHER - to_mouth) / MOUTH_FEATHER, 0.0, 1.0)
+    layer = pixels(shrink(full["sleep"]))
+    layer[..., 3] = np.rint(layer[..., 3] * mask)
+    save(Image.fromarray(layer.astype(np.uint8), "RGBA"), pet, "mouth")
+
+
+def pixels(image: Image.Image) -> np.ndarray:
+    return np.asarray(image).astype(int)
+
+
+def shrink(image: Image.Image) -> Image.Image:
+    """Уменьшение ровно как в [save] — чтобы слой моргания совпал с базовым до бита."""
+    return image.resize((SIDE, SIDE), Image.LANCZOS) if max(image.size) > SIDE else image
+
+
+def shrink_mask(mask: np.ndarray) -> np.ndarray:
+    """Маска в размер слоя: пиксель попадает, если задет хоть одним пикселем холста."""
+    image = Image.fromarray(mask.astype(np.uint8) * 255)
+    return np.asarray(image.resize((SIDE, SIDE), Image.BOX)) > 0
+
+
 def main() -> None:
     RES.mkdir(parents=True, exist_ok=True)
     for pet, limb_suffix in PETS.items():
         print(f"— {pet}")
         split(pet, limb_suffix)
+        blink(pet)
+        mouth(pet)
 
 
 if __name__ == "__main__":
