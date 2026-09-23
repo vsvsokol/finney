@@ -24,7 +24,7 @@ PNG в ресурсы не кладём: те же картинки в WebP бе
 Файлы стадий роста (_middle, _big) и туловище остаются только в design/exports:
 код их пока не рисует, в APK им делать нечего.
 
-Здесь же собираются слои моргания — см. [blink].
+Здесь же собираются слои моргания — см. [blink] — и открытого рта — см. [mouth].
 
 Запуск из корня репозитория (нужны Pillow и scipy: pip install Pillow scipy):
     python tools/split_pet_base.py
@@ -185,6 +185,48 @@ def blink(pet: str) -> None:
         save(Image.fromarray(layer.astype(np.uint8), "RGBA"), pet, f"blink_{state}")
 
 
+# Маска рта в пикселях слоя: сплошная до MOUTH_CORE от любого из ртов, дальше
+# за MOUTH_FEATHER сходит на нет. Запас нужен небольшой: слой при еде растягивают,
+# а до линии подбородка у Пушистика от рта всего пикселей пять.
+MOUTH_CORE = 2
+MOUTH_FEATHER = 2
+
+
+def mouth(pet: str) -> None:
+    """Слой открытого рта: рот из сна поверх рта любого настроения.
+
+    Рисованного «рта для еды» у дизайнеров нет, но во сне у всех пятерых рот
+    приоткрыт — его и берём. Вокруг рта лицо залито ровно, поэтому пиксели сна
+    в маске закрывают улыбку или грустную дугу без шва. Маска — все рты сразу:
+    разница с кадром сна у happy, sad и dirty около рта.
+
+    Слой один на питомца, а не на настроение: под маской в нём только кожа
+    и рот, а они у настроений общие. Центр рта печатается — это точка, куда
+    летит еда, и центр растяжения рта (mouthX, mouthY в PetSkin).
+    """
+    full = {state: load(pet, state) for state in STATES}
+    sleep = pixels(full["sleep"])
+    changed = np.abs(pixels(full["happy"]) - sleep).max(axis=2) > 0
+    parts, count = ndimage.label(ndimage.binary_dilation(changed, iterations=12))
+    sizes = ndimage.sum(changed, parts, range(1, count + 1))
+    near_mouth = parts == np.argmin(sizes) + 1
+
+    mouths = np.zeros_like(changed)
+    for state in ("happy", "sad", "dirty"):
+        mouths |= np.abs(pixels(full[state]) - sleep).max(axis=2) > 0
+    mouths &= near_mouth
+
+    ys, xs = np.nonzero(mouths & changed)
+    side = full["sleep"].size[0]
+    print(f"{pet}: рот в ({(xs.min() + xs.max()) / 2 / side:.4f}, {(ys.min() + ys.max()) / 2 / side:.4f})")
+
+    to_mouth = ndimage.distance_transform_edt(~shrink_mask(mouths))
+    mask = np.clip((MOUTH_CORE + MOUTH_FEATHER - to_mouth) / MOUTH_FEATHER, 0.0, 1.0)
+    layer = pixels(shrink(full["sleep"]))
+    layer[..., 3] = np.rint(layer[..., 3] * mask)
+    save(Image.fromarray(layer.astype(np.uint8), "RGBA"), pet, "mouth")
+
+
 def pixels(image: Image.Image) -> np.ndarray:
     return np.asarray(image).astype(int)
 
@@ -206,6 +248,7 @@ def main() -> None:
         print(f"— {pet}")
         split(pet, limb_suffix)
         blink(pet)
+        mouth(pet)
 
 
 if __name__ == "__main__":

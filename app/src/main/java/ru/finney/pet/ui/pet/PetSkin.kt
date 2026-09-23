@@ -27,6 +27,8 @@ data class PetSkin(
     @DrawableRes val blinkHappy: Int,
     @DrawableRes val blinkSad: Int,
     @DrawableRes val blinkDirty: Int,
+    /** Открытый рот поверх любого настроения — для еды. Один на питомца. */
+    @DrawableRes val mouth: Int,
     @DrawableRes val leftHand: Int,
     @DrawableRes val rightHand: Int,
     @DrawableRes val leftLeg: Int,
@@ -41,6 +43,8 @@ data class PetSkin(
     /** Где по высоте лежат глаза — в этих пределах опускается веко. Доли стороны, как и точки. */
     val eyesTop: Float,
     val eyesBottom: Float,
+    /** Центр рта: туда летит еда, от него растягивается открытый рот. */
+    val mouthCenter: TransformOrigin,
 ) {
     fun face(mood: PetMood): PetFace = when (mood) {
         PetMood.HAPPY -> PetFace(happy, blinkHappy)
@@ -58,7 +62,7 @@ data class PetFace(@DrawableRes val base: Int, @DrawableRes val blink: Int?)
 private const val PUSHISTIK_CANVAS = 2048f
 
 // Полосу глаз не снимают в редакторе: её печатает tools/split_pet_base.py, и уже
-// в пикселях слоя в ресурсах, а не холста.
+// в пикселях слоя в ресурсах, а не холста. Центр рта он печатает сразу долями.
 private const val BLINK_LAYER = 512f
 private const val ROGATIK_CANVAS = 2200f
 
@@ -78,6 +82,7 @@ private val ZalinaSkin = PetSkin(
     blinkHappy = R.drawable.pushistik_blink_happy,
     blinkSad = R.drawable.pushistik_blink_sad,
     blinkDirty = R.drawable.pushistik_blink_dirty,
+    mouth = R.drawable.pushistik_mouth,
     leftHand = R.drawable.pushistik_left_hand,
     rightHand = R.drawable.pushistik_right_hand,
     leftLeg = R.drawable.pushistik_left_leg,
@@ -89,6 +94,7 @@ private val ZalinaSkin = PetSkin(
     ground = TransformOrigin(0.5f, 1828f / PUSHISTIK_CANVAS),
     eyesTop = 234f / BLINK_LAYER,
     eyesBottom = 342f / BLINK_LAYER,
+    mouthCenter = TransformOrigin(0.5022f, 0.6619f),
 )
 
 private val VanyaSkin = PetSkin(
@@ -99,6 +105,7 @@ private val VanyaSkin = PetSkin(
     blinkHappy = R.drawable.rogatik_blink_happy,
     blinkSad = R.drawable.rogatik_blink_sad,
     blinkDirty = R.drawable.rogatik_blink_dirty,
+    mouth = R.drawable.rogatik_mouth,
     leftHand = R.drawable.rogatik_left_hand,
     rightHand = R.drawable.rogatik_right_hand,
     leftLeg = R.drawable.rogatik_left_leg,
@@ -110,6 +117,7 @@ private val VanyaSkin = PetSkin(
     ground = TransformOrigin(0.5f, 1898f / ROGATIK_CANVAS),
     eyesTop = 223f / BLINK_LAYER,
     eyesBottom = 337f / BLINK_LAYER,
+    mouthCenter = TransformOrigin(0.502f, 0.6395f),
 )
 
 private val IraSkin = PetSkin(
@@ -120,6 +128,7 @@ private val IraSkin = PetSkin(
     blinkHappy = R.drawable.zvezdochka_blink_happy,
     blinkSad = R.drawable.zvezdochka_blink_sad,
     blinkDirty = R.drawable.zvezdochka_blink_dirty,
+    mouth = R.drawable.zvezdochka_mouth,
     leftHand = R.drawable.zvezdochka_left_hand,
     rightHand = R.drawable.zvezdochka_right_hand,
     leftLeg = R.drawable.zvezdochka_left_leg,
@@ -131,6 +140,7 @@ private val IraSkin = PetSkin(
     ground = TransformOrigin(0.5f, 1906f / ZVEZDOCHKA_CANVAS),
     eyesTop = 201f / BLINK_LAYER,
     eyesBottom = 325f / BLINK_LAYER,
+    mouthCenter = TransformOrigin(0.5043f, 0.6307f),
 )
 
 private val SevaSkin = PetSkin(
@@ -141,6 +151,7 @@ private val SevaSkin = PetSkin(
     blinkHappy = R.drawable.bantik_blink_happy,
     blinkSad = R.drawable.bantik_blink_sad,
     blinkDirty = R.drawable.bantik_blink_dirty,
+    mouth = R.drawable.bantik_mouth,
     leftHand = R.drawable.bantik_left_hand,
     rightHand = R.drawable.bantik_right_hand,
     leftLeg = R.drawable.bantik_left_leg,
@@ -152,6 +163,7 @@ private val SevaSkin = PetSkin(
     ground = TransformOrigin(0.5f, 1902f / BANTIK_CANVAS),
     eyesTop = 227f / BLINK_LAYER,
     eyesBottom = 335f / BLINK_LAYER,
+    mouthCenter = TransformOrigin(0.5043f, 0.6516f),
 )
 
 private val YarikSkin = PetSkin(
@@ -162,6 +174,7 @@ private val YarikSkin = PetSkin(
     blinkHappy = R.drawable.luchik_blink_happy,
     blinkSad = R.drawable.luchik_blink_sad,
     blinkDirty = R.drawable.luchik_blink_dirty,
+    mouth = R.drawable.luchik_mouth,
     leftHand = R.drawable.luchik_left_hand,
     rightHand = R.drawable.luchik_right_hand,
     leftLeg = R.drawable.luchik_left_leg,
@@ -173,6 +186,7 @@ private val YarikSkin = PetSkin(
     ground = TransformOrigin(0.5f, 1913f / LUCHIK_CANVAS),
     eyesTop = 215f / BLINK_LAYER,
     eyesBottom = 330f / BLINK_LAYER,
+    mouthCenter = TransformOrigin(0.5036f, 0.638f),
 )
 
 val PetCharacter.skin: PetSkin

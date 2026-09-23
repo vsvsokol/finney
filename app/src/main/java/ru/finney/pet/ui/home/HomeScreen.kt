@@ -70,6 +70,16 @@ import ru.finney.pet.ui.pet.PetMood
 import ru.finney.pet.ui.pet.PetView
 import ru.finney.pet.ui.pet.rememberPoseProvider
 import ru.finney.pet.ui.pet.rememberPetAnimation
+import ru.finney.pet.ui.debug.DebugPanel
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import ru.finney.pet.ui.pet.skin
+import ru.finney.pet.ui.room.FeedingGame
+import ru.finney.pet.ui.room.WashingGame
 import ru.finney.pet.ui.room.CareBlock
 import ru.finney.pet.ui.room.CareOption
 import ru.finney.pet.ui.room.CarePanel
@@ -186,6 +196,26 @@ private fun HomeContent(
     var care by rememberSaveable { mutableStateOf<CareTarget?>(null) }
     var picked by rememberSaveable { mutableStateOf<String?>(null) }
 
+    // Панель отладки: долгое нажатие на уровень, только в отладочной сборке.
+    var debugOpen by rememberSaveable { mutableStateOf(false) }
+
+    // Игра ухода: что выбрали в панели и теперь бросают в рот или трут о питомца.
+    // Покупка — в конце игры, см. ui/room/CareGame.kt.
+    var playing by rememberSaveable { mutableStateOf<String?>(null) }
+
+    // Анимация живёт здесь, а не внутри комнаты: игры ухода открывают питомцу рот
+    // и заставляют его хихикать, а сами лежат поверх комнаты.
+    val animation = rememberPetAnimation()
+
+    // Где питомец на экране — игры целятся в него и в его рот.
+    var petBounds by remember { mutableStateOf(Rect.Zero) }
+
+    // Во время игры плашки и кнопки комнат гаснут: на их месте подсказка и
+    // «Не сейчас». Гаснут, а не убираются — иначе шкала настроения, которая
+    // тянется по свободной высоте, прыгала бы. Деньги остаются: ребёнок видит,
+    // как монеты уходят, когда еда попала в рот.
+    val hudAlpha by animateFloatAsState(if (playing == null) 1f else 0f, label = "hud")
+
     fun openCare(target: CareTarget) {
         care = target
         picked = null
@@ -215,7 +245,6 @@ private fun HomeContent(
                 }
             },
         ) {
-            val animation = rememberPetAnimation()
             // Нажатие — питомец подпрыгивает: это игра, а не меню. Черновик
             // анимаций, который раньше открывался здесь же, ушёл на долгое
             // нажатие и только в отладочной сборке — ребёнку он не нужен,
@@ -229,6 +258,7 @@ private fun HomeContent(
                 pose = rememberPoseProvider(animation),
                 modifier = Modifier
                     .fillMaxSize()
+                    .onGloballyPositioned { petBounds = it.boundsInRoot() }
                     .combinedClickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
@@ -265,7 +295,21 @@ private fun HomeContent(
                 MoneyButton(balance = state.balance, onClick = onOpenShop)
             }
 
-            LevelBadge(level = state.level, size = 56.dp, progress = state.levelProgress)
+            LevelBadge(
+                level = state.level,
+                size = 56.dp,
+                progress = state.levelProgress,
+                modifier = if (isDebuggable) {
+                    Modifier.combinedClickable(
+                        onClickLabel = null,
+                        onLongClickLabel = "Отладка",
+                        onLongClick = { debugOpen = true },
+                        onClick = {},
+                    )
+                } else {
+                    Modifier
+                },
+            )
 
             Row(
                 modifier = Modifier.weight(1f),
@@ -312,7 +356,7 @@ private fun HomeContent(
         // лампы, и второй ряд его бы срезал. Сытость, чистота и настроение сюда
         // не попадают — они переехали в кольца кнопок и в шкалу слева.
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().graphicsLayer { alpha = hudAlpha },
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             InfoChip(
@@ -376,7 +420,7 @@ private fun HomeContent(
         // У зала кольца нет: отдельной шкалы сна в домене не существует,
         // а рисовать пустое кольцо ради симметрии — врать про данные.
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().graphicsLayer { alpha = hudAlpha },
             horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
             FinneyNeedButton(
@@ -457,12 +501,71 @@ private fun HomeContent(
                         CareOption(it.item, it, isSelected = it.item.id == picked)
                     },
                     onPick = { picked = it },
+                    confirmLabel = when (target) {
+                        CareTarget.FOOD -> "Купить и покормить"
+                        CareTarget.BATH -> "Купить и помыть"
+                    },
                     onConfirm = { itemId ->
-                        onBuy(itemId)
+                        playing = itemId
                         care = null
                         picked = null
                     },
                     onDismiss = { care = null; picked = null },
+                )
+            }
+        }
+
+        playing?.let { itemId ->
+            val mouth = state.appearance.character.skin.mouthCenter
+            when (spot) {
+                RoomSpot.KITCHEN -> FeedingGame(
+                    itemId = itemId,
+                    pet = petBounds,
+                    mouth = Offset(
+                        petBounds.left + petBounds.width * mouth.pivotFractionX,
+                        petBounds.top + petBounds.height * mouth.pivotFractionY,
+                    ),
+                    onMouthOpen = animation::openMouth,
+                    onEaten = {
+                        onBuy(itemId)
+                        animation.playEat()
+                        playing = null
+                    },
+                    onCancel = { playing = null },
+                )
+                RoomSpot.BATH -> WashingGame(
+                    itemId = itemId,
+                    pet = petBounds,
+                    onScrub = animation::playGiggle,
+                    onClean = {
+                        onBuy(itemId)
+                        animation.playJoy()
+                        playing = null
+                    },
+                    onCancel = { playing = null },
+                )
+                // Игры идут поверх кнопок комнат, из кухни или ванной не уйти.
+                RoomSpot.LIVING -> Unit
+            }
+        }
+
+        if (debugOpen && isDebuggable) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(FinneyInk.copy(alpha = 0.45f))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = { debugOpen = false },
+                    )
+                    .systemBarsPadding()
+                    .padding(16.dp),
+                contentAlignment = Alignment.BottomCenter,
+            ) {
+                DebugPanel(
+                    onDismiss = { debugOpen = false },
+                    modifier = Modifier.pointerInput(Unit) { detectTapGestures { } },
                 )
             }
         }

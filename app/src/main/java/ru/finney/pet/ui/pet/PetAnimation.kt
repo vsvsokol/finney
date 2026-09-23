@@ -26,13 +26,16 @@ import kotlinx.coroutines.launch
 import kotlin.random.Random
 
 /**
- * Две анимации питомца.
+ * Анимации питомца.
  *
  * Покоя — бесконечная: дыхание (тело чуть тянется вверх и сжимается),
  * покачивание корпуса и рук, моргание. Идёт всегда, отдельно дёргать не нужно.
  *
  * Радости — по событию [playJoy]: приседание, прыжок с вытягиванием,
  * руки вверх, поджатые ноги, приземление с пружинкой.
+ *
+ * Еды — [openMouth], пока еда летит к питомцу, и [playEat], когда поймал.
+ * Мытья — [playGiggle]: от мыла щекотно.
  */
 @Stable
 class PetAnimation internal constructor(private val scope: CoroutineScope) {
@@ -43,7 +46,53 @@ class PetAnimation internal constructor(private val scope: CoroutineScope) {
     /** 0 — обычная поза, 1 — максимальное приседание перед прыжком. */
     internal val crouch = Animatable(0f)
 
+    /** 0 — рот настроения, 1 — открыт навстречу еде. */
+    internal val mouth = Animatable(0f)
+
+    /** Покачивание от щекотки: −1..1, наклон в обе стороны. */
+    internal val wiggle = Animatable(0f)
+
     private var job: Job? = null
+    private var mouthJob: Job? = null
+    private var wiggleJob: Job? = null
+
+    /** Еда летит к питомцу — рот открывается навстречу; мимо — закрывается. */
+    fun openMouth(open: Boolean) {
+        mouthJob?.cancel()
+        mouthJob = scope.launch {
+            mouth.animateTo(
+                targetValue = if (open) 1f else 0f,
+                animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMediumLow),
+            )
+        }
+    }
+
+    /** Поймал: рот захлопывается, три жевка с приседанием, потом радость. */
+    fun playEat() {
+        mouthJob?.cancel()
+        mouthJob = scope.launch {
+            mouth.animateTo(0f, tween(durationMillis = 90))
+            repeat(3) {
+                launch {
+                    crouch.animateTo(0.3f, tween(durationMillis = 110))
+                    crouch.animateTo(0f, tween(durationMillis = 130))
+                }
+                mouth.animateTo(0.45f, tween(durationMillis = 110))
+                mouth.animateTo(0f, tween(durationMillis = 130))
+            }
+            playJoy()
+        }
+    }
+
+    /** Щекотно от мыла. Пока покачивание идёт, новые касания его не перезапускают. */
+    fun playGiggle() {
+        if (wiggleJob?.isActive == true) return
+        wiggleJob = scope.launch {
+            for (target in floatArrayOf(1f, -0.8f, 0.5f, -0.25f, 0f)) {
+                wiggle.animateTo(target, tween(durationMillis = 70))
+            }
+        }
+    }
 
     fun playJoy() {
         job?.cancel()
@@ -104,7 +153,7 @@ fun rememberPoseProvider(animation: PetAnimation): () -> PetPose {
         {
             composePose(
                 breath.value, sway.value, animation.lift.value, animation.crouch.value,
-                lid.value,
+                lid.value, animation.mouth.value, animation.wiggle.value,
             )
         }
     }
@@ -145,18 +194,21 @@ private fun composePose(
     lift: Float,
     crouch: Float,
     lid: Float,
+    mouth: Float,
+    wiggle: Float,
 ): PetPose =
     // Дыхание и прыжок — это объём: что прибавилось по высоте, то убавилось по ширине.
     PetPose(
         scaleX = 1f - breath * 0.008f + crouch * 0.07f - lift * 0.035f,
         scaleY = 1f + breath * 0.016f - crouch * 0.10f + lift * 0.055f,
         offsetY = (-38f * lift + 8f * crouch).dp,
-        tilt = sway * 0.7f,
+        tilt = sway * 0.7f + wiggle * 5f,
         leftHand = sway * 3f - lift * 34f,
         rightHand = sway * 3f + lift * 34f,
         leftLeg = -lift * 8f,
         rightLeg = lift * 8f,
         lid = lid,
+        mouth = mouth,
     )
 
 /**
@@ -189,5 +241,5 @@ fun PetAnimation.currentPose(): PetPose {
     )
 
     // Моргание сюда не входит: превью — один неподвижный кадр, глаза в нём открыты.
-    return composePose(breath, sway, lift.value, crouch.value, lid = 0f)
+    return composePose(breath, sway, lift.value, crouch.value, lid = 0f, mouth.value, wiggle.value)
 }
