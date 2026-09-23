@@ -185,7 +185,7 @@ docs/
   content-tasks.md            задания и правила текстов
   assets-spec.md              спецификация графики для дизайнеров
 design/exports/      готовые PNG от дизайнеров — источник для ресурсов приложения
-tools/               скрипты подготовки ассетов (Python + Pillow)
+tools/               скрипты подготовки ассетов (Python + Pillow, scipy)
 .github/             CI и правила ревью
 CONTRIBUTING.md      правила работы с репозиторием
 CHANGELOG.md         журнал изменений и открытые вопросы

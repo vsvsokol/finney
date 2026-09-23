@@ -23,6 +23,10 @@ data class PetSkin(
     @DrawableRes val sad: Int,
     @DrawableRes val dirty: Int,
     @DrawableRes val sleep: Int,
+    /** Закрытые глаза поверх открытых — по слою на каждое настроение, где глаза открыты. */
+    @DrawableRes val blinkHappy: Int,
+    @DrawableRes val blinkSad: Int,
+    @DrawableRes val blinkDirty: Int,
     @DrawableRes val leftHand: Int,
     @DrawableRes val rightHand: Int,
     @DrawableRes val leftLeg: Int,
@@ -34,17 +38,28 @@ data class PetSkin(
     val rightLegPivot: TransformOrigin,
     /** Точка опоры: персонаж стоит на ногах, поэтому масштаб и наклон идут от ступней, а не от центра. */
     val ground: TransformOrigin,
+    /** Где по высоте лежат глаза — в этих пределах опускается веко. Доли стороны, как и точки. */
+    val eyesTop: Float,
+    val eyesBottom: Float,
 ) {
-    @DrawableRes
-    fun base(mood: PetMood): Int = when (mood) {
-        PetMood.HAPPY -> happy
-        PetMood.SAD -> sad
-        PetMood.DIRTY -> dirty
-        PetMood.SLEEP -> sleep
+    fun face(mood: PetMood): PetFace = when (mood) {
+        PetMood.HAPPY -> PetFace(happy, blinkHappy)
+        PetMood.SAD -> PetFace(sad, blinkSad)
+        PetMood.DIRTY -> PetFace(dirty, blinkDirty)
+        // Во сне глаза и так закрыты — моргать нечем.
+        PetMood.SLEEP -> PetFace(sleep, blink = null)
     }
 }
 
+/** Базовый слой настроения и его моргание: меняются только вместе. */
+@Immutable
+data class PetFace(@DrawableRes val base: Int, @DrawableRes val blink: Int?)
+
 private const val PUSHISTIK_CANVAS = 2048f
+
+// Полосу глаз не снимают в редакторе: её печатает tools/split_pet_base.py, и уже
+// в пикселях слоя в ресурсах, а не холста.
+private const val BLINK_LAYER = 512f
 private const val ROGATIK_CANVAS = 2200f
 
 // Звёздочка, Бантик и Лучик рисовались по шаблону Рогатика, поэтому холст у них тот же.
@@ -60,6 +75,9 @@ private val ZalinaSkin = PetSkin(
     sad = R.drawable.pushistik_base_sad,
     dirty = R.drawable.pushistik_base_dirty,
     sleep = R.drawable.pushistik_base_sleep,
+    blinkHappy = R.drawable.pushistik_blink_happy,
+    blinkSad = R.drawable.pushistik_blink_sad,
+    blinkDirty = R.drawable.pushistik_blink_dirty,
     leftHand = R.drawable.pushistik_left_hand,
     rightHand = R.drawable.pushistik_right_hand,
     leftLeg = R.drawable.pushistik_left_leg,
@@ -69,6 +87,8 @@ private val ZalinaSkin = PetSkin(
     leftLegPivot = TransformOrigin(960f / PUSHISTIK_CANVAS, 1640f / PUSHISTIK_CANVAS),
     rightLegPivot = TransformOrigin(1100f / PUSHISTIK_CANVAS, 1640f / PUSHISTIK_CANVAS),
     ground = TransformOrigin(0.5f, 1828f / PUSHISTIK_CANVAS),
+    eyesTop = 234f / BLINK_LAYER,
+    eyesBottom = 342f / BLINK_LAYER,
 )
 
 private val VanyaSkin = PetSkin(
@@ -76,6 +96,9 @@ private val VanyaSkin = PetSkin(
     sad = R.drawable.rogatik_base_sad,
     dirty = R.drawable.rogatik_base_dirty,
     sleep = R.drawable.rogatik_base_sleep,
+    blinkHappy = R.drawable.rogatik_blink_happy,
+    blinkSad = R.drawable.rogatik_blink_sad,
+    blinkDirty = R.drawable.rogatik_blink_dirty,
     leftHand = R.drawable.rogatik_left_hand,
     rightHand = R.drawable.rogatik_right_hand,
     leftLeg = R.drawable.rogatik_left_leg,
@@ -85,6 +108,8 @@ private val VanyaSkin = PetSkin(
     leftLegPivot = TransformOrigin(1054f / ROGATIK_CANVAS, 1771f / ROGATIK_CANVAS),
     rightLegPivot = TransformOrigin(1168f / ROGATIK_CANVAS, 1771f / ROGATIK_CANVAS),
     ground = TransformOrigin(0.5f, 1898f / ROGATIK_CANVAS),
+    eyesTop = 223f / BLINK_LAYER,
+    eyesBottom = 337f / BLINK_LAYER,
 )
 
 private val IraSkin = PetSkin(
@@ -92,6 +117,9 @@ private val IraSkin = PetSkin(
     sad = R.drawable.zvezdochka_base_sad,
     dirty = R.drawable.zvezdochka_base_dirty,
     sleep = R.drawable.zvezdochka_base_sleep,
+    blinkHappy = R.drawable.zvezdochka_blink_happy,
+    blinkSad = R.drawable.zvezdochka_blink_sad,
+    blinkDirty = R.drawable.zvezdochka_blink_dirty,
     leftHand = R.drawable.zvezdochka_left_hand,
     rightHand = R.drawable.zvezdochka_right_hand,
     leftLeg = R.drawable.zvezdochka_left_leg,
@@ -101,6 +129,8 @@ private val IraSkin = PetSkin(
     leftLegPivot = TransformOrigin(1060f / ZVEZDOCHKA_CANVAS, 1764f / ZVEZDOCHKA_CANVAS),
     rightLegPivot = TransformOrigin(1167f / ZVEZDOCHKA_CANVAS, 1765f / ZVEZDOCHKA_CANVAS),
     ground = TransformOrigin(0.5f, 1906f / ZVEZDOCHKA_CANVAS),
+    eyesTop = 201f / BLINK_LAYER,
+    eyesBottom = 325f / BLINK_LAYER,
 )
 
 private val SevaSkin = PetSkin(
@@ -108,6 +138,9 @@ private val SevaSkin = PetSkin(
     sad = R.drawable.bantik_base_sad,
     dirty = R.drawable.bantik_base_dirty,
     sleep = R.drawable.bantik_base_sleep,
+    blinkHappy = R.drawable.bantik_blink_happy,
+    blinkSad = R.drawable.bantik_blink_sad,
+    blinkDirty = R.drawable.bantik_blink_dirty,
     leftHand = R.drawable.bantik_left_hand,
     rightHand = R.drawable.bantik_right_hand,
     leftLeg = R.drawable.bantik_left_leg,
@@ -117,6 +150,8 @@ private val SevaSkin = PetSkin(
     leftLegPivot = TransformOrigin(1060f / BANTIK_CANVAS, 1791f / BANTIK_CANVAS),
     rightLegPivot = TransformOrigin(1156f / BANTIK_CANVAS, 1789f / BANTIK_CANVAS),
     ground = TransformOrigin(0.5f, 1902f / BANTIK_CANVAS),
+    eyesTop = 227f / BLINK_LAYER,
+    eyesBottom = 335f / BLINK_LAYER,
 )
 
 private val YarikSkin = PetSkin(
@@ -124,6 +159,9 @@ private val YarikSkin = PetSkin(
     sad = R.drawable.luchik_base_sad,
     dirty = R.drawable.luchik_base_dirty,
     sleep = R.drawable.luchik_base_sleep,
+    blinkHappy = R.drawable.luchik_blink_happy,
+    blinkSad = R.drawable.luchik_blink_sad,
+    blinkDirty = R.drawable.luchik_blink_dirty,
     leftHand = R.drawable.luchik_left_hand,
     rightHand = R.drawable.luchik_right_hand,
     leftLeg = R.drawable.luchik_left_leg,
@@ -133,6 +171,8 @@ private val YarikSkin = PetSkin(
     leftLegPivot = TransformOrigin(1064f / LUCHIK_CANVAS, 1752f / LUCHIK_CANVAS),
     rightLegPivot = TransformOrigin(1158f / LUCHIK_CANVAS, 1754f / LUCHIK_CANVAS),
     ground = TransformOrigin(0.5f, 1913f / LUCHIK_CANVAS),
+    eyesTop = 215f / BLINK_LAYER,
+    eyesBottom = 330f / BLINK_LAYER,
 )
 
 val PetCharacter.skin: PetSkin

@@ -1,8 +1,10 @@
 package ru.finney.pet.ui.pet
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
@@ -11,6 +13,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -18,13 +21,15 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.random.Random
 
 /**
  * Две анимации питомца.
  *
  * Покоя — бесконечная: дыхание (тело чуть тянется вверх и сжимается),
- * покачивание корпуса и рук. Идёт всегда, отдельно дёргать не нужно.
+ * покачивание корпуса и рук, моргание. Идёт всегда, отдельно дёргать не нужно.
  *
  * Радости — по событию [playJoy]: приседание, прыжок с вытягиванием,
  * руки вверх, поджатые ноги, приземление с пружинкой.
@@ -91,15 +96,56 @@ fun rememberPoseProvider(animation: PetAnimation): () -> PetPose {
         label = "sway",
     )
 
-    // Лямбда запоминается один раз: все четыре источника кадров — стабильные объекты,
+    val lid = rememberBlink()
+
+    // Лямбда запоминается один раз: все источники кадров — стабильные объекты,
     // и значения из них берутся в момент вызова, то есть при отрисовке.
-    return remember(animation, breath, sway) {
-        { composePose(breath.value, sway.value, animation.lift.value, animation.crouch.value) }
+    return remember(animation, breath, sway, lid) {
+        {
+            composePose(
+                breath.value, sway.value, animation.lift.value, animation.crouch.value,
+                lid.value,
+            )
+        }
     }
 }
 
+// Как у живого моргания: веко падает быстро и с разгоном, чуть задерживается
+// и поднимается медленнее, с торможением. Всё вместе — около четверти секунды:
+// короче глаз не успевает увидеть движение, дольше — питомец выглядит сонным.
+private const val LID_CLOSE_MS = 80
+private const val LID_HOLD_MS = 50L
+private const val LID_OPEN_MS = 130
+
+/**
+ * Веко опускается через случайные 2–5.5 с, иногда дважды подряд.
+ * Ровный ритм выглядит механически, поэтому паузы разные. У каждого питомца
+ * на экране свой ритм: двое на экране подбора моргают не хором.
+ */
+@Composable
+private fun rememberBlink(): Animatable<Float, AnimationVector1D> {
+    val lid = remember { Animatable(0f) }
+    LaunchedEffect(lid) {
+        while (true) {
+            delay(Random.nextLong(2000L, 5500L))
+            repeat(if (Random.nextFloat() < 0.2f) 2 else 1) {
+                lid.animateTo(1f, tween(LID_CLOSE_MS, easing = FastOutLinearInEasing))
+                delay(LID_HOLD_MS)
+                lid.animateTo(0f, tween(LID_OPEN_MS, easing = LinearOutSlowInEasing))
+            }
+        }
+    }
+    return lid
+}
+
 /** Общая арифметика позы: одна на [rememberPoseProvider] и [currentPose]. */
-private fun composePose(breath: Float, sway: Float, lift: Float, crouch: Float): PetPose =
+private fun composePose(
+    breath: Float,
+    sway: Float,
+    lift: Float,
+    crouch: Float,
+    lid: Float,
+): PetPose =
     // Дыхание и прыжок — это объём: что прибавилось по высоте, то убавилось по ширине.
     PetPose(
         scaleX = 1f - breath * 0.008f + crouch * 0.07f - lift * 0.035f,
@@ -110,6 +156,7 @@ private fun composePose(breath: Float, sway: Float, lift: Float, crouch: Float):
         rightHand = sway * 3f + lift * 34f,
         leftLeg = -lift * 8f,
         rightLeg = lift * 8f,
+        lid = lid,
     )
 
 /**
@@ -141,5 +188,6 @@ fun PetAnimation.currentPose(): PetPose {
         label = "sway",
     )
 
-    return composePose(breath, sway, lift.value, crouch.value)
+    // Моргание сюда не входит: превью — один неподвижный кадр, глаза в нём открыты.
+    return composePose(breath, sway, lift.value, crouch.value, lid = 0f)
 }
