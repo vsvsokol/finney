@@ -1,6 +1,9 @@
 package ru.finney.pet.ui.room
 
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.StartOffset
@@ -19,7 +22,12 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.TransformOrigin
@@ -33,6 +41,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import ru.finney.pet.ui.theme.FinneyCream
 import ru.finney.pet.ui.theme.FinneyTheme
+import kotlinx.coroutines.delay
+import kotlin.math.PI
+import kotlin.math.sin
+import kotlin.random.Random
 
 // Комната собирается из слоёв одного холста 1440×2400, и каждый предмет уже стоит
 // на своём месте в кадре — как у питомца, координаты подбирать не нужно. Числа
@@ -45,9 +57,14 @@ import ru.finney.pet.ui.theme.FinneyTheme
 private const val FOAM_SWELL = 0.02f
 private const val FOAM_PERIOD_MS = 3400
 
-/** Пролёт НЛО: сколько летит через окно и сколько ждёт до следующего раза. */
-private const val UFO_FLIGHT_MS = 7000
-private const val UFO_PAUSE_MS = 48000
+/**
+ * Паузы между пролётами НЛО, мс. Первая короткая — чтобы ребёнок успел его
+ * увидеть, пока смотрит на комнату, дальше реже: постоянно мелькающее НЛО
+ * перестаёт быть событием. Точный срок каждый раз случайный — по часам
+ * его ждать неинтересно.
+ */
+private val UfoFirstPauseMs = 3_000L..8_000L
+private val UfoPauseMs = 20_000L..45_000L
 
 /**
  * Комната питомца.
@@ -59,7 +76,8 @@ private const val UFO_PAUSE_MS = 48000
  * ширине, и сверху оставалась кремовая полоса почти в четверть экрана.
  *
  * По горизонтали кадр не по центру, а вокруг [Room.FOCUS_X]: слева торшер,
- * который понадобится для света, и срезать его нельзя, а справа край занавески.
+ * который понадобится для света, справа питомец на оси комнаты, а срезается
+ * край занавески.
  * Если экран шире холста (планшет), холст подгоняется по ширине и срезается
  * сверху — пол, стол и ванна нужны целиком, а верх стены пустой.
  *
@@ -153,6 +171,9 @@ private fun Pet(
  * Рама шире вида (0.350..0.979 против 0.428..0.881) и кладётся последней —
  * она перекрывает его края, и стык не виден. НЛО летит между ними, обрезанный
  * проёмом: за рамой ему делать нечего.
+ *
+ * Между пролётами НЛО не рисуется вовсе, а не ждёт за краем: раньше оно
+ * стояло там всю паузу, и на экране торчал его обрезанный край.
  */
 @Composable
 private fun Window(canvasW: Dp, canvasH: Dp) {
@@ -165,43 +186,144 @@ private fun Window(canvasW: Dp, canvasH: Dp) {
             .requiredSize(canvasW * hole.width, canvasH * hole.height)
             .clipToBounds(),
     ) {
-        val flight = rememberInfiniteTransition(label = "ufo")
-        val progress by flight.animateFloat(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(
-                // Пролёт занимает малую часть цикла: остальное НЛО ждёт за кадром,
-                // иначе оно мелькает в окне постоянно и перестаёт быть событием.
-                animation = tween(UFO_FLIGHT_MS + UFO_PAUSE_MS, easing = LinearEasing),
-            ),
-            label = "flight",
-        )
+        var flight by remember { mutableStateOf<UfoFlight?>(null) }
+        val progress = remember { Animatable(0f) }
+
+        LaunchedEffect(Unit) {
+            var pause = UfoFirstPauseMs
+            while (true) {
+                delay(Random.nextLong(pause.first, pause.last))
+                val next = Random.nextUfoFlight()
+                flight = next
+                progress.snapTo(0f)
+                progress.animateTo(1f, tween(next.durationMs, easing = LinearEasing))
+                flight = null
+                pause = UfoPauseMs
+            }
+        }
 
         val ufo = Room.WindowUfo.rect
-        val span = UFO_FLIGHT_MS.toFloat() / (UFO_FLIGHT_MS + UFO_PAUSE_MS)
-        Image(
-            painter = painterResource(Room.WindowUfo.image),
-            contentDescription = null,
-            contentScale = ContentScale.FillBounds,
-            modifier = Modifier
-                .offset(canvasW * (ufo.left - hole.left), canvasH * (ufo.top - hole.top))
-                .requiredSize(canvasW * ufo.width, canvasH * ufo.height)
-                .graphicsLayer {
-                    // Экспорт дизайнера — середина пути: отсюда НЛО уезжает на ширину
-                    // окна влево и вправо, и положение на картинке оказывается тем,
-                    // что видно в середине пролёта.
-                    val travel = size.width * 6f
-                    translationX = if (progress < span) {
-                        (progress / span - 0.5f) * travel
-                    } else {
-                        travel // ждёт за краем проёма
-                    }
-                },
-        )
+        flight?.let { current ->
+            Image(
+                painter = painterResource(Room.WindowUfo.image),
+                contentDescription = null,
+                contentScale = ContentScale.FillBounds,
+                modifier = Modifier
+                    .requiredSize(canvasW * ufo.width, canvasH * ufo.height)
+                    // Прогресс читается только здесь, на отрисовке: кадры пролёта
+                    // двигают готовую картинку и не пересобирают окно.
+                    .graphicsLayer {
+                        val t = progress.value
+                        val holeW = (canvasW * hole.width).toPx()
+                        val holeH = (canvasH * hole.height).toPx()
+
+                        // Путь от «целиком за одним краем проёма» до «целиком
+                        // за другим»: пролёт кончается, только когда НЛО ушло
+                        // из окна полностью, и не обрывается на полпути.
+                        val along = current.along(t)
+                        val x = -size.width + along * (holeW + size.width)
+                        translationX = if (current.fromLeft) x else holeW - size.width - x
+                        translationY = current.height(t) * (holeH - size.height)
+                        rotationZ = current.tilt(t)
+                    },
+            )
+        }
     }
 
     Layer(Room.WindowFrame, canvasW, canvasH)
 }
+
+/**
+ * Один пролёт НЛО.
+ *
+ * Пролёты не повторяются: каждый раз заново выбирается, с какой стороны оно
+ * летит, на какой высоте, как сильно покачивается и не зависнет ли посреди
+ * окна — поглазеть на питомца. Одинаковый ровный пролёт на третий раз
+ * смотреть уже скучно.
+ *
+ * Всё в долях: путь 0..1 от «целиком за краем, откуда летит» до «целиком
+ * за противоположным», высота 0..1 от верха проёма до низа.
+ */
+@Immutable
+private data class UfoFlight(
+    val durationMs: Int,
+    val fromLeft: Boolean,
+    val startHeight: Float,
+    val endHeight: Float,
+    /** Размах покачивания вверх-вниз, доля высоты проёма. */
+    val bob: Float,
+    /** Сколько раз НЛО качнётся за пролёт. */
+    val bobCycles: Float,
+    /** Где на пути зависнуть; null — пролететь не останавливаясь. */
+    val hoverAt: Float?,
+    /** Повисев, улететь туда же, откуда прилетело. */
+    val turnBack: Boolean,
+) {
+    /** Сколько пути пройдено к моменту [t]. */
+    fun along(t: Float): Float {
+        val stop = hoverAt ?: return t
+        return when {
+            // Подлетает с торможением, висит, уходит с разгоном: как будто
+            // заметило что-то в комнате, а потом спохватилось.
+            t < HOVER_IN -> stop * FastOutSlowInEasing.transform(t / HOVER_IN)
+            t < HOVER_OUT -> stop + HOVER_DRIFT * sin((t - HOVER_IN) / (HOVER_OUT - HOVER_IN) * PI.toFloat())
+            else -> {
+                val exit = FastOutLinearInEasing.transform((t - HOVER_OUT) / (1f - HOVER_OUT))
+                val target = if (turnBack) 0f else 1f
+                stop + (target - stop) * exit
+            }
+        }
+    }
+
+    /** Высота к моменту [t]: плавный уход с одной высоты на другую плюс покачивание. */
+    fun height(t: Float): Float {
+        val drift = startHeight + (endHeight - startHeight) * t
+        return (drift + bob * sin(t * bobCycles * 2f * PI.toFloat())).coerceIn(0f, 1f)
+    }
+
+    /**
+     * Наклон по ходу движения: тарелка клюёт носом туда, куда летит, и
+     * выравнивается, когда зависает. Скорость берётся разностью — путь
+     * кусочный, и производную по формулам пришлось бы писать на каждый кусок.
+     */
+    fun tilt(t: Float): Float {
+        val dt = 0.01f
+        val speed = (along((t + dt).coerceAtMost(1f)) - along(t)) / dt
+        val direction = if (fromLeft) 1f else -1f
+        return (speed * direction * UFO_TILT_PER_SPEED).coerceIn(-UFO_MAX_TILT, UFO_MAX_TILT)
+    }
+}
+
+/** Доли пролёта с зависанием: до HOVER_IN подлетает, до HOVER_OUT висит. */
+private const val HOVER_IN = 0.35f
+private const val HOVER_OUT = 0.65f
+
+/** Пока висит, НЛО чуть подаётся вперёд и обратно — неподвижное выглядит картинкой. */
+private const val HOVER_DRIFT = 0.02f
+
+/** Градусов наклона на единицу скорости: ровный пролёт — около 6°. */
+private const val UFO_TILT_PER_SPEED = 6f
+private const val UFO_MAX_TILT = 14f
+
+private fun Random.nextUfoFlight(): UfoFlight {
+    val hover = nextFloat() < 0.4f
+    // Высоты — в средней части проёма: рама заходит на края вида, и у самого
+    // верха или низа НЛО наполовину пряталось бы под ней.
+    val start = between(0.2f, 0.8f)
+    return UfoFlight(
+        // Без зависания пролёт бывает и стремительным, и ленивым.
+        durationMs = if (hover) nextInt(7_000, 10_000) else nextInt(2_500, 7_500),
+        fromLeft = nextBoolean(),
+        startHeight = start,
+        endHeight = (start + between(-0.35f, 0.35f)).coerceIn(0.1f, 0.9f),
+        bob = between(0f, 0.12f),
+        bobCycles = between(1f, 4f),
+        hoverAt = if (hover) between(0.35f, 0.6f) else null,
+        turnBack = hover && nextBoolean(),
+    )
+}
+
+private fun Random.between(from: Float, until: Float): Float = from + nextFloat() * (until - from)
 
 /** Пена тихо колышется. Слои дышат в противофазе, иначе движение читается как рывок всей ванны. */
 @Composable

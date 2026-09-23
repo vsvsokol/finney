@@ -14,19 +14,10 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.remember
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import ru.finney.pet.ui.theme.FinneyPeach
-import ru.finney.pet.ui.theme.FinneyPink
-import ru.finney.pet.ui.theme.FinneyStrokeRatio
-import ru.finney.pet.ui.theme.FinneyYellow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.Box
@@ -66,6 +57,7 @@ import ru.finney.pet.domain.model.PetStats
 import ru.finney.pet.domain.pet.Emotion
 import ru.finney.pet.domain.model.TaskDefinition
 import ru.finney.pet.ui.components.Coin
+import ru.finney.pet.ui.components.buttonFill
 import ru.finney.pet.ui.components.FinneyButton
 import ru.finney.pet.ui.components.FinneyIcon
 import ru.finney.pet.ui.components.FinneyIconButton
@@ -553,7 +545,7 @@ private fun MoneyButton(balance: Int, onClick: () -> Unit) {
         Box(
             modifier = Modifier
                 .clip(shape)
-                .moneyButtonFill(pressed)
+                .buttonFill(pressed, round = false, glare = false)
                 .padding(horizontal = 14.dp, vertical = 8.dp),
             contentAlignment = Alignment.Center,
         ) {
@@ -569,27 +561,6 @@ private fun MoneyButton(balance: Int, onClick: () -> Unit) {
             }
         }
     }
-}
-
-/** Заливка кнопки денег: те же цвета и полоса, что у [FinneyButton]. */
-private fun Modifier.moneyButtonFill(pressed: Boolean): Modifier = drawBehind {
-    val face = if (pressed) FinneyPeach else FinneyYellow
-    val band = if (pressed) FinneyPink else FinneyPeach
-    drawRect(face)
-    val bandHeight = size.height * 0.25f
-    drawRect(
-        color = band,
-        topLeft = Offset(0f, size.height - bandHeight),
-        size = Size(size.width, bandHeight),
-    )
-    val outline = size.height * FinneyStrokeRatio
-    drawRoundRect(
-        color = FinneyInk,
-        topLeft = Offset(outline / 2f, outline / 2f),
-        size = Size(size.width - outline, size.height - outline),
-        cornerRadius = CornerRadius(size.height / 2f),
-        style = Stroke(width = outline),
-    )
 }
 
 /**
