@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Цвет капюшона Пушистика: фон значка там, где капюшон кончается (tools/make_app_icon.py). -->
+    <color name="ic_launcher_background">#A628C3</color>
+</resources>

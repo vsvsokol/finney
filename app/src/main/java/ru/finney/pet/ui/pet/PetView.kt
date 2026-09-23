@@ -30,7 +30,7 @@ import ru.finney.pet.domain.model.PetCharacter
 // сами и координаты подбирать не нужно.
 //
 // Порядок отрисовки снизу вверх: ноги, руки, базовый слой (голова и туловище),
-// слой моргания. Моргание собирает из состояний сна тот же скрипт.
+// слой моргания, открытый рот. Моргание и рот собирает из состояний сна тот же скрипт.
 // В базовом слое конечности вырезаны из состояния лица — см. tools/split_pet_base.py.
 // Без выреза под повёрнутой рукой видно исходную; вырез обязан быть точным по краю,
 // иначе по контуру рук и ног идёт светлый шов.
@@ -54,6 +54,8 @@ data class PetPose(
     val rightLeg: Float = 0f,
     /** Веко: 0 — глаза открыты, 1 — закрыты. */
     val lid: Float = 0f,
+    /** Рот: 0 — как у настроения, 1 — открыт навстречу еде. */
+    val mouth: Float = 0f,
 )
 
 /**
@@ -115,8 +117,32 @@ fun PetView(
                 }
             }
         }
+
+        // Во сне рот и так приоткрыт, а есть питомец во сне не будет.
+        if (mood != PetMood.SLEEP) {
+            Image(
+                painter = painterResource(skin.mouth),
+                contentDescription = null,
+                modifier = Modifier
+                    .matchParentSize()
+                    .graphicsLayer {
+                        val open = pose().mouth
+                        alpha = if (open > MOUTH_SHOWN) 1f else 0f
+                        transformOrigin = skin.mouthCenter
+                        scaleX = 1f + open * MOUTH_STRETCH_X
+                        scaleY = 1f + open * MOUTH_STRETCH_Y
+                    },
+            )
+        }
     }
 }
+
+// Открытый рот — это рот из сна, и меньше него он не бывает: сжатый слой перестал бы
+// закрывать улыбку под собой. Растягивается он умеренно: у Пушистика до линии
+// подбородка от края слоя всего пикселей пять, дальше кожа рта легла бы на обводку.
+private const val MOUTH_SHOWN = 0.02f
+private const val MOUTH_STRETCH_X = 0.12f
+private const val MOUTH_STRETCH_Y = 0.3f
 
 // Мягкость края века в долях стороны. Жёсткий край на полпути выглядит разрезом
 // глаза, а не веком.

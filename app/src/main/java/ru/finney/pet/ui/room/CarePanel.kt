@@ -72,6 +72,9 @@ data class CareBlock(
  * [block] — покупка запрещена целиком. Тогда вместо «Купить» стоит кнопка,
  * которая ведёт туда, где запрет снимается: тупика с неработающей кнопкой
  * у ребёнка быть не должно.
+ *
+ * [confirmLabel] — что случится по нажатию. На главном это «Купить и покормить»:
+ * дальше идёт игра, а деньги уходят, когда еда попала в рот.
  */
 @Composable
 fun CarePanel(
@@ -82,6 +85,7 @@ fun CarePanel(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
     block: CareBlock? = null,
+    confirmLabel: String = "Купить",
 ) {
     val selected = options.firstOrNull { it.isSelected }
 
@@ -115,7 +119,7 @@ fun CarePanel(
         // с нехваткой уже написано, сколько не достаёт и что делать, — кнопка
         // молча неактивной не остаётся.
         FinneyButton(
-            text = if (selected == null) "Выбери, что купить" else "Купить",
+            text = if (selected == null) "Выбери, что купить" else confirmLabel,
             onClick = { selected?.let { onConfirm(it.item.id) } },
             enabled = selected != null && selected.preview.shortage == 0,
         )
