@@ -35,9 +35,11 @@ data object ShopRoute
 @Serializable
 data object GoalsRoute
 
+/** Все задания и мини-игры по темам. */
 @Serializable
 data object TasksRoute
 
+/** Одно задание или мини-игра: вступление, игра, итог. */
 @Serializable
 data class TaskRoute(val taskId: String)
 

@@ -1,197 +1,120 @@
 [
   {
-    "id": "budget_01",
+    "id": "game_sorter",
     "theme": "planning",
-    "engine": "distributor",
-    "title": "Разложи по конвертам",
-    "intro": "Финни получил 60 монет. Помоги распределить их на неделю.",
-    "amount": 60,
-    "baskets": [
-      {
-        "id": "needs",
-        "label": "Нужное",
-        "hint": "еда и шампунь"
-      },
-      {
-        "id": "wants",
-        "label": "Хочется",
-        "hint": "игрушки"
-      },
-      {
-        "id": "savings",
-        "label": "Копилка",
-        "hint": "на цель"
-      }
+    "engine": "sorter",
+    "title": "Конвейер",
+    "intro": "По ленте едут вещи. Отнеси каждую в корзину: «Нужное» или «Хочется».",
+    "minCorrect": 10,
+    "items": [
+      { "id": "apple", "label": "Яблоко", "category": "needs", "art": "item_food_apple", "why": "Яблоко — еда. Без еды Финни проголодается." },
+      { "id": "donut", "label": "Пончик", "category": "wants", "art": "item_treat_donut", "why": "Пончик — вкусняшка. Без него Финни не проголодается." },
+      { "id": "soap", "label": "Мыло", "category": "needs", "art": "item_care_soap", "why": "Без мыла Финни будет грязным." },
+      { "id": "ball", "label": "Мячик", "category": "wants", "emoji": "⚽", "why": "Мячик поднимает настроение, но его можно купить и потом." },
+      { "id": "milk", "label": "Молоко", "category": "needs", "art": "item_food_milk", "why": "Молоко — еда на каждый день." },
+      { "id": "candy", "label": "Леденец", "category": "wants", "art": "item_treat_candy", "why": "Леденец — сладость. Это приятно, но не обязательно." },
+      { "id": "coat_winter", "label": "Тёплая куртка зимой", "category": "needs", "emoji": "🧥", "why": "Зимой без тёплой куртки холодно — это нужное." },
+      { "id": "coat_second", "label": "Вторая куртка", "category": "wants", "emoji": "🧥", "why": "Одна куртка уже есть. Вторая — это «хочется»." },
+      { "id": "bowl", "label": "Миска корма", "category": "needs", "art": "item_food_bowl", "why": "Корм — главная еда Финни." },
+      { "id": "chocolate", "label": "Шоколадка", "category": "wants", "art": "item_treat_chocolate", "why": "Шоколадка — вкусняшка, без неё можно обойтись." },
+      { "id": "toothbrush", "label": "Зубная щётка", "category": "needs", "emoji": "🪥", "why": "Чистить зубы нужно каждый день." },
+      { "id": "stickers", "label": "Наклейки", "category": "wants", "emoji": "🌟", "why": "Наклейки красивые, но это «хочется»." }
     ],
-    "rules": [
-      {
-        "type": "min",
-        "basket": "needs",
-        "value": 25
-      },
-      {
-        "type": "min",
-        "basket": "savings",
-        "value": 5
-      }
-    ],
-    "explainOk": "Ты закрыл всё нужное и ещё отложил. Финни сыт, а цель стала ближе.",
-    "explainFail": "На нужное не хватило. Финни проголодается. В следующий раз сначала закрой обязательное, потом остальное."
+    "explainOk": "Нужное — в одной корзине, желаемое — в другой. Сначала покупают нужное, а желаемое — если остались монеты.",
+    "explainFail": "Некоторые вещи попали не туда. Подумай: что будет, если этого не купить? Если Финни станет голодным или грязным — это нужное. Попробуй ещё раз!"
   },
   {
-    "id": "budget_02",
-    "theme": "planning",
-    "engine": "basket",
-    "title": "Что сначала",
-    "intro": "У Финни 40 монет. В магазине есть еда и новая игрушка.",
-    "limit": 40,
-    "shelf": [
-      {
-        "id": "soup",
-        "label": "Супчик",
-        "price": 25,
-        "category": "needs"
-      },
-      {
-        "id": "robot",
-        "label": "Робот",
-        "price": 30,
-        "category": "wants"
-      },
-      {
-        "id": "apple",
-        "label": "Яблоко",
-        "price": 10,
-        "category": "needs"
-      }
-    ],
-    "rules": [
-      {
-        "type": "hasCategory",
-        "category": "needs"
-      },
-      {
-        "type": "excludes",
-        "item": "robot"
-      }
-    ],
-    "explainOk": "Сначала еда, потом игрушки. Финни не остался голодным.",
-    "explainFail": "Игрушка куплена, а еды не хватило. Игрушку можно было купить в следующий раз — она никуда не денется."
-  },
-  {
-    "id": "savings_01",
-    "theme": "savings",
-    "engine": "goal_slider",
-    "title": "Успеть ко дню рождения",
-    "intro": "Праздничная шляпа стоит 90 монет. До праздника 3 периода.",
-    "goalPrice": 90,
-    "periods": 3,
-    "incomePerPeriod": 50,
-    "explainOk": "По 30 монет за раз — и к празднику наберётся ровно 90. Откладывать понемногу, но регулярно — это и есть копить.",
-    "explainFail": "Столько откладывать мало: до праздника наберётся меньше 90. Попробуй увеличить взнос."
-  },
-  {
-    "id": "savings_02",
-    "theme": "savings",
-    "engine": "distributor",
-    "title": "Соблазн",
-    "intro": "В копилке 100 из 150 монет на велосипед. А в магазине появилась игрушка за 40.",
-    "amount": 40,
-    "baskets": [
-      {
-        "id": "wants",
-        "label": "Купить игрушку"
-      },
-      {
-        "id": "savings",
-        "label": "В копилку"
-      }
-    ],
-    "goal": {
-      "label": "Велосипед",
-      "price": 150,
-      "saved": 100,
-      "basket": "savings"
-    },
-    "rules": [
-      {
-        "type": "min",
-        "basket": "savings",
-        "value": 40
-      }
-    ],
-    "explainOk": "Ты не потратил и стал ближе к велосипеду. Иногда подождать выгоднее.",
-    "explainFail": "Игрушка твоя, но велосипед отодвинулся. Это нормально — просто теперь копить дольше."
-  },
-  {
-    "id": "shopping_01",
+    "id": "game_shopping",
     "theme": "shopping",
     "engine": "basket",
-    "title": "Что выгоднее",
-    "intro": "Финни любит яблоки. В магазине два предложения.",
-    "limit": 20,
-    "shelf": [
-      {
-        "id": "pack_small",
-        "label": "2 яблока",
-        "price": 10,
-        "category": "needs"
-      },
-      {
-        "id": "pack_big",
-        "label": "5 яблок",
-        "price": 20,
-        "category": "needs"
-      }
-    ],
-    "rules": [
-      {
-        "type": "includes",
-        "item": "pack_big"
-      }
-    ],
-    "explainOk": "За те же деньги яблок больше. Полезно сравнивать, сколько получаешь за свою монету.",
-    "explainFail": "Можно было взять больше яблок за ту же сумму. Сравнивай не только цену, но и сколько дают."
-  },
-  {
-    "id": "shopping_02",
-    "theme": "shopping",
-    "engine": "basket",
-    "title": "Не хватило на кассе",
-    "intro": "У Финни 50 монет, а в корзине набралось на 55.",
+    "title": "Список покупок",
+    "intro": "Финни дал список и 50 монет. Собери всё по списку и не забудь сравнить упаковки.",
     "limit": 50,
-    "preloaded": [
-      "soup",
-      "candy",
-      "ball"
-    ],
     "shelf": [
-      {
-        "id": "soup",
-        "label": "Супчик",
-        "price": 25,
-        "category": "needs"
-      },
-      {
-        "id": "candy",
-        "label": "Конфета",
-        "price": 15,
-        "category": "wants"
-      },
-      {
-        "id": "ball",
-        "label": "Мячик",
-        "price": 15,
-        "category": "wants"
-      }
+      { "id": "apple2", "label": "2 яблока", "price": 10, "qty": 2, "category": "needs", "art": "item_food_apple" },
+      { "id": "apple5", "label": "5 яблок", "price": 20, "qty": 5, "category": "needs", "art": "item_food_apple" },
+      { "id": "milk", "label": "Молоко", "price": 15, "category": "needs", "art": "item_food_milk" },
+      { "id": "soap", "label": "Мыло", "price": 10, "category": "needs", "art": "item_care_soap" },
+      { "id": "soap_liquid", "label": "Жидкое мыло", "price": 15, "category": "needs", "art": "item_care_soap_liquid" },
+      { "id": "chocolate", "label": "Шоколадка у кассы", "price": 15, "category": "wants", "art": "item_treat_chocolate" }
     ],
     "rules": [
-      {
-        "type": "hasCategory",
-        "category": "needs"
-      }
+      { "type": "minQty", "items": ["apple2", "apple5"], "qty": 4, "label": "4 яблока — еда на 2 дня" },
+      { "type": "anyOf", "items": ["soap", "soap_liquid"], "label": "Мыло" }
     ],
-    "explainOk": "Ты убрал необязательное и уложился. Отложить желаемое — не ошибка.",
-    "explainFail": "Ты уложился в деньги, но без еды. Финни останется голодным — верни супчик и убери игрушку."
+    "explainOk": "Всё по списку, и деньги остались! 5 яблок за 20 выгоднее, чем 2 за 10: за каждую монету получаешь больше.",
+    "explainFail": "В корзине не всё из списка. Посмотри, где галочки не стоят, — и попробуй ещё раз. Подсказка: 2 яблок на 2 дня мало."
+  },
+  {
+    "id": "game_race",
+    "theme": "savings",
+    "engine": "goal_race",
+    "title": "Дорога к цели",
+    "intro": "Финни копит на самокат. Каждый день он получает 10 монет. Реши, сколько отложить, а сколько потратить.",
+    "goal": { "label": "Самокат", "price": 50, "emoji": "🛴" },
+    "days": 6,
+    "incomePerDay": 10,
+    "step": 5,
+    "events": [
+      { "day": 2, "label": "Наклейки", "price": 5, "emoji": "🌟" },
+      { "day": 4, "label": "Мороженое с другом", "price": 5, "emoji": "🍦" },
+      { "day": 5, "label": "Кино", "price": 10, "emoji": "🎬" }
+    ],
+    "explainOk": "Самокат твой! Откладывать понемногу, но каждый день — так и копят. И одно удовольствие цели не помешало.",
+    "explainFail": "Самокат пока не набрался. Накопленное никуда не делось: ещё пара дней по 10 — и он твой. В следующий раз откажись от одного соблазна."
+  },
+  {
+    "id": "game_rainy",
+    "theme": "planning",
+    "engine": "reserve",
+    "title": "Дождливый день",
+    "intro": "У Финни 60 монет на неделю. Выбери, что купить, а остальное оставь в запасе — вдруг что-то случится.",
+    "amount": 60,
+    "spendings": [
+      { "id": "food", "label": "Еда на неделю", "price": 20, "category": "needs", "art": "item_food_bowl" },
+      { "id": "soap", "label": "Мыло", "price": 10, "category": "needs", "art": "item_care_soap" },
+      { "id": "ball", "label": "Мячик", "price": 10, "category": "wants", "emoji": "⚽" },
+      { "id": "stickers", "label": "Наклейки", "price": 10, "category": "wants", "emoji": "🌟" },
+      { "id": "icecream", "label": "Мороженое", "price": 5, "category": "wants", "emoji": "🍦" }
+    ],
+    "surprise": {
+      "label": "Сломался зонт!",
+      "text": "Новый стоит 15. Без него Финни промокнет по дороге.",
+      "price": 15,
+      "emoji": "☂️"
+    },
+    "explainOk": "Хорошо, что был запас! Неожиданная трата не испортила неделю. Запас — это деньги на всякий случай.",
+    "explainFail": "Запаса не хватило, и что-то пришлось перенести. Ничего страшного — в следующий раз оставь немного монет на всякий случай."
+  },
+  {
+    "id": "game_lemonade",
+    "theme": "planning",
+    "engine": "stand",
+    "title": "Лимонадная лавка",
+    "intro": "Финни открывает лавку. Утром купи лимоны, днём налей лимонад гостям, вечером посчитай, что осталось.",
+    "budget": 50,
+    "ingredient": { "label": "Лимон", "price": 5, "yields": 2, "emoji": "🍋" },
+    "cupPrice": 5,
+    "guests": 8,
+    "forecast": "Жарко — придут 8 гостей",
+    "explainOk": "Лимонов было ровно столько, сколько нужно: все гости с лимонадом, и ничего не пропало. Считать заранее — выгодно.",
+    "explainFail": "Лимонов было не столько, сколько нужно. Посмотри итог дня: сколько гостей пришло и сколько стаканов вышло из одного лимона. Завтра получится!"
+  },
+  {
+    "id": "game_cashier",
+    "theme": "shopping",
+    "engine": "change",
+    "title": "Касса Финни",
+    "intro": "Финни работает на кассе. Отсчитай сдачу покупателю, а потом заплати сам — ровно, без сдачи.",
+    "coins": [1, 2, 5, 10],
+    "minCorrect": 3,
+    "rounds": [
+      { "mode": "give", "label": "Сок", "price": 17, "paid": 20, "art": "item_food_juice" },
+      { "mode": "give", "label": "Яблоко", "price": 6, "paid": 10, "art": "item_food_apple" },
+      { "mode": "exact", "label": "Молоко", "price": 17, "wallet": [10, 5, 5, 2, 1, 1], "art": "item_food_milk" },
+      { "mode": "give", "label": "Леденец", "price": 12, "paid": 20, "art": "item_treat_candy" }
+    ],
+    "explainOk": "Все монеты сошлись! Сдача — это разница: сколько дали минус сколько стоит. Всегда проверяй сдачу.",
+    "explainFail": "Кое-где монет было больше или меньше, чем нужно. Считай так: сколько дали минус сколько стоит — это и есть сдача."
   }
 ]

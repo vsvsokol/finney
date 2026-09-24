@@ -1,0 +1,277 @@
+package ru.finney.pet.ui.tasks.games
+
+import android.annotation.SuppressLint
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import ru.finney.pet.domain.model.Category
+import ru.finney.pet.domain.model.ItemArt
+import ru.finney.pet.domain.tasks.TaskInputError
+import ru.finney.pet.ui.components.FinneyIconButton
+import ru.finney.pet.ui.components.OutlinedText
+import ru.finney.pet.ui.theme.FinneyBlue
+import ru.finney.pet.ui.theme.FinneyCream
+import ru.finney.pet.ui.theme.FinneyGreen
+import ru.finney.pet.ui.theme.FinneyInk
+import ru.finney.pet.ui.theme.FinneyPeach
+import ru.finney.pet.ui.theme.FinneyPink
+import ru.finney.pet.ui.theme.FinneySand
+import ru.finney.pet.ui.theme.FinneyYellow
+import ru.finney.pet.ui.theme.RadiusCard
+import ru.finney.pet.ui.theme.StrokeBold
+import ru.finney.pet.ui.theme.StrokeRegular
+
+// Общие детали мини-игр: рамка экрана, рисунок предмета, монета с номиналом,
+// подсказка, кнопки «−» и «+». Каждая игра собрана из них, поэтому выглядят
+// они одинаково и правятся в одном месте.
+
+/**
+ * Рамка игры: короткая подсказка сверху, игра посередине, кнопки снизу.
+ *
+ * [scrollable] — середина прокручивается: полка магазина или список трат длиннее
+ * экрана на 360 dp. Для игр с перетаскиванием прокрутку не включать — она перехватит жест.
+ */
+@Composable
+internal fun MiniGameFrame(
+    hint: String,
+    modifier: Modifier = Modifier,
+    scrollable: Boolean = false,
+    bottom: @Composable ColumnScope.() -> Unit = {},
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(FinneyCream)
+            .systemBarsPadding()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        OutlinedText(hint, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .then(if (scrollable) Modifier.verticalScroll(rememberScrollState()) else Modifier),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            content = content,
+        )
+        bottom()
+    }
+}
+
+/**
+ * Рисунок предмета: картинка из res/drawable-nodpi по имени из JSON, иначе эмодзи,
+ * иначе первая буква. Так [@vsvsokol] добавляет предмет без программиста, а
+ * дизайнеры потом заменяют эмодзи на рисунок одной строкой.
+ */
+@SuppressLint("DiscouragedApi") // Имя картинки приходит из JSON — R.drawable.* здесь не подставить.
+@Composable
+internal fun ItemPicture(art: ItemArt, label: String, size: Dp, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val drawable = remember(art.art) {
+        art.art?.let { context.resources.getIdentifier(it, "drawable", context.packageName) }?.takeIf { it != 0 }
+    }
+    Box(
+        modifier = modifier
+            .size(size)
+            .clearAndSetSemantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
+    ) {
+        when {
+            drawable != null -> Image(painterResource(drawable), contentDescription = null, modifier = Modifier.fillMaxSize())
+            art.emoji != null -> Text(art.emoji!!, fontSize = (size.value * 0.62f).sp, textAlign = TextAlign.Center)
+            else -> Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(CircleShape)
+                    .background(FinneySand)
+                    .border(StrokeRegular, FinneyInk, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                OutlinedText(label.take(1), style = MaterialTheme.typography.headlineMedium)
+            }
+        }
+    }
+}
+
+/** Подпись категории. Цвет дублируется словом и значком: ТЗ п. 3.6. */
+@Composable
+internal fun CategoryChip(category: Category, modifier: Modifier = Modifier) {
+    val (text, color) = when (category) {
+        Category.NEEDS -> "🍴 нужное" to FinneyGreen
+        Category.WANTS -> "★ хочется" to FinneyPink
+    }
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelMedium,
+        color = FinneyInk,
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(color)
+            .border(2.dp, FinneyInk, RoundedCornerShape(10.dp))
+            .padding(horizontal = 8.dp, vertical = 2.dp),
+    )
+}
+
+/**
+ * Монета с номиналом — жёлтый кружок с цифрой, как «1» в ките. Отличается от
+ * монеты игровой валюты: на кассе важен номинал, а не значок финки.
+ * Номинал подписан цифрой, цвет — только помощь глазу.
+ */
+@Composable
+internal fun DenominationCoin(
+    value: Int,
+    modifier: Modifier = Modifier,
+    size: Dp = 52.dp,
+    faded: Boolean = false,
+) {
+    val fill = when (value) {
+        1 -> FinneyYellow
+        2 -> FinneyBlue
+        5 -> FinneyPeach
+        else -> FinneyGreen
+    }
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(if (faded) FinneySand else fill)
+            .border(StrokeRegular, if (faded) FinneyInk.copy(alpha = 0.35f) else FinneyInk, CircleShape)
+            .clearAndSetSemantics { contentDescription = "монета $value" },
+        contentAlignment = Alignment.Center,
+    ) {
+        OutlinedText(
+            value.toString(),
+            style = MaterialTheme.typography.titleLarge.copy(fontSize = (size.value * 0.42f).sp),
+            fill = if (faded) FinneySand else FinneyCream,
+            outline = if (faded) FinneyInk.copy(alpha = 0.35f) else FinneyInk,
+        )
+    }
+}
+
+/** Заметка в рамке: подсказка, ошибка, «верно!». [color] — фон, смысл несёт текст. */
+@Composable
+internal fun Note(text: String, modifier: Modifier = Modifier, color: Color = FinneyYellow) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyLarge,
+        color = FinneyInk,
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(color)
+            .border(2.dp, FinneyInk, RoundedCornerShape(16.dp))
+            .padding(12.dp),
+    )
+}
+
+/** Кремовая карточка с рамкой: ячейка полки, строка траты, панель дня. */
+@Composable
+internal fun GameCard(
+    modifier: Modifier = Modifier,
+    selected: Boolean = false,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(RadiusCard))
+            .background(if (selected) FinneyYellow else Color.White)
+            .border(if (selected) StrokeBold else StrokeRegular, FinneyInk, RoundedCornerShape(RadiusCard))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        content = content,
+    )
+}
+
+/** Число с кнопками «−» и «+». Кнопки 56 dp — больше минимума ТЗ п. 3.6. */
+@Composable
+internal fun Stepper(
+    value: String,
+    onMinus: () -> Unit,
+    onPlus: () -> Unit,
+    minusEnabled: Boolean,
+    plusEnabled: Boolean,
+    what: String,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        FinneyIconButton(onClick = onMinus, contentDescription = "Меньше: $what", size = 56.dp, enabled = minusEnabled) {
+            OutlinedText("−", style = MaterialTheme.typography.headlineMedium)
+        }
+        OutlinedText(value, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(horizontal = 4.dp))
+        FinneyIconButton(onClick = onPlus, contentDescription = "Больше: $what", size = 56.dp, enabled = plusEnabled) {
+            OutlinedText("+", style = MaterialTheme.typography.headlineMedium)
+        }
+    }
+}
+
+/** Строка «подпись — число» для итогов и расчётов. */
+@Composable
+internal fun SumRow(label: String, value: String, modifier: Modifier = Modifier, strong: Boolean = false) {
+    Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = FinneyInk,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = value,
+            style = if (strong) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
+            color = FinneyInk,
+        )
+    }
+}
+
+/**
+ * Ошибка ввода — не исход задания: ребёнок исправляет и пробует снова.
+ * Тексты короткие, в каждом есть следующий шаг (ТЗ п. 2.5.9).
+ */
+internal fun inputErrorText(error: TaskInputError): String = when (error) {
+    is TaskInputError.OverLimit -> "Не хватает ${error.shortage} монет. Убери что-нибудь и попробуй снова."
+    is TaskInputError.NotFullyDistributed ->
+        if (error.remaining > 0) "Осталось разложить ${error.remaining}." else "Разложено на ${-error.remaining} больше, чем есть."
+    is TaskInputError.NotAllSorted -> "Разложи все вещи — осталось ${error.missing}."
+    is TaskInputError.SurpriseNotCovered -> "Пока не хватает ${error.shortage}. Перенеси ещё что-нибудь."
+    is TaskInputError.NeedsLocked, is TaskInputError.NeedsNotPlanned -> "Нужное переносить нельзя — без него питомцу будет плохо."
+    is TaskInputError.CoinsNotInWallet -> "В кошельке нет таких монет."
+    else -> "Так не получится. Попробуй по-другому."
+}

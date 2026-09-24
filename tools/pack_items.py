@@ -1,8 +1,9 @@
 """Переносит рисунки предметов из экспорта дизайнеров в ресурсы приложения.
 
-Берутся только предметы, которые есть в магазине (assets/content/shop.json):
-рисунок без записи в магазине в игре не покажется, и в APK ему делать нечего.
-Добавят предмет в магазин — перезапустить скрипт, рисунок подтянется сам.
+Берутся только предметы, которые есть в магазине (assets/content/shop.json)
+или на которые ссылается поле "art" в мини-играх (assets/content/tasks.json):
+рисунок без ссылки в игре не покажется, и в APK ему делать нечего.
+Добавят предмет в магазин или мини-игру — перезапустить скрипт, рисунок подтянется сам.
 
 Холст у предметов 2000 × 2000, а сам предмет занимает его середину. Слой
 обрезается по непрозрачным пикселям и уменьшается до SIDE по большей стороне:
@@ -24,19 +25,32 @@ from PIL import Image
 SRC = Path("design/exports/items")
 RES = Path("app/src/main/res/drawable-nodpi")
 SHOP = Path("app/src/main/assets/content/shop.json")
+TASKS = Path("app/src/main/assets/content/tasks.json")
 SIDE = 256
 
 
+def art_names(node) -> set[str]:
+    """Все значения "art" в JSON мини-игр, на любой глубине."""
+    if isinstance(node, dict):
+        found = {node["art"]} if isinstance(node.get("art"), str) else set()
+        return found.union(*(art_names(v) for v in node.values()))
+    if isinstance(node, list):
+        return set().union(*(art_names(v) for v in node))
+    return set()
+
+
 def main() -> None:
-    for item in json.loads(SHOP.read_text(encoding="utf-8")):
-        src = SRC / f"item_{item['id']}.png"
+    names = {f"item_{item['id']}" for item in json.loads(SHOP.read_text(encoding="utf-8"))}
+    names |= art_names(json.loads(TASKS.read_text(encoding="utf-8")))
+    for name in sorted(names):
+        src = SRC / f"{name}.png"
         if not src.exists():
-            print(f"{item['id']}: рисунка нет — в игре будет значок")
+            print(f"{name}: рисунка нет — в игре будет значок")
             continue
         image = Image.open(src).convert("RGBA")
         image = image.crop(image.getbbox())
         image.thumbnail((SIDE, SIDE), Image.LANCZOS)
-        out = RES / f"item_{item['id']}.webp"
+        out = RES / f"{name}.webp"
         image.save(out, "WEBP", lossless=True, method=6)
         print(f"{out} — {image.size[0]}×{image.size[1]}, {out.stat().st_size // 1024} КБ")
 

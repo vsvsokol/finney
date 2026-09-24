@@ -18,6 +18,8 @@ import ru.finney.pet.ui.home.HomeScreen
 import ru.finney.pet.ui.onboarding.PetSetupScreen
 import ru.finney.pet.ui.period.PeriodResultScreen
 import ru.finney.pet.ui.pet.PetLabScreen
+import ru.finney.pet.ui.tasks.TaskScreen
+import ru.finney.pet.ui.tasks.TasksScreen
 
 /**
  * Граф экранов. Экраны не знают про NavController: получают лямбды `onOpenX`,
@@ -98,12 +100,16 @@ fun FinneyNavHost(
         }
 
         composable<TasksRoute> {
-            StubScreen("Задания", "Назад" to { navController.popBackStack() })
+            TasksScreen(
+                onOpenTask = { taskId -> navController.navigate(TaskRoute(taskId)) },
+                onBack = { navController.popBackStack() },
+            )
         }
 
+        // Задание и мини-игра — один экран: какую игру показать, решает движок задания.
         composable<TaskRoute> { entry ->
             val route = entry.toRoute<TaskRoute>()
-            StubScreen("Задание ${route.taskId}", "Назад" to { navController.popBackStack() })
+            TaskScreen(taskId = route.taskId, onBack = { navController.popBackStack() })
         }
 
         composable<PeriodResultRoute> { entry ->

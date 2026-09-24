@@ -38,7 +38,7 @@ ru.finney.pet
 │   ├── budget/      план бюджета
 │   ├── shop/        покупки
 │   ├── goals/       накопления и цели
-│   ├── tasks/       задания
+│   ├── tasks/       мини-игры: список, вступление и итог; games/ — сцены и экраны игр
 │   ├── progress/    история и прогресс
 │   ├── adult/       раздел для взрослого
 │   ├── pet/         композит питомца, анимация слоёв
@@ -52,7 +52,7 @@ ru.finney.pet
 │   ├── period/      план и факт периода
 │   ├── progress/    очки развития, уровни, стадии
 │   ├── pet/         шкалы, эмоция, подсказка по нужному
-│   ├── tasks/       три движка заданий
+│   ├── tasks/       движки заданий и мини-игр
 │   └── model/       состояние игры и модели контента (@Serializable)
 │
 ├── data/            ХРАНИЛИЩЕ                      — [@lemonke68], только он
@@ -250,7 +250,7 @@ fun ShopScreen(onBack: () -> Unit, viewModel: ShopViewModel = viewModel(factory 
 
 ```
 content/
-├── tasks.json      задания
+├── tasks.json      задания — шесть мини-игр (docs/minigames.md)
 ├── shop.json       товары и цены
 ├── goals.json      цели накопления
 ├── economy.json    баланс: доход, награды, очки, шкалы питомца

@@ -17,6 +17,7 @@ object ContentParser {
     const val ECONOMY = "economy.json"
     const val SHOP = "shop.json"
     const val GOALS = "goals.json"
+    /** Задания — это мини-игры: у каждой свой движок, docs/minigames.md. */
     const val TASKS = "tasks.json"
     const val GLOSSARY = "glossary.json"
 

@@ -605,7 +605,7 @@ private fun HomeMenu(
         }
         HomeMenuItem("Знакомство с игрой") { onDismiss(); onOpenOnboarding() }
         HomeMenuItem("План расходов") { onDismiss(); onOpenBudget() }
-        HomeMenuItem("Все задания") { onDismiss(); onOpenTasks() }
+        HomeMenuItem("Мини-игры") { onDismiss(); onOpenTasks() }
         HomeMenuItem("Прогресс") { onDismiss(); onOpenProgress() }
         HomeMenuItem("Для взрослых") { onDismiss(); onOpenAdult() }
     }
