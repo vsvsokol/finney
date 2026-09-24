@@ -113,7 +113,15 @@ private fun TaskIntro(state: TaskUiState.Ready, onStart: () -> Unit, onBack: () 
                 FinneyButton(text = "Играть", onClick = onStart)
             } else {
                 ScenePanel(title = null, modifier = Modifier.fillMaxWidth()) {
-                    Text("Эта игра откроется в следующих периодах.", style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
+                    Text(
+                        if (state.lockedUntilLevel != null) {
+                            "Эта игра откроется на уровне ${state.lockedUntilLevel}. Уровень растёт за план, копилку и задания."
+                        } else {
+                            "Эта игра откроется в следующих периодах."
+                        },
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = FinneyInk,
+                    )
                 }
             }
         }

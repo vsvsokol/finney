@@ -65,4 +65,11 @@ data class GameContent(
     fun item(id: String): ShopItem? = shop.firstOrNull { it.id == id }
     fun goal(id: String): Goal? = goals.firstOrNull { it.id == id }
     fun task(id: String): TaskDefinition? = tasks.firstOrNull { it.id == id }
+
+    /**
+     * Задания по играм: игры — в порядке первого появления в tasks.json, варианты внутри
+     * игры — от простого к сложному, по [TaskDefinition.unlockLevel].
+     */
+    val taskSeries: List<List<TaskDefinition>> =
+        tasks.groupBy { it.seriesId }.values.map { variants -> variants.sortedBy { it.unlockLevel } }
 }

@@ -31,6 +31,18 @@ sealed class TaskDefinition {
 
     /** С какого периода задание открыто. В демо-режиме игнорируется. */
     abstract val unlockPeriod: Int
+
+    /** С какого уровня питомца открыт этот вариант. В демо-режиме игнорируется. */
+    abstract val unlockLevel: Int
+
+    /**
+     * Игра, к которой относится вариант. У «Кассы» три варианта с одним [series] и разным
+     * [unlockLevel]: числа и тексты свои, движок и тема общие. Без поля задание — само себе
+     * игра из одного варианта. Для ТЗ игра — одно задание, варианты — его сложность.
+     */
+    abstract val series: String?
+
+    val seriesId: String get() = series ?: id
 }
 
 @Serializable
@@ -44,6 +56,8 @@ data class DistributorTask(
     override val explainFail: String,
     override val reward: TaskReward? = null,
     override val unlockPeriod: Int = 1,
+    override val unlockLevel: Int = 1,
+    override val series: String? = null,
     val amount: Int,
     val baskets: List<TaskBasket>,
     val rules: List<DistributorRule> = emptyList(),
@@ -83,6 +97,8 @@ data class BasketTask(
     override val explainFail: String,
     override val reward: TaskReward? = null,
     override val unlockPeriod: Int = 1,
+    override val unlockLevel: Int = 1,
+    override val series: String? = null,
     val limit: Int,
     val shelf: List<ShelfItem>,
     val preloaded: List<String> = emptyList(),
@@ -144,6 +160,8 @@ data class GoalSliderTask(
     override val explainFail: String,
     override val reward: TaskReward? = null,
     override val unlockPeriod: Int = 1,
+    override val unlockLevel: Int = 1,
+    override val series: String? = null,
     val goalPrice: Int,
     val periods: Int,
     val incomePerPeriod: Int,
@@ -176,6 +194,8 @@ data class SorterTask(
     override val explainFail: String,
     override val reward: TaskReward? = null,
     override val unlockPeriod: Int = 1,
+    override val unlockLevel: Int = 1,
+    override val series: String? = null,
     val items: List<SortItem>,
     /** Сколько вещей нужно разложить верно для успеха. */
     val minCorrect: Int,
@@ -203,6 +223,8 @@ data class GoalRaceTask(
     override val explainFail: String,
     override val reward: TaskReward? = null,
     override val unlockPeriod: Int = 1,
+    override val unlockLevel: Int = 1,
+    override val series: String? = null,
     val goal: RaceGoal,
     val days: Int,
     val incomePerDay: Int,
@@ -240,6 +262,8 @@ data class ReserveTask(
     override val explainFail: String,
     override val reward: TaskReward? = null,
     override val unlockPeriod: Int = 1,
+    override val unlockLevel: Int = 1,
+    override val series: String? = null,
     val amount: Int,
     val spendings: List<Spending>,
     val surprise: Surprise,
@@ -275,6 +299,8 @@ data class StandTask(
     override val explainFail: String,
     override val reward: TaskReward? = null,
     override val unlockPeriod: Int = 1,
+    override val unlockLevel: Int = 1,
+    override val series: String? = null,
     /** Сколько денег на закупку. */
     val budget: Int,
     val ingredient: StandIngredient,
@@ -306,6 +332,8 @@ data class ChangeTask(
     override val explainFail: String,
     override val reward: TaskReward? = null,
     override val unlockPeriod: Int = 1,
+    override val unlockLevel: Int = 1,
+    override val series: String? = null,
     /** Номиналы монет в ящике кассы. */
     val coins: List<Int>,
     val rounds: List<ChangeRound>,

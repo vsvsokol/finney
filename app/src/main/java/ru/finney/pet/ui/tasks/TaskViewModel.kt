@@ -41,8 +41,10 @@ sealed interface TaskUiState {
         val task: TaskDefinition,
         val character: PetCharacter,
         val balance: Int,
-        /** false — задание откроется в следующих периодах. */
+        /** false — задание откроется позже: на уровне [lockedUntilLevel] или в следующих периодах. */
         val available: Boolean,
+        /** Уровень, до которого питомец ещё не дорос; null — уровня хватает. */
+        val lockedUntilLevel: Int?,
         /** Уже пройдено успешно: награды за успех больше не будет, играть можно. */
         val completed: Boolean,
         val reward: TaskReward,
@@ -111,6 +113,7 @@ class TaskViewModel(
             character = saved.profile.appearance.character,
             balance = state.balance,
             available = game.isTaskAvailable(state, task),
+            lockedUntilLevel = task.unlockLevel.takeIf { !state.isDemo && it > game.level(state) },
             completed = state.attempts.any { it.taskId == taskId && it.outcome == TaskOutcome.SUCCESS },
             reward = task.reward ?: content.economy.taskReward,
             phase = local.phase,

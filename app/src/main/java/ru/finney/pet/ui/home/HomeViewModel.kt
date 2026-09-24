@@ -131,7 +131,7 @@ class HomeViewModel(
             periodNumber = state.currentPeriod.number,
             phase = state.currentPeriod.phase,
             needsHint = game.needsHint(state),
-            nextTask = content.tasks.firstOrNull { it.id !in passed && game.isTaskAvailable(state, it) },
+            nextTask = game.currentTasks(state).firstOrNull { it.id !in passed && game.isTaskAvailable(state, it) },
             // Что лежит на столе и что в ванной, решает не список имён, а эффект
             // предмета: добавят в контент новую еду — она появится на столе сама.
             food = previews(state) { it.effect.satiety > 0 },

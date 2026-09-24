@@ -50,6 +50,7 @@ object ContentValidator {
         for (task in content.tasks) {
             val at = "задание ${task.id}"
             if (task.unlockPeriod < 1) add("$at — unlockPeriod должен быть ≥ 1")
+            if (task.unlockLevel !in 1..e.maxLevel) add("$at — unlockLevel должен быть от 1 до ${e.maxLevel}")
             when (task) {
                 is DistributorTask -> {
                     val baskets = task.baskets.map { it.id }
@@ -77,6 +78,7 @@ object ContentValidator {
                         if (rule is BasketRule.AnyOf && rule.items.isEmpty()) add("$at — в правиле anyOf пустой список")
                         if (rule is BasketRule.MinQty && rule.qty <= 0) add("$at — в правиле minQty qty должно быть > 0")
                     }
+                    checkBasketWinnable(task, at)
                 }
                 is GoalSliderTask -> {
                     if (task.goalPrice <= 0 || task.periods <= 0 || task.incomePerPeriod <= 0 || task.step <= 0) {
@@ -90,9 +92,32 @@ object ContentValidator {
                 is ChangeTask -> checkChange(task, at)
             }
         }
+
+        for (variants in content.taskSeries) {
+            if (variants.size < 2) continue
+            val at = "игра ${variants.first().seriesId}"
+            if (variants.map { it::class }.distinct().size > 1) add("$at — у вариантов разные движки")
+            if (variants.map { it.theme }.distinct().size > 1) add("$at — у вариантов разные темы")
+            duplicates(variants.map { it.unlockLevel.toString() }).forEach { add("$at — два варианта с unlockLevel $it") }
+        }
     }
 
     // ---------- Мини-игры: кроме чисел проверяем, что игру можно и выиграть ----------
+
+    /** Перебор корзин: хоть одна укладывается в limit и выполняет список. Полка в игре — до десятка товаров. */
+    private fun MutableList<String>.checkBasketWinnable(task: BasketTask, at: String) {
+        val shelf = task.shelf
+        if (shelf.size > MAX_SHELF) {
+            add("$at — на полке больше $MAX_SHELF товаров")
+            return
+        }
+        val winnable = (0 until (1 shl shelf.size)).any { mask ->
+            val items = shelf.filterIndexed { i, _ -> mask and (1 shl i) != 0 }
+            items.sumOf { it.price } <= task.limit &&
+                task.rules.all { TaskEngines.ruleMet(task, it, items.map { item -> item.id }.toSet()) }
+        }
+        if (!winnable) add("$at — ни одна корзина в limit ${task.limit} не выполняет список: игру не выиграть")
+    }
 
     private fun MutableList<String>.checkSorter(task: SorterTask, at: String) {
         if (task.items.isEmpty()) add("$at — items пустой")
@@ -170,6 +195,8 @@ object ContentValidator {
         for (coin in wallet) for (s in sum downTo coin) if (ok[s - coin]) ok[s] = true
         return ok[sum]
     }
+
+    private const val MAX_SHELF = 12
 
     private fun duplicates(ids: List<String>): Set<String> =
         ids.groupingBy { it }.eachCount().filterValues { it > 1 }.keys

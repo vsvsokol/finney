@@ -4,6 +4,8 @@
     "theme": "planning",
     "engine": "sorter",
     "title": "Конвейер",
+    "series": "sorter",
+    "unlockLevel": 1,
     "intro": "По ленте едут вещи. Отнеси каждую в корзину: «Нужное» или «Хочется».",
     "minCorrect": 10,
     "items": [
@@ -24,10 +26,62 @@
     "explainFail": "Некоторые вещи попали не туда. Подумай: что будет, если этого не купить? Если Финни станет голодным или грязным — это нужное. Попробуй ещё раз!"
   },
   {
+    "id": "game_sorter_2",
+    "theme": "planning",
+    "engine": "sorter",
+    "title": "Конвейер",
+    "series": "sorter",
+    "unlockLevel": 3,
+    "intro": "Теперь на ленте вещи для школы и дома. Подумай, без чего не обойтись, а чего просто хочется.",
+    "minCorrect": 8,
+    "items": [
+      { "id": "notebooks", "label": "Тетради к школе", "category": "needs", "why": "Без тетрадей не получится учиться." },
+      { "id": "toy_machine", "label": "Игрушка из автомата", "category": "wants", "why": "Игрушка радует минуту, без неё можно обойтись." },
+      { "id": "water", "label": "Бутылка воды", "category": "needs", "why": "Пить нужно каждый день." },
+      { "id": "soda", "label": "Газировка", "category": "wants", "why": "Газировка — вкусняшка. Пить можно и воду." },
+      { "id": "bus", "label": "Билет на автобус до школы", "category": "needs", "why": "Без билета не доехать до школы." },
+      { "id": "keychain", "label": "Брелок на рюкзак", "category": "wants", "why": "Рюкзак носит вещи и без брелока." },
+      { "id": "medicine", "label": "Лекарство, когда болеешь", "category": "needs", "why": "Когда болеешь, лекарство помогает выздороветь." },
+      { "id": "hat_winter", "label": "Шапка зимой", "category": "needs", "why": "Зимой без шапки замёрзнут уши." },
+      { "id": "hat_second", "label": "Шапка с ушками, когда шапка уже есть", "category": "wants", "why": "Одна шапка уже есть — вторая просто для красоты." },
+      { "id": "bread", "label": "Хлеб", "category": "needs", "why": "Хлеб — обычная еда на каждый день." }
+    ],
+    "explainOk": "Нужное — то, без чего плохо: еда, вода, одежда по погоде, дорога в школу. Остальное — «хочется», его покупают, если остались монеты.",
+    "explainFail": "Кое-что попало не туда. Спроси себя: что будет, если этого не купить? Если станет плохо или не получится учиться — это нужное. Попробуй ещё раз!"
+  },
+  {
+    "id": "game_sorter_3",
+    "theme": "planning",
+    "engine": "sorter",
+    "title": "Конвейер",
+    "series": "sorter",
+    "unlockLevel": 6,
+    "intro": "Одна и та же вещь бывает нужной, а бывает — «хочется». Читай подпись: всё решает, что случилось.",
+    "minCorrect": 10,
+    "items": [
+      { "id": "sneakers_small", "label": "Кроссовки, когда старые стали малы", "category": "needs", "why": "Маленькие кроссовки жмут — новые нужны." },
+      { "id": "sneakers_friend", "label": "Кроссовки как у друга, когда свои целые", "category": "wants", "why": "Свои кроссовки целые. Такие же, как у друга, — это «хочется»." },
+      { "id": "umbrella_broken", "label": "Зонт, когда старый сломался", "category": "needs", "why": "Без зонта промокнешь под дождём." },
+      { "id": "umbrella_second", "label": "Второй зонт, покрасивее", "category": "wants", "why": "Один зонт уже есть — второй для красоты." },
+      { "id": "lunch", "label": "Обед в школе", "category": "needs", "why": "Без обеда трудно учиться до вечера." },
+      { "id": "cake", "label": "Торт без праздника", "category": "wants", "why": "Торт — угощение. Без праздника можно обойтись." },
+      { "id": "toothpaste", "label": "Зубная паста", "category": "needs", "why": "Зубы чистят каждый день." },
+      { "id": "board_game", "label": "Ещё одна настольная игра", "category": "wants", "why": "Игры дома уже есть — новая это «хочется»." },
+      { "id": "milk", "label": "Молоко", "category": "needs", "art": "item_food_milk", "why": "Молоко — еда на каждый день." },
+      { "id": "cartoons", "label": "Подписка на мультики", "category": "wants", "why": "Мультики весёлые, но без них можно прожить." },
+      { "id": "pencils", "label": "Карандаши, когда старые кончились", "category": "needs", "why": "Без карандашей не порисуешь на уроке." },
+      { "id": "phone_stickers", "label": "Наклейки на телефон", "category": "wants", "why": "Телефон работает и без наклеек." }
+    ],
+    "explainOk": "Ты смотрел не только на вещь, но и на то, что случилось. Кроссовки нужны, когда старые малы, а если свои целые — это уже «хочется».",
+    "explainFail": "Некоторые вещи попали не туда. Одна и та же вещь бывает нужной и ненужной — всё решает подпись. Прочитай её ещё раз и попробуй снова!"
+  },
+  {
     "id": "game_shopping",
     "theme": "shopping",
     "engine": "basket",
     "title": "Список покупок",
+    "series": "shopping",
+    "unlockLevel": 1,
     "intro": "Финни дал список и 50 монет. Собери всё по списку и не забудь сравнить упаковки.",
     "limit": 50,
     "shelf": [
@@ -46,10 +100,66 @@
     "explainFail": "В корзине не всё из списка. Посмотри, где галочки не стоят, — и попробуй ещё раз. Подсказка: 2 яблок на 2 дня мало."
   },
   {
+    "id": "game_shopping_2",
+    "theme": "shopping",
+    "engine": "basket",
+    "title": "Список покупок",
+    "series": "shopping",
+    "unlockLevel": 4,
+    "intro": "У Финни 45 монет и список: сок на 3 дня, молоко и мыло. Сок продают по-разному — сравни упаковки.",
+    "limit": 45,
+    "shelf": [
+      { "id": "juice1", "label": "1 сок", "price": 10, "category": "needs", "art": "item_food_juice" },
+      { "id": "juice2", "label": "2 сока", "price": 15, "qty": 2, "category": "needs", "art": "item_food_juice" },
+      { "id": "juice3", "label": "3 сока", "price": 20, "qty": 3, "category": "needs", "art": "item_food_juice" },
+      { "id": "milk", "label": "Молоко", "price": 15, "category": "needs", "art": "item_food_milk" },
+      { "id": "soap", "label": "Мыло", "price": 10, "category": "needs", "art": "item_care_soap" },
+      { "id": "donut", "label": "Пончик у кассы", "price": 5, "category": "wants", "art": "item_treat_donut" }
+    ],
+    "rules": [
+      { "type": "minQty", "items": ["juice1", "juice2", "juice3"], "qty": 3, "label": "3 сока — по одному на день" },
+      { "type": "anyOf", "items": ["milk"], "label": "Молоко" },
+      { "type": "anyOf", "items": ["soap"], "label": "Мыло" }
+    ],
+    "explainOk": "Всё по списку! 3 сока одной упаковкой стоят 20, а если брать 1 и 2 — 25. Большая упаковка выгоднее, когда всё правда пригодится.",
+    "explainFail": "В корзине не всё из списка. Посмотри, где нет галочки. Подсказка: одна большая упаковка сока дешевле, чем несколько маленьких."
+  },
+  {
+    "id": "game_shopping_3",
+    "theme": "shopping",
+    "engine": "basket",
+    "title": "Список покупок",
+    "series": "shopping",
+    "unlockLevel": 7,
+    "intro": "Финни собирается в поход на 3 дня. У него 60 монет, а список длинный. Уложись и ничего не забудь!",
+    "limit": 60,
+    "shelf": [
+      { "id": "apple1", "label": "1 яблоко", "price": 5, "category": "needs", "art": "item_food_apple" },
+      { "id": "apple2", "label": "2 яблока", "price": 10, "qty": 2, "category": "needs", "art": "item_food_apple" },
+      { "id": "apple5", "label": "5 яблок", "price": 20, "qty": 5, "category": "needs", "art": "item_food_apple" },
+      { "id": "milk", "label": "Молоко", "price": 15, "category": "needs", "art": "item_food_milk" },
+      { "id": "juice", "label": "Сок", "price": 10, "category": "needs", "art": "item_food_juice" },
+      { "id": "bowl", "label": "Корм", "price": 15, "category": "needs", "art": "item_food_bowl" },
+      { "id": "soap", "label": "Мыло", "price": 10, "category": "needs", "art": "item_care_soap" },
+      { "id": "soap_liquid", "label": "Жидкое мыло", "price": 15, "category": "needs", "art": "item_care_soap_liquid" },
+      { "id": "chocolate", "label": "Шоколадка у кассы", "price": 10, "category": "wants", "art": "item_treat_chocolate" }
+    ],
+    "rules": [
+      { "type": "minQty", "items": ["apple1", "apple2", "apple5"], "qty": 6, "label": "6 яблок — по 2 на день" },
+      { "type": "anyOf", "items": ["milk", "juice"], "label": "Молоко или сок" },
+      { "type": "anyOf", "items": ["bowl"], "label": "Корм" },
+      { "type": "anyOf", "items": ["soap", "soap_liquid"], "label": "Мыло" }
+    ],
+    "explainOk": "Поход собран ровно на 60! 1 и 5 яблок стоят 25 — дешевле, чем 2 и 5 за 30. А сок вместо молока сберёг ещё 5 монет.",
+    "explainFail": "В корзине не всё из списка. Посмотри, где нет галочки. Подсказка: сравни, как дешевле набрать 6 яблок, и что дешевле — молоко или сок."
+  },
+  {
     "id": "game_race",
     "theme": "savings",
     "engine": "goal_race",
     "title": "Дорога к цели",
+    "series": "race",
+    "unlockLevel": 1,
     "intro": "Финни копит на самокат. Каждый день он получает 10 монет. Реши, сколько отложить, а сколько потратить.",
     "goal": { "label": "Самокат", "price": 50 },
     "days": 6,
@@ -64,10 +174,56 @@
     "explainFail": "Самокат пока не набрался. Накопленное никуда не делось: ещё пара дней по 10 — и он твой. В следующий раз откажись от одного соблазна."
   },
   {
+    "id": "game_race_2",
+    "theme": "savings",
+    "engine": "goal_race",
+    "title": "Дорога к цели",
+    "series": "race",
+    "unlockLevel": 4,
+    "intro": "Финни копит на конструктор за 70 монет. Каждый день он получает 10. Соблазнов по дороге много — выбирай с умом.",
+    "goal": { "label": "Конструктор", "price": 70 },
+    "days": 8,
+    "incomePerDay": 10,
+    "step": 5,
+    "events": [
+      { "day": 2, "label": "Наклейки", "price": 5 },
+      { "day": 3, "label": "Мороженое", "price": 5 },
+      { "day": 5, "label": "Кино", "price": 10 },
+      { "day": 7, "label": "Игрушка из автомата", "price": 5 }
+    ],
+    "explainOk": "Конструктор твой! За 8 дней пришло 80, а потратить можно было только 10. Ты выбрал, что важнее, и дошёл до цели.",
+    "explainFail": "На конструктор пока не хватило. Посчитай: за 8 дней приходит 80, а нужно 70 — на соблазны остаётся всего 10. В следующий раз выбери один."
+  },
+  {
+    "id": "game_race_3",
+    "theme": "savings",
+    "engine": "goal_race",
+    "title": "Дорога к цели",
+    "series": "race",
+    "unlockLevel": 8,
+    "intro": "Финни мечтает о роликах за 100 монет. В копилке уже 20, каждый день приходит 15. Хватит ли терпения?",
+    "goal": { "label": "Ролики", "price": 100 },
+    "days": 6,
+    "incomePerDay": 15,
+    "step": 5,
+    "startSaved": 20,
+    "events": [
+      { "day": 1, "label": "Сладкая вата", "price": 5 },
+      { "day": 2, "label": "Кино", "price": 15 },
+      { "day": 3, "label": "Наклейки", "price": 5 },
+      { "day": 4, "label": "Новая игра", "price": 15 },
+      { "day": 6, "label": "Мороженое", "price": 5 }
+    ],
+    "explainOk": "Ролики твои! В копилке было 20, и за 6 дней пришло 90. Свободных монет было всего 10 — и ты уложился.",
+    "explainFail": "До роликов пока не дотянуть. 20 и ещё 90 — это 110, а нужно 100: на удовольствия остаётся только 10. Выбери одно маленькое — и цель будет твоя."
+  },
+  {
     "id": "game_rainy",
     "theme": "planning",
     "engine": "reserve",
     "title": "Дождливый день",
+    "series": "rainy",
+    "unlockLevel": 1,
     "intro": "У Финни 60 монет на неделю. Выбери, что купить, а остальное оставь в запасе — вдруг что-то случится.",
     "amount": 60,
     "spendings": [
@@ -86,10 +242,65 @@
     "explainFail": "Запаса не хватило, и что-то пришлось перенести. Ничего страшного — в следующий раз оставь немного монет на всякий случай."
   },
   {
+    "id": "game_rainy_2",
+    "theme": "planning",
+    "engine": "reserve",
+    "title": "Дождливый день",
+    "series": "rainy",
+    "unlockLevel": 5,
+    "intro": "У Финни 80 монет на неделю. Нужное уже в плане. Реши, что ещё купить, и оставь запас на всякий случай.",
+    "amount": 80,
+    "spendings": [
+      { "id": "food", "label": "Еда на неделю", "price": 25, "category": "needs", "art": "item_food_bowl" },
+      { "id": "soap", "label": "Мыло", "price": 10, "category": "needs", "art": "item_care_soap" },
+      { "id": "bus", "label": "Проезд", "price": 15, "category": "needs" },
+      { "id": "ball", "label": "Мячик", "price": 10, "category": "wants" },
+      { "id": "cinema", "label": "Кино", "price": 10, "category": "wants" },
+      { "id": "stickers", "label": "Наклейки", "price": 10, "category": "wants" },
+      { "id": "icecream", "label": "Мороженое", "price": 5, "category": "wants" }
+    ],
+    "surprise": {
+      "label": "Порвался рюкзак!",
+      "text": "Новый стоит 20. Без рюкзака не в чем носить тетради.",
+      "price": 20
+    },
+    "explainOk": "Запаса хватило на новый рюкзак! Когда нужное оплачено, часть монет лучше не тратить сразу.",
+    "explainFail": "Запаса не хватило, и кое-что пришлось отменить. В следующий раз оставь на всякий случай побольше монет."
+  },
+  {
+    "id": "game_rainy_3",
+    "theme": "planning",
+    "engine": "reserve",
+    "title": "Дождливый день",
+    "series": "rainy",
+    "unlockLevel": 9,
+    "intro": "У Финни 100 монет на неделю, и планов много. Нужное уже в плане. Что ещё купить, а что оставить в запасе?",
+    "amount": 100,
+    "spendings": [
+      { "id": "food", "label": "Еда на неделю", "price": 30, "category": "needs", "art": "item_food_bowl" },
+      { "id": "soap", "label": "Мыло", "price": 10, "category": "needs", "art": "item_care_soap" },
+      { "id": "bus", "label": "Проезд", "price": 15, "category": "needs" },
+      { "id": "notebooks", "label": "Тетради", "price": 10, "category": "needs" },
+      { "id": "cinema", "label": "Кино", "price": 15, "category": "wants" },
+      { "id": "game", "label": "Новая игра", "price": 20, "category": "wants" },
+      { "id": "stickers", "label": "Наклейки", "price": 10, "category": "wants" },
+      { "id": "icecream", "label": "Мороженое", "price": 5, "category": "wants" }
+    ],
+    "surprise": {
+      "label": "Порвались кроссовки!",
+      "text": "Новые стоят 25. В рваных по лужам не походишь.",
+      "price": 25
+    },
+    "explainOk": "Запас спас неделю: кроссовки купили и ничего не отменили. Чем больше трат, тем важнее запас.",
+    "explainFail": "Запаса не хватило. Когда трат много, откладывай на всякий случай больше — хотя бы четверть денег."
+  },
+  {
     "id": "game_lemonade",
     "theme": "planning",
     "engine": "stand",
     "title": "Лимонадная лавка",
+    "series": "lemonade",
+    "unlockLevel": 1,
     "intro": "Финни открывает лавку. Утром купи лимоны, днём налей лимонад гостям, вечером посчитай, что осталось.",
     "budget": 50,
     "ingredient": { "label": "Лимон", "price": 5, "yields": 2 },
@@ -100,10 +311,44 @@
     "explainFail": "Лимонов было не столько, сколько нужно. Посмотри итог дня: сколько гостей пришло и сколько стаканов вышло из одного лимона. Завтра получится!"
   },
   {
+    "id": "game_lemonade_2",
+    "theme": "planning",
+    "engine": "stand",
+    "title": "Лимонадная лавка",
+    "series": "lemonade",
+    "unlockLevel": 6,
+    "intro": "Сегодня в лавке новые гости. Из одного лимона выходит 2 стакана. Купи столько лимонов, чтобы хватило всем и не осталось лишнего.",
+    "budget": 40,
+    "ingredient": { "label": "Лимон", "price": 5, "yields": 2 },
+    "cupPrice": 5,
+    "guests": 9,
+    "forecast": "Тепло — придут 9 гостей",
+    "explainOk": "5 лимонов — это 10 стаканов: всем 9 гостям хватило, и остался всего один. Когда гостей нечётное число, один лишний стакан — это нормально.",
+    "explainFail": "Лимонов было не столько, сколько нужно. Посчитай: из 4 лимонов выйдет 8 стаканов — одному гостю не хватит. А сколько нужно на 9? Завтра получится!"
+  },
+  {
+    "id": "game_lemonade_3",
+    "theme": "planning",
+    "engine": "stand",
+    "title": "Лимонадная лавка",
+    "series": "lemonade",
+    "unlockLevel": 9,
+    "intro": "В лавке большие лимоны: из одного выходит 3 стакана, а стоит он 10. Посчитай закупку сам!",
+    "budget": 60,
+    "ingredient": { "label": "Большой лимон", "price": 10, "yields": 3 },
+    "cupPrice": 5,
+    "guests": 13,
+    "forecast": "Жара и выходной — придут 13 гостей",
+    "explainOk": "5 больших лимонов — это 15 стаканов: всем 13 гостям хватило. Потратили 50, заработали 65 — лавка в плюсе!",
+    "explainFail": "Лимонов было не столько, сколько нужно. 4 больших лимона — это 12 стаканов, одному гостю не хватит. А сколько нужно на 13? Завтра получится!"
+  },
+  {
     "id": "game_cashier",
     "theme": "shopping",
     "engine": "change",
     "title": "Касса Финни",
+    "series": "cashier",
+    "unlockLevel": 1,
     "intro": "Финни работает на кассе. Отсчитай сдачу покупателю, а потом заплати сам — ровно, без сдачи.",
     "coins": [1, 2, 5, 10],
     "minCorrect": 3,
@@ -115,5 +360,44 @@
     ],
     "explainOk": "Все монеты сошлись! Сдача — это разница: сколько дали минус сколько стоит. Всегда проверяй сдачу.",
     "explainFail": "Кое-где монет было больше или меньше, чем нужно. Считай так: сколько дали минус сколько стоит — это и есть сдача."
+  },
+  {
+    "id": "game_cashier_2",
+    "theme": "shopping",
+    "engine": "change",
+    "title": "Касса Финни",
+    "series": "cashier",
+    "unlockLevel": 2,
+    "intro": "На кассе очередь, и покупатели платят крупными деньгами. Отсчитай сдачу, а потом заплати сам — ровно, без сдачи.",
+    "coins": [1, 2, 5, 10],
+    "minCorrect": 3,
+    "rounds": [
+      { "mode": "give", "label": "Шоколадка", "price": 14, "paid": 50, "art": "item_treat_chocolate" },
+      { "mode": "give", "label": "Книжка", "price": 23, "paid": 30 },
+      { "mode": "exact", "label": "Сок", "price": 18, "wallet": [10, 5, 2, 2, 1], "art": "item_food_juice" },
+      { "mode": "give", "label": "Пончик", "price": 9, "paid": 20, "art": "item_treat_donut" }
+    ],
+    "explainOk": "Сдача сошлась! Большую сдачу проще считать по шагам: от 14 до 20 — это 6, от 20 до 50 — ещё 30, всего 36.",
+    "explainFail": "Кое-где монет было больше или меньше, чем нужно. Считай по шагам: сначала до круглого числа, потом дальше."
+  },
+  {
+    "id": "game_cashier_3",
+    "theme": "shopping",
+    "engine": "change",
+    "title": "Касса Финни",
+    "series": "cashier",
+    "unlockLevel": 5,
+    "intro": "Сегодня Финни — старший кассир. Сдача побольше, а в кошельке неудобные монеты. Подумай, прежде чем класть!",
+    "coins": [1, 2, 5, 10],
+    "minCorrect": 4,
+    "rounds": [
+      { "mode": "give", "label": "Арбуз", "price": 37, "paid": 50, "art": "item_food_watermelon" },
+      { "mode": "exact", "label": "Молоко", "price": 6, "wallet": [5, 2, 2, 2], "art": "item_food_milk" },
+      { "mode": "give", "label": "Жидкое мыло", "price": 26, "paid": 40, "art": "item_care_soap_liquid" },
+      { "mode": "exact", "label": "Шоколадка", "price": 8, "wallet": [5, 2, 2, 2, 2], "art": "item_treat_chocolate" },
+      { "mode": "give", "label": "Леденец", "price": 8, "paid": 50, "art": "item_treat_candy" }
+    ],
+    "explainOk": "Все монеты сошлись! Иногда крупная монета мешает: 6 не набрать с пятёркой, если нет единички, — зато 2, 2 и 2 как раз.",
+    "explainFail": "Кое-где монеты не сошлись. Если крупная монета не подходит, попробуй набрать сумму одними мелкими."
   }
 ]

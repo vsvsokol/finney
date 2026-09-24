@@ -53,10 +53,21 @@ import ru.finney.pet.ui.theme.FinneyGreen
 import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneyYellow
 
-/** Карточка игры: задание, пройдено ли и открыто ли. */
-data class TaskRow(val task: TaskDefinition, val done: Boolean, val available: Boolean)
+/**
+ * Карточка игры: вариант под уровень питомца, пройден ли он и открыт ли.
+ * [difficulty] — номер варианта с 1, [difficulties] — сколько их у игры.
+ * [lockedUntilLevel] — уровень, до которого питомец ещё не дорос; null — уровня хватает.
+ */
+data class TaskRow(
+    val task: TaskDefinition,
+    val done: Boolean,
+    val available: Boolean,
+    val difficulty: Int = 1,
+    val difficulties: Int = 1,
+    val lockedUntilLevel: Int? = null,
+)
 
-/** Все мини-игры в порядке tasks.json. */
+/** Все мини-игры в порядке tasks.json, у каждой — вариант под текущий уровень. */
 class TasksViewModel(session: Session, private val game: Game, private val content: GameContent) : ViewModel() {
 
     val rows: StateFlow<List<TaskRow>?> = session.activeGame
@@ -64,7 +75,17 @@ class TasksViewModel(session: Session, private val game: Game, private val conte
         .map { saved ->
             val state = saved.state
             val done = state.attempts.filter { it.outcome == TaskOutcome.SUCCESS }.map { it.taskId }.toSet()
-            content.tasks.map { TaskRow(it, it.id in done, game.isTaskAvailable(state, it)) }
+            content.taskSeries.map { variants ->
+                val task = game.currentVariant(state, variants)
+                TaskRow(
+                    task = task,
+                    done = task.id in done,
+                    available = game.isTaskAvailable(state, task),
+                    difficulty = variants.indexOf(task) + 1,
+                    difficulties = variants.size,
+                    lockedUntilLevel = task.unlockLevel.takeIf { !state.isDemo && it > game.level(state) },
+                )
+            }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
@@ -132,8 +153,17 @@ private fun GameCard(row: TaskRow, modifier: Modifier, onClick: () -> Unit) {
         }
         OutlinedText(row.task.title, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
         Text(row.task.theme.label(), style = MaterialTheme.typography.labelMedium, color = FinneyInk, textAlign = TextAlign.Center)
+        if (row.difficulties > 1) {
+            Text(
+                "сложность ${row.difficulty} из ${row.difficulties}",
+                style = MaterialTheme.typography.labelMedium,
+                color = FinneyInk,
+                textAlign = TextAlign.Center,
+            )
+        }
         Text(
             text = when {
+                row.lockedUntilLevel != null -> "откроется на уровне ${row.lockedUntilLevel}"
                 !row.available -> "откроется позже"
                 row.done -> "✓ пройдено"
                 else -> "новая"

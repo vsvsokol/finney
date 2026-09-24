@@ -40,6 +40,8 @@ sealed interface PeriodResultUiState {
         val level: Int,
         /** Уровень вырос именно за этот период. */
         val leveledUp: Boolean,
+        /** Названия игр, которые с новым уровнем стали сложнее или открылись. */
+        val harderGames: List<String>,
         val balance: Int,
         /** Период уже открыт следующим: закрытие периода сразу начинает новый. */
         val nextPeriodNumber: Int,
@@ -86,6 +88,9 @@ class PeriodResultViewModel(
             totalPoints = totalPoints,
             level = game.levelFor(totalPoints),
             leveledUp = game.levelFor(totalPoints) > game.levelFor(totalPoints - result.points),
+            harderGames = game.tasksUnlockedBetween(game.levelFor(totalPoints - result.points), game.levelFor(totalPoints))
+                .map { it.title }
+                .distinct(),
             balance = state.balance,
             nextPeriodNumber = state.currentPeriod.number,
         )

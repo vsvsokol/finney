@@ -98,6 +98,13 @@ private fun PeriodResultContent(state: PeriodResultUiState.Ready, onBack: () -> 
                 color = FinneyInk,
             )
         }
+        if (state.harderGames.isNotEmpty()) {
+            Text(
+                text = "Новые задания в мини-играх: ${state.harderGames.joinToString { "«$it»" }}",
+                style = MaterialTheme.typography.bodyLarge,
+                color = FinneyInk,
+            )
+        }
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -176,6 +183,7 @@ private fun PeriodResultPreview() {
                 totalPoints = 5,
                 level = 2,
                 leveledUp = true,
+                harderGames = listOf("Касса Финни"),
                 balance = 15,
                 nextPeriodNumber = 2,
             ),

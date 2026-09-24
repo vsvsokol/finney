@@ -111,7 +111,23 @@ class Game(
         PetRules.needsCost(state.pet, content.shop, economy.pet.needsThreshold)
 
     fun isTaskAvailable(state: GameState, task: TaskDefinition): Boolean =
-        state.isDemo || task.unlockPeriod <= state.currentPeriod.number
+        state.isDemo || (task.unlockPeriod <= state.currentPeriod.number && task.unlockLevel <= level(state))
+
+    /**
+     * Вариант игры для питомца сейчас: самый сложный из тех, до чьего уровня он дорос.
+     * Так сложность растёт с уровнем и в демо-режиме. Не дорос ни до одного — первый
+     * вариант, экран покажет его закрытым.
+     */
+    fun currentVariant(state: GameState, variants: List<TaskDefinition>): TaskDefinition =
+        variants.lastOrNull { it.unlockLevel <= level(state) } ?: variants.first()
+
+    /** По одному варианту каждой игры — то, что видит ребёнок в списке мини-игр. */
+    fun currentTasks(state: GameState): List<TaskDefinition> =
+        content.taskSeries.map { currentVariant(state, it) }
+
+    /** Игры, которые стали сложнее или открылись при переходе с уровня [from] на [to]. */
+    fun tasksUnlockedBetween(from: Int, to: Int): List<TaskDefinition> =
+        content.tasks.filter { it.unlockLevel in (from + 1)..to }
 
     fun goalProgress(state: GameState, goalId: String? = state.activeGoalId): GoalProgress? {
         val goal = goalId?.let(content::goal) ?: return null
