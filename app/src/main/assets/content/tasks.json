@@ -12,7 +12,7 @@
       { "id": "apple", "label": "Яблоко", "category": "needs", "art": "item_food_apple", "why": "Яблоко — еда. Без еды Финни проголодается." },
       { "id": "donut", "label": "Пончик", "category": "wants", "art": "item_treat_donut", "why": "Пончик — вкусняшка. Без него Финни не проголодается." },
       { "id": "soap", "label": "Мыло", "category": "needs", "art": "item_care_soap", "why": "Без мыла Финни будет грязным." },
-      { "id": "ball", "label": "Мячик", "category": "wants", "emoji": "⚽", "why": "Мячик поднимает настроение, но его можно купить и потом." },
+      { "id": "ball", "label": "Мячик", "category": "wants", "art": "item_toy_ball", "why": "Мячик поднимает настроение, но его можно купить и потом." },
       { "id": "milk", "label": "Молоко", "category": "needs", "art": "item_food_milk", "why": "Молоко — еда на каждый день." },
       { "id": "candy", "label": "Леденец", "category": "wants", "art": "item_treat_candy", "why": "Леденец — сладость. Это приятно, но не обязательно." },
       { "id": "coat_winter", "label": "Тёплая куртка зимой", "category": "needs", "emoji": "🧥", "why": "Зимой без тёплой куртки холодно — это нужное." },
@@ -20,7 +20,7 @@
       { "id": "bowl", "label": "Миска корма", "category": "needs", "art": "item_food_bowl", "why": "Корм — главная еда Финни." },
       { "id": "chocolate", "label": "Шоколадка", "category": "wants", "art": "item_treat_chocolate", "why": "Шоколадка — вкусняшка, без неё можно обойтись." },
       { "id": "toothbrush", "label": "Зубная щётка", "category": "needs", "emoji": "🪥", "why": "Чистить зубы нужно каждый день." },
-      { "id": "stickers", "label": "Наклейки", "category": "wants", "emoji": "🌟", "why": "Наклейки красивые, но это «хочется»." }
+      { "id": "stickers", "label": "Наклейки", "category": "wants", "art": "item_toy_stickers", "why": "Наклейки красивые, но это «хочется»." }
     ],
     "explainOk": "Нужное — в одной корзине, желаемое — в другой. Сначала покупают нужное, а желаемое — если остались монеты.",
     "explainFail": "Некоторые вещи попали не туда. Подумай: что будет, если этого не купить? Если Финни станет голодным или грязным — это нужное. Попробуй ещё раз!"
@@ -161,14 +161,14 @@
     "series": "race",
     "unlockLevel": 1,
     "intro": "Финни копит на самокат. Каждый день он получает 10 монет. Реши, сколько отложить, а сколько потратить.",
-    "goal": { "label": "Самокат", "price": 50, "emoji": "🛴" },
+    "goal": { "label": "Самокат", "price": 50, "art": "item_toy_scooter" },
     "days": 6,
     "incomePerDay": 10,
     "step": 5,
     "events": [
-      { "day": 2, "label": "Наклейки", "price": 5, "emoji": "🌟" },
-      { "day": 4, "label": "Мороженое с другом", "price": 5, "emoji": "🍦" },
-      { "day": 5, "label": "Кино", "price": 10, "emoji": "🎬" }
+      { "day": 2, "label": "Наклейки", "price": 5, "art": "item_toy_stickers" },
+      { "day": 4, "label": "Мороженое с другом", "price": 5, "art": "item_treat_icecream" },
+      { "day": 5, "label": "Кино", "price": 10, "art": "item_fun_movie" }
     ],
     "explainOk": "Самокат твой! Откладывать понемногу, но каждый день — так и копят. И одно удовольствие цели не помешало.",
     "explainFail": "Самокат пока не набрался. Накопленное никуда не делось: ещё пара дней по 10 — и он твой. В следующий раз откажись от одного соблазна."
@@ -186,9 +186,9 @@
     "incomePerDay": 10,
     "step": 5,
     "events": [
-      { "day": 2, "label": "Наклейки", "price": 5, "emoji": "🌟" },
-      { "day": 3, "label": "Мороженое", "price": 5, "emoji": "🍦" },
-      { "day": 5, "label": "Кино", "price": 10, "emoji": "🎬" },
+      { "day": 2, "label": "Наклейки", "price": 5, "art": "item_toy_stickers" },
+      { "day": 3, "label": "Мороженое", "price": 5, "art": "item_treat_icecream" },
+      { "day": 5, "label": "Кино", "price": 10, "art": "item_fun_movie" },
       { "day": 7, "label": "Игрушка из автомата", "price": 5, "emoji": "🧸" }
     ],
     "explainOk": "Конструктор твой! За 8 дней пришло 80, а потратить можно было только 10. Ты выбрал, что важнее, и дошёл до цели.",
@@ -209,10 +209,10 @@
     "startSaved": 20,
     "events": [
       { "day": 1, "label": "Сладкая вата", "price": 5, "emoji": "🍭" },
-      { "day": 2, "label": "Кино", "price": 15, "emoji": "🎬" },
-      { "day": 3, "label": "Наклейки", "price": 5, "emoji": "🌟" },
+      { "day": 2, "label": "Кино", "price": 15, "art": "item_fun_movie" },
+      { "day": 3, "label": "Наклейки", "price": 5, "art": "item_toy_stickers" },
       { "day": 4, "label": "Новая игра", "price": 15, "emoji": "🎮" },
-      { "day": 6, "label": "Мороженое", "price": 5, "emoji": "🍦" }
+      { "day": 6, "label": "Мороженое", "price": 5, "art": "item_treat_icecream" }
     ],
     "explainOk": "Ролики твои! В копилке было 20, и за 6 дней пришло 90. Свободных монет было всего 10 — и ты уложился.",
     "explainFail": "До роликов пока не дотянуть. 20 и ещё 90 — это 110, а нужно 100: на удовольствия остаётся только 10. Выбери одно маленькое — и цель будет твоя."
@@ -229,9 +229,9 @@
     "spendings": [
       { "id": "food", "label": "Еда на неделю", "price": 20, "category": "needs", "art": "item_food_bowl" },
       { "id": "soap", "label": "Мыло", "price": 10, "category": "needs", "art": "item_care_soap" },
-      { "id": "ball", "label": "Мячик", "price": 10, "category": "wants", "emoji": "⚽" },
-      { "id": "stickers", "label": "Наклейки", "price": 10, "category": "wants", "emoji": "🌟" },
-      { "id": "icecream", "label": "Мороженое", "price": 5, "category": "wants", "emoji": "🍦" }
+      { "id": "ball", "label": "Мячик", "price": 10, "category": "wants", "art": "item_toy_ball" },
+      { "id": "stickers", "label": "Наклейки", "price": 10, "category": "wants", "art": "item_toy_stickers" },
+      { "id": "icecream", "label": "Мороженое", "price": 5, "category": "wants", "art": "item_treat_icecream" }
     ],
     "surprise": {
       "label": "Сломался зонт!",
@@ -255,10 +255,10 @@
       { "id": "food", "label": "Еда на неделю", "price": 25, "category": "needs", "art": "item_food_bowl" },
       { "id": "soap", "label": "Мыло", "price": 10, "category": "needs", "art": "item_care_soap" },
       { "id": "bus", "label": "Проезд", "price": 15, "category": "needs", "emoji": "🚌" },
-      { "id": "ball", "label": "Мячик", "price": 10, "category": "wants", "emoji": "⚽" },
-      { "id": "cinema", "label": "Кино", "price": 10, "category": "wants", "emoji": "🎬" },
-      { "id": "stickers", "label": "Наклейки", "price": 10, "category": "wants", "emoji": "🌟" },
-      { "id": "icecream", "label": "Мороженое", "price": 5, "category": "wants", "emoji": "🍦" }
+      { "id": "ball", "label": "Мячик", "price": 10, "category": "wants", "art": "item_toy_ball" },
+      { "id": "cinema", "label": "Кино", "price": 10, "category": "wants", "art": "item_fun_movie" },
+      { "id": "stickers", "label": "Наклейки", "price": 10, "category": "wants", "art": "item_toy_stickers" },
+      { "id": "icecream", "label": "Мороженое", "price": 5, "category": "wants", "art": "item_treat_icecream" }
     ],
     "surprise": {
       "label": "Порвался рюкзак!",
@@ -283,10 +283,10 @@
       { "id": "soap", "label": "Мыло", "price": 10, "category": "needs", "art": "item_care_soap" },
       { "id": "bus", "label": "Проезд", "price": 15, "category": "needs", "emoji": "🚌" },
       { "id": "notebooks", "label": "Тетради", "price": 10, "category": "needs", "emoji": "📓" },
-      { "id": "cinema", "label": "Кино", "price": 15, "category": "wants", "emoji": "🎬" },
+      { "id": "cinema", "label": "Кино", "price": 15, "category": "wants", "art": "item_fun_movie" },
       { "id": "game", "label": "Новая игра", "price": 20, "category": "wants", "emoji": "🎮" },
-      { "id": "stickers", "label": "Наклейки", "price": 10, "category": "wants", "emoji": "🌟" },
-      { "id": "icecream", "label": "Мороженое", "price": 5, "category": "wants", "emoji": "🍦" }
+      { "id": "stickers", "label": "Наклейки", "price": 10, "category": "wants", "art": "item_toy_stickers" },
+      { "id": "icecream", "label": "Мороженое", "price": 5, "category": "wants", "art": "item_treat_icecream" }
     ],
     "surprise": {
       "label": "Порвались кроссовки!",
@@ -306,7 +306,7 @@
     "unlockLevel": 1,
     "intro": "Финни открывает лавку. Утром купи лимоны, днём налей лимонад гостям, вечером посчитай, что осталось.",
     "budget": 50,
-    "ingredient": { "label": "Лимон", "price": 5, "yields": 2, "emoji": "🍋" },
+    "ingredient": { "label": "Лимон", "price": 5, "yields": 2, "art": "item_food_lemon" },
     "cupPrice": 5,
     "guests": 8,
     "forecast": "Жарко — придут 8 гостей",
@@ -322,7 +322,7 @@
     "unlockLevel": 6,
     "intro": "Сегодня в лавке новые гости. Из одного лимона выходит 2 стакана. Купи столько лимонов, чтобы хватило всем и не осталось лишнего.",
     "budget": 40,
-    "ingredient": { "label": "Лимон", "price": 5, "yields": 2, "emoji": "🍋" },
+    "ingredient": { "label": "Лимон", "price": 5, "yields": 2, "art": "item_food_lemon" },
     "cupPrice": 5,
     "guests": 9,
     "forecast": "Тепло — придут 9 гостей",
@@ -338,7 +338,7 @@
     "unlockLevel": 9,
     "intro": "В лавке большие лимоны: из одного выходит 3 стакана, а стоит он 10. Посчитай закупку сам!",
     "budget": 60,
-    "ingredient": { "label": "Большой лимон", "price": 10, "yields": 3, "emoji": "🍋" },
+    "ingredient": { "label": "Большой лимон", "price": 10, "yields": 3, "art": "item_food_lemon" },
     "cupPrice": 5,
     "guests": 13,
     "forecast": "Жара и выходной — придут 13 гостей",
