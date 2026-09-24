@@ -31,12 +31,16 @@ class ContentTest {
         assertEquals(emptyList<String>(), ContentValidator.validate(content))
     }
 
-    /** Эмодзи на разных телефонах рисуются по-разному и спорят с плоским стилем макета. */
+    /**
+     * Эмодзи в текстах — вступлениях, объяснениях, названиях — не бывает: на разных телефонах
+     * они рисуются по-разному. Исключение — поле `emoji`, временный значок предмета без рисунка.
+     */
     @Test
-    fun `в контенте нет эмодзи`() {
+    fun `в текстах контента нет эмодзи`() {
         val emoji = Regex("[\\x{1F000}-\\x{1FAFF}\\x{2600}-\\x{27BF}\\x{2B00}-\\x{2BFF}\\x{FE0F}]")
+        val iconField = Regex("\"emoji\"\\s*:\\s*\"[^\"]*\"")
         File("src/main/assets/content").listFiles { f -> f.extension == "json" }!!.forEach { file ->
-            val found = emoji.findAll(file.readText()).map { it.value }.toList()
+            val found = emoji.findAll(file.readText().replace(iconField, "")).map { it.value }.toList()
             assertEquals("${file.name}: эмодзи в тексте", emptyList<String>(), found)
         }
     }

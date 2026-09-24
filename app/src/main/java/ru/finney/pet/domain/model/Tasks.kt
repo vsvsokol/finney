@@ -107,7 +107,7 @@ data class BasketTask(
 
 /**
  * Товар на полке задания. [qty] — сколько штук в упаковке: «5 яблок за 20» выгоднее «2 за 10».
- * [art] — только для рисунка, см. [ItemArt].
+ * [art] и [emoji] — только для рисунка, см. [ItemArt].
  */
 @Serializable
 data class ShelfItem(
@@ -117,6 +117,7 @@ data class ShelfItem(
     val category: Category,
     val qty: Int = 1,
     override val art: String? = null,
+    override val emoji: String? = null,
 ) : ItemArt
 
 @OptIn(ExperimentalSerializationApi::class)
@@ -175,11 +176,11 @@ data class GoalSliderTask(
 
 /**
  * Рисунок предмета в мини-игре. [art] — имя картинки из res/drawable-nodpi без расширения
- * (`item_food_apple`). Нет картинки — первая буква названия. Эмодзи нет намеренно:
- * лишнее поле в JSON ContentParser не пропустит.
+ * (`item_food_apple`), [emoji] — если картинки нет. Нет ни того, ни другого — первая буква названия.
  */
 interface ItemArt {
     val art: String?
+    val emoji: String?
 }
 
 /** «Конвейер»: разложить вещи на нужное и желаемое. */
@@ -209,6 +210,7 @@ data class SortItem(
     val category: Category,
     val why: String,
     override val art: String? = null,
+    override val emoji: String? = null,
 ) : ItemArt
 
 /** «Дорога к цели»: каждый день решить, сколько из дохода отложить. */
@@ -239,6 +241,7 @@ data class RaceGoal(
     val label: String,
     val price: Int,
     override val art: String? = null,
+    override val emoji: String? = null,
 ) : ItemArt
 
 /** Соблазн дня [day] (с 1). Взят, если в этот день потрачено не меньше [price]. */
@@ -248,6 +251,7 @@ data class RaceEvent(
     val label: String,
     val price: Int,
     override val art: String? = null,
+    override val emoji: String? = null,
 ) : ItemArt
 
 /** «Дождливый день»: спланировать траты с запасом, потом случается непредвиденное. */
@@ -277,6 +281,7 @@ data class Spending(
     val price: Int,
     val category: Category,
     override val art: String? = null,
+    override val emoji: String? = null,
 ) : ItemArt
 
 @Serializable
@@ -285,6 +290,7 @@ data class Surprise(
     val text: String,
     val price: Int,
     override val art: String? = null,
+    override val emoji: String? = null,
 ) : ItemArt
 
 /** «Лимонадная лавка»: закупить сырьё под число гостей. */
@@ -318,6 +324,7 @@ data class StandIngredient(
     val price: Int,
     val yields: Int,
     override val art: String? = null,
+    override val emoji: String? = null,
 ) : ItemArt
 
 /** «Касса»: отсчитать сдачу или заплатить без сдачи. */
@@ -358,6 +365,7 @@ data class ChangeRound(
     val paid: Int? = null,
     val wallet: List<Int> = emptyList(),
     override val art: String? = null,
+    override val emoji: String? = null,
 ) : ItemArt {
     /** Сколько монет нужно положить на кассу. */
     val target: Int get() = if (mode == ChangeMode.GIVE) (paid ?: 0) - price else price

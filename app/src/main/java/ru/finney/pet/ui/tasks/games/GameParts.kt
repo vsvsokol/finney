@@ -95,10 +95,10 @@ internal fun MiniGameFrame(
 }
 
 /**
- * Рисунок предмета: картинка из res/drawable-nodpi по имени из JSON, иначе первая
- * буква названия в кружке. Так [@vsvsokol] добавляет предмет без программиста, а
- * дизайнеры потом ставят рисунок одной строкой. Эмодзи в играх нет: они спорят
- * с плоским стилем макета и на разных телефонах выглядят по-разному.
+ * Рисунок предмета: картинка из res/drawable-nodpi по имени из JSON, иначе эмодзи,
+ * иначе первая буква. Так [@vsvsokol] добавляет предмет без программиста, а
+ * дизайнеры потом заменяют эмодзи на рисунок одной строкой. Эмодзи — только
+ * временный значок предмета; в текстах игр их нет.
  */
 @SuppressLint("DiscouragedApi") // Имя картинки приходит из JSON — R.drawable.* здесь не подставить.
 @Composable
@@ -115,6 +115,7 @@ internal fun ItemPicture(art: ItemArt, label: String, size: Dp, modifier: Modifi
     ) {
         when {
             drawable != null -> Image(painterResource(drawable), contentDescription = null, modifier = Modifier.fillMaxSize())
+            art.emoji != null -> Text(art.emoji!!, fontSize = (size.value * 0.62f).sp, textAlign = TextAlign.Center)
             else -> Box(
                 modifier = Modifier
                     .fillMaxSize()
