@@ -134,7 +134,7 @@ private fun GameCard(row: TaskRow, modifier: Modifier, onClick: () -> Unit) {
         Text(row.task.theme.label(), style = MaterialTheme.typography.labelMedium, color = FinneyInk, textAlign = TextAlign.Center)
         Text(
             text = when {
-                !row.available -> "🔒 откроется позже"
+                !row.available -> "откроется позже"
                 row.done -> "✓ пройдено"
                 else -> "новая"
             },

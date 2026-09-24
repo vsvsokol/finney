@@ -37,7 +37,9 @@ import androidx.compose.ui.unit.sp
 import ru.finney.pet.domain.model.Category
 import ru.finney.pet.domain.model.ItemArt
 import ru.finney.pet.domain.tasks.TaskInputError
+import ru.finney.pet.ui.components.FinneyIcon
 import ru.finney.pet.ui.components.FinneyIconButton
+import ru.finney.pet.ui.components.FinneyIcons
 import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.theme.FinneyBlue
 import ru.finney.pet.ui.theme.FinneyCream
@@ -93,9 +95,10 @@ internal fun MiniGameFrame(
 }
 
 /**
- * Рисунок предмета: картинка из res/drawable-nodpi по имени из JSON, иначе эмодзи,
- * иначе первая буква. Так [@vsvsokol] добавляет предмет без программиста, а
- * дизайнеры потом заменяют эмодзи на рисунок одной строкой.
+ * Рисунок предмета: картинка из res/drawable-nodpi по имени из JSON, иначе первая
+ * буква названия в кружке. Так [@vsvsokol] добавляет предмет без программиста, а
+ * дизайнеры потом ставят рисунок одной строкой. Эмодзи в играх нет: они спорят
+ * с плоским стилем макета и на разных телефонах выглядят по-разному.
  */
 @SuppressLint("DiscouragedApi") // Имя картинки приходит из JSON — R.drawable.* здесь не подставить.
 @Composable
@@ -112,7 +115,6 @@ internal fun ItemPicture(art: ItemArt, label: String, size: Dp, modifier: Modifi
     ) {
         when {
             drawable != null -> Image(painterResource(drawable), contentDescription = null, modifier = Modifier.fillMaxSize())
-            art.emoji != null -> Text(art.emoji!!, fontSize = (size.value * 0.62f).sp, textAlign = TextAlign.Center)
             else -> Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -131,19 +133,21 @@ internal fun ItemPicture(art: ItemArt, label: String, size: Dp, modifier: Modifi
 @Composable
 internal fun CategoryChip(category: Category, modifier: Modifier = Modifier) {
     val (text, color) = when (category) {
-        Category.NEEDS -> "🍴 нужное" to FinneyGreen
-        Category.WANTS -> "★ хочется" to FinneyPink
+        Category.NEEDS -> "нужное" to FinneyGreen
+        Category.WANTS -> "хочется" to FinneyPink
     }
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelMedium,
-        color = FinneyInk,
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
         modifier = modifier
             .clip(RoundedCornerShape(10.dp))
             .background(color)
             .border(2.dp, FinneyInk, RoundedCornerShape(10.dp))
             .padding(horizontal = 8.dp, vertical = 2.dp),
-    )
+    ) {
+        FinneyIcon(categoryIcon(category), size = 14.dp)
+        Text(text = text, style = MaterialTheme.typography.labelMedium, color = FinneyInk)
+    }
 }
 
 /**

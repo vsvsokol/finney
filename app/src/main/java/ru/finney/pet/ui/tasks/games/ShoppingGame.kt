@@ -248,7 +248,7 @@ private fun CartBar(total: Int, limit: Int, enabled: Boolean, onCheckout: () -> 
     ) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row {
-                Text("🛒 $total", style = MaterialTheme.typography.titleMedium, color = FinneyInk, modifier = Modifier.weight(1f))
+                Text("В корзине $total", style = MaterialTheme.typography.titleMedium, color = FinneyInk, modifier = Modifier.weight(1f))
                 Text(
                     if (total <= limit) "осталось ${limit - total}" else "не хватит ${total - limit}",
                     style = MaterialTheme.typography.titleMedium,

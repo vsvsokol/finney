@@ -26,6 +26,16 @@ class ContentTest {
         assertEquals(emptyList<String>(), ContentValidator.validate(content))
     }
 
+    /** Эмодзи на разных телефонах рисуются по-разному и спорят с плоским стилем макета. */
+    @Test
+    fun `в контенте нет эмодзи`() {
+        val emoji = Regex("[\\x{1F000}-\\x{1FAFF}\\x{2600}-\\x{27BF}\\x{2B00}-\\x{2BFF}\\x{FE0F}]")
+        File("src/main/assets/content").listFiles { f -> f.extension == "json" }!!.forEach { file ->
+            val found = emoji.findAll(file.readText()).map { it.value }.toList()
+            assertEquals("${file.name}: эмодзи в тексте", emptyList<String>(), found)
+        }
+    }
+
     @Test
     fun `минимальный объём контента по ТЗ п 2_6`() {
         assertTrue("покупок ≥ 8", content.shop.size >= 8)

@@ -202,7 +202,7 @@ private fun Envelope(spending: Spending, checked: Boolean, onChange: (Boolean) -
         OutlinedText(spending.price.toString(), style = MaterialTheme.typography.titleLarge)
         Text(
             when {
-                locked -> "🔒 нужное"
+                locked -> "нужное"
                 checked -> "✓ купить"
                 else -> "в запас"
             },
@@ -282,7 +282,7 @@ private fun PostponeRow(spending: Spending, checked: Boolean, onChange: (Boolean
         ItemPicture(spending, spending.label, 32.dp)
         Text(spending.label, style = MaterialTheme.typography.bodyLarge, color = FinneyInk, modifier = Modifier.weight(1f))
         Text(
-            if (locked) "🔒 нужное" else "★ хочется",
+            if (locked) "нужное" else "хочется",
             style = MaterialTheme.typography.labelMedium,
             color = if (locked) FinneyInk else Color.White,
             modifier = Modifier

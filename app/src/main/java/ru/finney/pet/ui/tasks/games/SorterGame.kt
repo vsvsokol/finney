@@ -53,6 +53,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 import ru.finney.pet.domain.model.Category
 import ru.finney.pet.domain.model.PetCharacter
@@ -60,13 +61,14 @@ import ru.finney.pet.domain.model.SortItem
 import ru.finney.pet.domain.model.SorterTask
 import ru.finney.pet.domain.tasks.TaskInput
 import ru.finney.pet.ui.components.FinneyButton
+import ru.finney.pet.ui.components.FinneyIcon
+import ru.finney.pet.ui.components.FinneyIcons
 import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.theme.FinneyCream
 import ru.finney.pet.ui.theme.FinneyGreen
 import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneyPeach
 import ru.finney.pet.ui.theme.FinneyPink
-import kotlin.math.roundToInt
 
 // «Конвейер», как «Food Drop» в Pou, но без спешки: лента ждёт, пока вещь не
 // смахнут вниз, в корзину «Нужное» или «Хочется». Кто не умеет смахивать,
@@ -309,6 +311,9 @@ private fun MistakePanel(item: SortItem, onMove: () -> Unit) {
 
 internal fun categoryWord(category: Category) = if (category == Category.NEEDS) "нужное" else "хочется"
 
+/** Значок категории — тот же, что в панели покупки: тетрадь у нужного, звезда у желаемого. */
+internal fun categoryIcon(category: Category) = if (category == Category.NEEDS) FinneyIcons.Plan else FinneyIcons.Star
+
 /**
  * Корзина — она же кнопка. Сверху видно, что в ней уже лежит; вещь, попавшая не туда,
  * обведена, пока её не переложат. Подпись и значок, а не только цвет (ТЗ п. 3.6).
@@ -345,7 +350,7 @@ private fun Bin(
                 Modifier.size(40.dp).clip(CircleShape).background(FinneyCream).border(3.dp, FinneyInk, CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(if (needs) "🍴" else "★", style = MaterialTheme.typography.titleLarge, color = FinneyInk)
+                FinneyIcon(categoryIcon(category), size = 24.dp)
             }
             OutlinedText(
                 if (needs) "Нужное" else "Хочется",

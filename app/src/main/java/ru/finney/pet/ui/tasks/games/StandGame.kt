@@ -100,7 +100,7 @@ private fun Morning(
         ) {
             ScenePet(character, 110.dp, Modifier.width(110.dp))
             ScenePanel(title = "Закупка", modifier = Modifier.fillMaxWidth()) {
-                Text("☀ ${task.forecast}", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
+                Text(task.forecast, style = MaterialTheme.typography.titleMedium, color = FinneyInk)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
