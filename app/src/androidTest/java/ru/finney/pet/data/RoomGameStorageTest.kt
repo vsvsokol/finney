@@ -66,8 +66,8 @@ class RoomGameStorageTest {
             store.ok(id) { buy(it, "food_bowl") }
             store.ok(id) { buy(it, "care_soap") }
             store.ok(id) { buy(it, "treat_candy") }
-            val task = if (round == 0) "savings_01" else "savings_02"
-            val input = if (round == 0) TaskInput.Deposit(30) else TaskInput.Distribution(mapOf("wants" to 40))
+            val task = if (round == 0) "game_lemonade" else "game_race"
+            val input = if (round == 0) TaskInput.Stock(4) else TaskInput.DailyDeposits(listOf(10, 10, 5, 5, 10, 10))
             assertTrue(store.submitTask(id, task, input) is TaskResult.Submitted)
             store.ok(id) { deposit(it, 15) }
             store.ok(id) { withdraw(it, 5) }
@@ -91,7 +91,8 @@ class RoomGameStorageTest {
         assertEquals(3, after.state.periods.size)
         assertTrue(after.state.periods.take(2).all { it.result != null })
         assertTrue(after.state.balance >= 0)
-        assertEquals(20, after.state.goalSaved("goal_bike"))
+        // За круг: 10 из плана (копилка плана списывается сразу) + 15 − 5.
+        assertEquals(40, after.state.goalSaved("goal_bike"))
         assertEquals("Финни", after.profile.petName)
         assertEquals(look, after.profile.appearance)
     }
@@ -114,8 +115,8 @@ class RoomGameStorageTest {
             apply(game.buy(expected, "food_bowl"))
             apply(game.buy(expected, "care_soap"))
             apply(game.buy(expected, "treat_candy"))
-            val task = if (round == 0) "savings_01" else "savings_02"
-            val input = if (round == 0) TaskInput.Deposit(30) else TaskInput.Distribution(mapOf("wants" to 40))
+            val task = if (round == 0) "game_lemonade" else "game_race"
+            val input = if (round == 0) TaskInput.Stock(4) else TaskInput.DailyDeposits(listOf(10, 10, 5, 5, 10, 10))
             expected = (game.submitTask(expected, task, input) as TaskResult.Submitted).state
             apply(game.deposit(expected, 15))
             apply(game.withdraw(expected, 5))
@@ -147,5 +148,26 @@ class RoomGameStorageTest {
 
         store.deleteAll()
         assertTrue(store.observeProfiles().first().isEmpty())
+    }
+
+    @Test
+    fun resetProgressKeepsPetAndStartsOver() = runBlocking {
+        val store = store(db)
+        val look = PetAppearance(PetCharacter.PUSHISTIK, BodyColor.C, EyesVariant.OVAL)
+        val id = (store.createProfile("Финни", look, isDemo = true) as ProfileResult.Saved).profileId
+        playTwoPeriods(store, id)
+
+        store.resetProgress(id)
+
+        val reset = RoomGameStorage(db.gameDao()).load(id)!!
+        assertEquals("Финни", reset.profile.petName)
+        assertEquals(look, reset.profile.appearance)
+        val fresh = game.newGame(isDemo = true)
+        assertEquals(fresh, reset.state.copy(ledger = reset.state.ledger.map { it.copy(createdAt = fresh.ledger.first().createdAt) }))
+
+        // После сброса игра продолжается обычными командами: хвосты операций считаются с нуля.
+        store.ok(id) { confirmPlan(it, needs = 0, wants = 0, savings = 0) }
+        store.ok(id) { closePeriod(it) }
+        assertEquals(2, RoomGameStorage(db.gameDao()).load(id)!!.state.periods.size)
     }
 }

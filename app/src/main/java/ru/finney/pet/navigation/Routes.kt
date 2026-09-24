@@ -60,3 +60,7 @@ data object GlossaryRoute
 /** Раздел взрослого. Барьер (удержание кнопки или пример) — часть этого экрана (ТЗ п. 2.5.12). */
 @Serializable
 data object AdultRoute
+
+/** Подтверждение сброса прогресса из раздела взрослого. */
+@Serializable
+data object ResetProgressRoute

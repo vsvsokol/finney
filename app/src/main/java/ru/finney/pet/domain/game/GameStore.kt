@@ -69,6 +69,15 @@ class GameStore(
         result
     }
 
+    /**
+     * Начать заново тем же питомцем: имя, внешность и демо-режим остаются, прогресс — как
+     * у только что созданного профиля (ТЗ п. 2.5.13: тестовый профиль сбрасывается к исходному состоянию).
+     */
+    suspend fun resetProgress(profileId: Long) = mutex.withLock {
+        val profile = checkNotNull(storage.load(profileId)) { "Профиль $profileId не найден" }.profile
+        storage.replace(profileId, game.newGame(profile.isDemo))
+    }
+
     /** Сброс тестового профиля: профиль удаляется целиком, приложение возвращается к первому запуску. */
     suspend fun deleteProfile(profileId: Long) = mutex.withLock { storage.delete(profileId) }
 

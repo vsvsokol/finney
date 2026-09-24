@@ -12,6 +12,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
+import ru.finney.pet.ui.adult.ResetProgressScreen
 import ru.finney.pet.ui.budget.BudgetScreen
 import ru.finney.pet.ui.goals.GoalsScreen
 import ru.finney.pet.ui.home.HomeScreen
@@ -138,7 +139,15 @@ fun FinneyNavHost(
             StubScreen(
                 "Раздел взрослого",
                 "Имя и внешность питомца" to { navController.navigate(PetSetupRoute(isEditing = true)) },
+                "Начать игру заново" to { navController.navigate(ResetProgressRoute) },
                 "Назад" to { navController.popBackStack() },
+            )
+        }
+
+        composable<ResetProgressRoute> {
+            ResetProgressScreen(
+                onDone = { navController.openGame() },
+                onCancel = { navController.popBackStack() },
             )
         }
     }

@@ -85,6 +85,28 @@ class GameStoreTest {
     }
 
     @Test
+    fun `сброс прогресса оставляет питомца и начинает игру заново`() = runBlocking {
+        val storage = FakeStorage()
+        val store = GameStore(Fixtures.game(), storage)
+        val id = (store.createProfile("Финни", appearance, isDemo = true) as ProfileResult.Saved).profileId
+        val start = storage.load(id)!!
+        store.execute(id) { confirmPlan(it, needs = 20, wants = 0, savings = 0) }
+        store.execute(id) { buy(it, "apple") }
+        store.submitTask(id, "t1", Fixtures.success)
+        store.execute(id) { closePeriod(it) }
+
+        store.resetProgress(id)
+
+        val reset = storage.load(id)!!
+        assertEquals(start.profile, reset.profile)
+        assertEquals(1, reset.state.periods.size)
+        assertTrue(reset.state.attempts.isEmpty())
+        assertEquals(start.state.balance, reset.state.balance)
+        assertEquals(start.state.pet, reset.state.pet)
+        assertTrue(reset.state.isDemo)
+    }
+
+    @Test
     fun `удаление профиля и всех данных`() = runBlocking {
         val storage = FakeStorage()
         val store = GameStore(Fixtures.game(), storage)

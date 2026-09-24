@@ -25,6 +25,9 @@ interface GameStorage {
      */
     suspend fun save(profileId: Long, state: GameState)
 
+    /** Заменяет состояние целиком, профиль остаётся тем же. Для сброса прогресса: [save] только дописывает. */
+    suspend fun replace(profileId: Long, state: GameState)
+
     suspend fun updateProfile(profileId: Long, petName: String, appearance: PetAppearance)
 
     suspend fun delete(profileId: Long)

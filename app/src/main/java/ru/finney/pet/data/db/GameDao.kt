@@ -66,6 +66,15 @@ abstract class GameDao {
     @Query("DELETE FROM profiles")
     abstract suspend fun deleteAllProfiles()
 
+    @Query("DELETE FROM periods WHERE profileId = :profileId")
+    abstract suspend fun deletePeriods(profileId: Long)
+
+    @Query("DELETE FROM ledger WHERE profileId = :profileId")
+    abstract suspend fun deleteLedger(profileId: Long)
+
+    @Query("DELETE FROM task_attempts WHERE profileId = :profileId")
+    abstract suspend fun deleteAttempts(profileId: Long)
+
     @Transaction
     open suspend fun createGame(profile: ProfileEntity, game: GameRows): Long {
         val profileId = insertProfile(profile)
@@ -90,6 +99,15 @@ abstract class GameDao {
         val storedAttempts = attemptCount(profileId)
         check(storedAttempts <= game.attempts.size) { "Попыток в базе $storedAttempts, в состоянии ${game.attempts.size}" }
         insertAttempts(game.attempts.drop(storedAttempts))
+    }
+
+    /** Сброс прогресса: периоды, операции и попытки профиля стираются и пишутся заново. Профиль тот же. */
+    @Transaction
+    open suspend fun replaceGame(profileId: Long, game: GameRows) {
+        deletePeriods(profileId)
+        deleteLedger(profileId)
+        deleteAttempts(profileId)
+        writeGame(profileId, game)
     }
 }
 

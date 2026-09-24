@@ -59,6 +59,9 @@ class Session(
     suspend fun submitTask(taskId: String, input: TaskInput): TaskResult =
         store.submitTask(requireProfileId(), taskId, input)
 
+    /** Прогресс открытого профиля — к исходному состоянию, питомец остаётся. См. [GameStore.resetProgress]. */
+    suspend fun resetProgress() = store.resetProgress(requireProfileId())
+
     /** Сброс тестового профиля. После него открыт другой профиль, если он есть; иначе — первый запуск. */
     suspend fun deleteActiveProfile() = mutex.withLock {
         store.deleteProfile(requireProfileId())

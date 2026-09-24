@@ -38,6 +38,11 @@ class FakeStorage : GameStorage {
         all.value += profileId to all.value.getValue(profileId).copy(state = state)
     }
 
+    override suspend fun replace(profileId: Long, state: GameState) {
+        yield()
+        all.value += profileId to all.value.getValue(profileId).copy(state = state)
+    }
+
     override suspend fun updateProfile(profileId: Long, petName: String, appearance: PetAppearance) {
         val saved = all.value.getValue(profileId)
         all.value += profileId to saved.copy(profile = saved.profile.copy(petName = petName, appearance = appearance))
