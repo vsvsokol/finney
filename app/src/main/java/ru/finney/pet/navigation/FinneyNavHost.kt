@@ -69,7 +69,7 @@ fun FinneyNavHost(
             HomeScreen(
                 onOpenBudget = { navController.navigate(BudgetRoute) },
                 onOpenShop = { navController.navigate(ShopRoute) },
-                onOpenOnboarding = { navController.navigate(OnboardingRoute) },
+                onOpenOnboarding = { navController.navigate(OnboardingRoute()) },
                 onOpenGoals = { navController.navigate(GoalsRoute) },
                 onOpenTasks = { navController.navigate(TasksRoute) },
                 onOpenTask = { taskId -> navController.navigate(TaskRoute(taskId)) },
