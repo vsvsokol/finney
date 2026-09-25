@@ -3,30 +3,23 @@ package ru.finney.pet.ui.onboarding
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -35,8 +28,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import ru.finney.pet.domain.model.BodyColor
-import ru.finney.pet.domain.model.EyesVariant
 import ru.finney.pet.domain.model.PetCharacter
 import ru.finney.pet.domain.profile.PetNameError
 import ru.finney.pet.ui.components.FinneyButton
@@ -48,11 +39,7 @@ import ru.finney.pet.ui.pet.PetPose
 import ru.finney.pet.ui.pet.PetView
 import ru.finney.pet.ui.pet.rememberPoseProvider
 import ru.finney.pet.ui.pet.rememberPetAnimation
-import ru.finney.pet.ui.theme.FinneyBlue
-import ru.finney.pet.ui.theme.FinneyGreen
 import ru.finney.pet.ui.theme.FinneyInk
-import ru.finney.pet.ui.theme.FinneyPeach
-import ru.finney.pet.ui.theme.FinneyPink
 import ru.finney.pet.ui.theme.FinneySand
 import ru.finney.pet.ui.theme.FinneyTheme
 import ru.finney.pet.ui.theme.RadiusCard
@@ -71,20 +58,6 @@ private val CharacterLabels = mapOf(
     PetCharacter.ZVEZDOCHKA to "Звёздочка",
     PetCharacter.BANTIK to "Бантик",
     PetCharacter.LUCHIK to "Лучик",
-)
-
-/** Цвета тела для плашек выбора. Пока графики нет, вариант показывается кружком. */
-private val BodyColorSwatches = mapOf(
-    BodyColor.A to FinneyPeach,
-    BodyColor.B to FinneyBlue,
-    BodyColor.C to FinneyGreen,
-)
-
-/** Названия вариантов глаз: ребёнок выбирает по слову, а не по букве enum. */
-private val EyesLabels = mapOf(
-    EyesVariant.ROUND to "круглые",
-    EyesVariant.OVAL to "овальные",
-    EyesVariant.SLY to "хитрые",
 )
 
 @Composable
@@ -107,19 +80,21 @@ fun PetSetupScreen(
         state = state,
         onNameChange = viewModel::setName,
         onCharacterChange = viewModel::setCharacter,
-        onBodyColorChange = viewModel::setBodyColor,
-        onEyesChange = viewModel::setEyes,
         onSave = viewModel::save,
     )
 }
 
+/**
+ * Выбора цвета тела и глаз здесь нет, хотя в профиле они хранятся: питомцы
+ * нарисованы в одном варианте, и `PetView` эти поля не читает. Выбор, который
+ * ничего не меняет на экране, ребёнка только путает. Появятся слои в
+ * design/exports/pet — вернём, сеттеры в [PetSetupViewModel] остались.
+ */
 @Composable
 private fun PetSetupContent(
     state: PetSetupUiState,
     onNameChange: (String) -> Unit,
     onCharacterChange: (PetCharacter) -> Unit,
-    onBodyColorChange: (BodyColor) -> Unit,
-    onEyesChange: (EyesVariant) -> Unit,
     onSave: () -> Unit,
 ) {
     FinneyScreen(
@@ -146,38 +121,6 @@ private fun PetSetupContent(
             enabled = !state.isLoading,
             onNameChange = onNameChange,
         )
-
-        SectionTitle("Цвет")
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            BodyColor.entries.forEach { color ->
-                ColorSwatch(
-                    color = BodyColorSwatches.getValue(color),
-                    label = color.name,
-                    selected = state.appearance.bodyColor == color,
-                    enabled = !state.isLoading,
-                    onSelect = { onBodyColorChange(color) },
-                )
-            }
-        }
-
-        SectionTitle("Глаза")
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            EyesVariant.entries.forEach { eyes ->
-                ChoiceChip(
-                    label = EyesLabels.getValue(eyes),
-                    selected = state.appearance.eyes == eyes,
-                    enabled = !state.isLoading,
-                    onSelect = { onEyesChange(eyes) },
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
 
         FinneyButton(
             text = if (state.isEditing) "Сохранить" else "Начать игру",
@@ -322,82 +265,13 @@ private fun CharacterCard(
 /** Поза невыбранного питомца: стоит ровно. Одна на всех, чтобы не плодить лямбды. */
 private val StillPose: () -> PetPose = { PetPose() }
 
-/** Кружок цвета. Выбранный — с толстой рамкой и подписью под ним, чтобы не полагаться на цвет. */
-@Composable
-private fun ColorSwatch(
-    color: Color,
-    label: String,
-    selected: Boolean,
-    enabled: Boolean,
-    onSelect: () -> Unit,
-) {
-    Box(
-        modifier = Modifier
-            // 64 dp — с запасом к минимуму 48 dp из ТЗ п. 3.6.
-            .size(64.dp)
-            .clip(CircleShape)
-            .background(color)
-            .border(if (selected) StrokeBold else StrokeThin, FinneyInk, CircleShape)
-            .selectable(
-                selected = selected,
-                enabled = enabled,
-                role = Role.RadioButton,
-                onClick = onSelect,
-            )
-            .clearAndSetSemantics { contentDescription = "Цвет $label" },
-        contentAlignment = Alignment.Center,
-    ) {
-        // Галочка — второй, не цветовой признак выбора.
-        if (selected) {
-            OutlinedText("✓", style = MaterialTheme.typography.titleLarge)
-        }
-    }
-}
-
-/** Плашка выбора из нескольких вариантов. */
-@Composable
-private fun ChoiceChip(
-    label: String,
-    selected: Boolean,
-    enabled: Boolean,
-    onSelect: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(percent = 50))
-            .background(if (selected) FinneyYellow else FinneySand)
-            .border(
-                width = if (selected) StrokeBold else StrokeThin,
-                color = FinneyInk,
-                shape = RoundedCornerShape(percent = 50),
-            )
-            .selectable(
-                selected = selected,
-                enabled = enabled,
-                role = Role.RadioButton,
-                onClick = onSelect,
-            )
-            .padding(horizontal = 12.dp, vertical = 16.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelLarge,
-            color = FinneyInk,
-            textAlign = TextAlign.Center,
-        )
-    }
-}
-
 @Preview(showBackground = true, backgroundColor = 0xFFFFEDCD)
 @Composable
 private fun PetSetupContentPreview() {
     FinneyTheme {
         PetSetupContent(
             state = PetSetupUiState(isEditing = false, name = "Финни"),
-            onNameChange = {}, onCharacterChange = {}, onBodyColorChange = {},
-            onEyesChange = {}, onSave = {},
+            onNameChange = {}, onCharacterChange = {}, onSave = {},
         )
     }
 }
