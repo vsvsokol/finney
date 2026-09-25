@@ -7,17 +7,15 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -110,30 +108,33 @@ private fun Shelves(
     onCheckout: () -> Unit,
 ) {
     val listRules = task.rules.filter { it.label != null }
-    Column(Modifier.fillMaxSize().padding(top = HudHeight)) {
-        Column(
-            modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Row(verticalAlignment = Alignment.Top) {
-                if (listRules.isNotEmpty()) ShoppingList(task, listRules, cart, Modifier.weight(1f))
+    SceneBody(bottom = { CartBar(total = total, limit = task.limit, enabled = cart.isNotEmpty(), onCheckout = onCheckout) }) {
+        Row(verticalAlignment = Alignment.Bottom) {
+            if (listRules.isNotEmpty()) ShoppingList(task, listRules, cart, Modifier.weight(1f).align(Alignment.Top))
+            // Реплика над питомцем, хвостиком к нему. Сбоку от списка она уезжала
+            // под питомца и показывала хвостиком в пустоту.
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                val hint = if (task.shelf.any { it.qty > 1 }) "Где больше за монету?" else "Сначала — по списку!"
+                Bubble(hint, Tail.DOWN_LEFT, maxWidth = 130.dp)
                 ScenePet(character, 90.dp, Modifier.width(90.dp))
             }
-            val hint = if (task.shelf.any { it.qty > 1 }) "Где больше за монету?" else "Сначала — по списку!"
-            Bubble(hint, Tail.RIGHT, Modifier.align(Alignment.End))
-
-            task.shelf.chunked(3).forEach { row ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.Bottom,
-                ) {
-                    row.forEach { item -> Goods(item, inCart = item.id in cart) { onToggle(item.id) } }
-                }
-                Shelf()
-            }
         }
-        CartBar(total = total, limit = task.limit, enabled = cart.isNotEmpty(), onCheckout = onCheckout)
+
+        // Полки стоят внизу, на полу магазина, во всю ширину экрана, а товары
+        // делят полку поровну. С шириной числом они жались к середине, а под
+        // ними оставалась пустая полоса пола.
+        Spacer(Modifier.weight(1f))
+        task.shelf.chunked(3).forEach { row ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.Bottom,
+            ) {
+                row.forEach { item -> Goods(item, inCart = item.id in cart, Modifier.weight(1f)) { onToggle(item.id) } }
+                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+            Shelf()
+        }
     }
 }
 
@@ -172,12 +173,11 @@ private fun ShoppingList(task: BasketTask, rules: List<BasketRule>, cart: Set<St
 
 /** Товар на полке: рисунок и ценник «монетка · 2 шт · 10». В тележке — розовая подсветка и галочка. */
 @Composable
-private fun Goods(item: ShelfItem, inCart: Boolean, onToggle: () -> Unit) {
+private fun Goods(item: ShelfItem, inCart: Boolean, modifier: Modifier, onToggle: () -> Unit) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(3.dp),
-        modifier = Modifier
-            .width(104.dp)
+        modifier = modifier
             .clip(RoundedCornerShape(12.dp))
             .background(if (inCart) FinneyPink.copy(alpha = 0.18f) else Color.Transparent)
             .toggleable(value = inCart, role = Role.Checkbox, onValueChange = { onToggle() })
@@ -187,10 +187,10 @@ private fun Goods(item: ShelfItem, inCart: Boolean, onToggle: () -> Unit) {
             if (item.qty > 1) {
                 // Упаковка — несколько штук рядом: сразу видно, что их больше.
                 Row(horizontalArrangement = Arrangement.spacedBy((-18).dp)) {
-                    repeat(minOf(item.qty, 3)) { ItemPicture(item, item.label, 40.dp) }
+                    repeat(minOf(item.qty, 3)) { ItemPicture(item, item.label, 48.dp) }
                 }
             } else {
-                ItemPicture(item, item.label, 56.dp)
+                ItemPicture(item, item.label, 68.dp)
             }
             if (inCart) {
                 Box(
@@ -226,6 +226,7 @@ private fun Shelf() {
     Box(
         Modifier
             .fillMaxWidth()
+            .bleed()
             .height(14.dp)
             .background(Wood)
             .border(3.dp, FinneyInk),
@@ -238,7 +239,6 @@ private fun CartBar(total: Int, limit: Int, enabled: Boolean, onCheckout: () -> 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 8.dp)
             .clip(RoundedCornerShape(18.dp))
             .background(FinneyCream)
             .border(4.dp, FinneyInk, RoundedCornerShape(18.dp))
@@ -273,9 +273,11 @@ private fun Checkout(
     onBack: () -> Unit,
     onPay: () -> Unit,
 ) {
-    Column(
-        Modifier.fillMaxSize().padding(top = HudHeight).verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+    SceneBody(
+        bottom = {
+            FinneyButton(text = "Оплатить", onClick = onPay, enabled = cart.isNotEmpty())
+            FinneyButton(text = "Вернуться к полкам", onClick = onBack)
+        },
     ) {
         ScenePanel(title = "Касса", modifier = Modifier.fillMaxWidth()) {
             if (shortage != null) {
@@ -301,9 +303,10 @@ private fun Checkout(
                     ItemPicture(item, item.label, 32.dp)
                     Text(item.label, style = MaterialTheme.typography.bodyLarge, color = FinneyInk, modifier = Modifier.weight(1f))
                     OutlinedText(item.price.toString(), style = MaterialTheme.typography.titleLarge)
+                    // 48 dp — минимум ТЗ п. 3.6 для всего, на что нажимают.
                     Box(
                         Modifier
-                            .size(36.dp)
+                            .size(48.dp)
                             .clip(CircleShape)
                             .background(FinneyPeach)
                             .border(3.dp, FinneyInk, CircleShape)
@@ -317,15 +320,7 @@ private fun Checkout(
                 Text("в кошельке ${task.limit}", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
             }
         }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            ScenePet(character, 100.dp, Modifier.width(100.dp))
-            Bubble(
-                if (shortage != null) "Что-то подождёт — убери лишнее" else "Всё по списку? Платим!",
-                Tail.LEFT,
-                Modifier.weight(1f),
-            )
-        }
-        FinneyButton(text = "Оплатить", onClick = onPay, enabled = cart.isNotEmpty())
-        FinneyButton(text = "Вернуться к полкам", onClick = onBack)
+        Spacer(Modifier.weight(1f))
+        PetSays(character, if (shortage != null) "Что-то подождёт — убери лишнее" else "Всё по списку? Платим!", petSize = 100.dp)
     }
 }

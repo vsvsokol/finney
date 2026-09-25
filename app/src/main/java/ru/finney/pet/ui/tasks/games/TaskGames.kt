@@ -149,14 +149,15 @@ fun ColumnScope.ResultBody(task: TaskDefinition, details: TaskDetails, input: Ta
 
         is TaskDetails.Stand -> {
             val stand = task as? StandTask
-            LedgerRow("+", FinneyGreen, "Продал ${details.sold} стаканов", "+${details.earned}")
-            LedgerRow("−", FinneyPeach, "Купил ${details.spent / (stand?.ingredient?.price ?: 1)} ${stand?.ingredient?.label?.lowercase().orEmpty()}", "−${details.spent}")
+            LedgerRow("+", FinneyGreen, "Продал ${cupCount(details.sold)}", "+${details.earned}")
+            // Название сырья приходит из контента в одной форме, поэтому «× 7», а не «7 лимон».
+            LedgerRow("−", FinneyPeach, "Купил: ${stand?.ingredient?.label?.lowercase().orEmpty()} × ${details.spent / (stand?.ingredient?.price ?: 1)}", "−${details.spent}")
             LedgerRow("=", Color.White, "Заработал", details.kept.toString(), highlight = true)
             val notes = listOfNotNull(
-                details.leftover.takeIf { it > 0 }?.let { "$it стакана не купили." },
-                details.missed.takeIf { it > 0 }?.let { "$it гостям не хватило." },
+                details.leftover.takeIf { it > 0 }?.let { "${cupCount(it)} не купили." },
+                details.missed.takeIf { it > 0 }?.let { "${plural(it, "гостю", "гостям", "гостям")} не хватило." },
             )
-            if (notes.isNotEmpty()) Summary(notes.joinToString(" ") + " На всех гостей хватило бы ${details.best}.")
+            if (notes.isNotEmpty()) Summary(notes.joinToString(" ") + " На всех гостей хватило бы: ${stand?.ingredient?.label?.lowercase().orEmpty()} × ${details.best}.")
         }
 
         is TaskDetails.Change -> {

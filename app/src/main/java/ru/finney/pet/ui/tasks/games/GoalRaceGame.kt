@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -38,6 +39,7 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -84,10 +86,6 @@ internal fun GoalRaceGame(
             ScenePanel(title = null, modifier = Modifier.fillMaxWidth()) {
                 OutlinedText("День $day · получил ${task.incomePerDay}", style = MaterialTheme.typography.titleLarge)
                 CoinSplit(income = task.incomePerDay, step = task.step, deposit = today, onChange = { today = it })
-                Row {
-                    Text("в копилку $today", style = MaterialTheme.typography.titleMedium, color = FinneyInk, modifier = Modifier.weight(1f))
-                    Text("потратить ${task.incomePerDay - today}", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
-                }
                 event?.let {
                     val affordable = task.incomePerDay - today >= it.price
                     Row(
@@ -168,18 +166,25 @@ private fun PiggyCard(saved: Int, adding: Int, task: GoalRaceTask) {
 private fun Board(task: GoalRaceTask, day: Int, character: PetCharacter, modifier: Modifier) {
     val eventDays = task.events.map { it.day }.toSet()
     BoxWithConstraints(modifier) {
-        val perRow = 4
-        val rows = (task.days + perRow - 1) / perRow
+        // Дни и финиш — в два ряда: при восьми днях по пять в ряд, иначе третий ряд
+        // не помещался над панелью дня и поле налезало на копилку.
+        val perRow = if (task.days + 1 > 8) 5 else 4
+        val pointRows = (task.days + perRow) / perRow
         val tile = 48.dp
         val stepX = (maxWidth - tile) / perRow
-        val stepY = ((maxHeight - tile - 40.dp) / rows.coerceAtLeast(1)).coerceIn(40.dp, 96.dp)
+        // Сверху — место под цель на финише, снизу — под нижний ряд кружков.
+        val top = 56.dp
+        val bottom = tile / 2 + 8.dp
+        val stepY = if (pointRows > 1) ((maxHeight - top - bottom) / (pointRows - 1)).coerceIn(96.dp, 150.dp) else 0.dp
+        // Поле посередине свободного места, а не прижато к панели: иначе над ним пустовало полэкрана.
+        val lift = ((maxHeight - top - bottom - stepY * (pointRows - 1)) / 2).coerceAtLeast(0.dp)
 
         // Змейка снизу вверх: первый ряд слева направо, второй справа налево. Последняя точка — цель.
         fun centre(i: Int): DpOffset {
             val row = i / perRow
             val col = i % perRow
             val x = if (row % 2 == 0) col else perRow - 1 - col
-            return DpOffset(tile / 2 + stepX * x + stepX / 2, maxHeight - tile / 2 - 8.dp - stepY * row)
+            return DpOffset(tile / 2 + stepX * x + stepX / 2, maxHeight - lift - bottom - stepY * row)
         }
         val points = (0..task.days).map(::centre)
 
@@ -220,8 +225,10 @@ private fun Board(task: GoalRaceTask, day: Int, character: PetCharacter, modifie
             PriceTag(task.goal.price.toString())
         }
 
+        // Фишка стоит на своём кружке, а не над ним: над кружком она задевала
+        // ценник цели в ряду выше. Какой сейчас день, написано в панели.
         val here = points[(day - 1).coerceIn(0, task.days - 1)]
-        ScenePet(character, 64.dp, Modifier.width(64.dp).offset(here.x - 32.dp, here.y - tile / 2 - 52.dp))
+        ScenePet(character, 60.dp, Modifier.width(60.dp).offset(here.x - 30.dp, here.y - 50.dp))
     }
 }
 
@@ -269,9 +276,14 @@ private fun CoinSplit(income: Int, step: Int, deposit: Int, onChange: (Int) -> U
             if (split == count) Divider()
         }
     }
-    // Для тех, кому неудобно тянуть: те же шаги кнопками.
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    // Для тех, кому неудобно тянуть: те же шаги кнопками. Подписи между ними —
+    // одной строкой с кнопками, чтобы панель дня не отнимала высоту у поля.
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         SmallButton("− $step", enabled = deposit >= step) { onChange(deposit - step) }
+        Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("в копилку $deposit", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
+            Text("потратить ${income - deposit}", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
+        }
         SmallButton("+ $step", enabled = deposit + step <= income) { onChange(deposit + step) }
     }
 }
@@ -283,17 +295,23 @@ private fun Divider() {
     Box(Modifier.width(6.dp).height(40.dp).clip(RoundedCornerShape(3.dp)).background(FinneyPink).border(2.dp, FinneyInk, RoundedCornerShape(3.dp)))
 }
 
+/** Кнопка шага «− 5» / «+ 5». Высота — от 48 dp, как у всех нажимаемых элементов (ТЗ п. 3.6). */
 @Composable
 private fun SmallButton(text: String, enabled: Boolean, onClick: () -> Unit) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.titleMedium,
-        color = if (enabled) FinneyInk else FinneyInk.copy(alpha = 0.35f),
+    Box(
         modifier = Modifier
             .clip(RoundedCornerShape(50))
             .background(if (enabled) FinneyGreen else FinneyCream)
             .border(3.dp, FinneyInk, RoundedCornerShape(50))
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-    )
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .defaultMinSize(minWidth = 64.dp, minHeight = 48.dp)
+            .padding(horizontal = 14.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.titleMedium,
+            color = if (enabled) FinneyInk else FinneyInk.copy(alpha = 0.35f),
+        )
+    }
 }

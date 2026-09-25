@@ -72,7 +72,11 @@ private fun GoalsContent(
     onComplete: () -> Unit,
     onBack: () -> Unit,
 ) {
-    FinneyScreen(scrollable = true, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    FinneyScreen(
+        scrollable = true,
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        bottom = { FinneyButton(text = "Назад", onClick = onBack) },
+    ) {
         OutlinedText("Копилка", style = MaterialTheme.typography.headlineLarge)
 
         FinneyPanel(title = "На что копим") {
@@ -125,8 +129,6 @@ private fun GoalsContent(
         }
 
         state.rejection?.let { RejectionNote(it) }
-
-        FinneyButton(text = "Назад", onClick = onBack)
     }
 }
 

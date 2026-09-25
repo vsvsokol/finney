@@ -6,19 +6,16 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -62,7 +59,6 @@ import ru.finney.pet.ui.theme.FinneyYellow
 // ломается зонт. Запаса хватило — успех. Нет — ребёнок сам переносит желаемое;
 // нужное перенести нельзя. Питомец не болеет и не пугается.
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun ReserveGame(
     task: ReserveTask,
@@ -79,18 +75,20 @@ internal fun ReserveGame(
 
     if (!weekStarted) {
         GameScene(backdrop = Backdrop.ROOM, onClose = onClose, money = task.amount) {
-            Column(
-                Modifier.fillMaxSize().padding(top = HudHeight).verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+            SceneBody(
+                bottom = { FinneyButton(text = "Начать неделю", onClick = { weekStarted = true }, enabled = reserve >= 0) },
             ) {
                 ScenePanel(title = "Моя неделя", modifier = Modifier.fillMaxWidth()) {
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        task.spendings.forEach { s ->
-                            Envelope(s, checked = s.id in planned) { planned = if (it) planned + s.id else planned - s.id }
+                    // По три конверта в ряд на всю ширину панели. С шириной числом они
+                    // оставляли справа пустую полосу, а на широком экране — ещё шире.
+                    task.spendings.chunked(3).forEach { row ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.height(IntrinsicSize.Max)) {
+                            row.forEach { s ->
+                                Envelope(s, checked = s.id in planned, Modifier.weight(1f).fillMaxHeight()) {
+                                    planned = if (it) planned + s.id else planned - s.id
+                                }
+                            }
+                            repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
                         }
                     }
                     ReserveJar(maxOf(0, reserve))
@@ -106,11 +104,8 @@ internal fun ReserveGame(
                     }
                     TwoPartMeter(spent = spent, total = task.amount)
                 }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    ScenePet(character, 100.dp, Modifier.width(100.dp))
-                    Bubble("А если что-то случится?", Tail.LEFT, Modifier.weight(1f))
-                }
-                FinneyButton(text = "Начать неделю", onClick = { weekStarted = true }, enabled = reserve >= 0)
+                Spacer(Modifier.weight(1f))
+                PetSays(character, "А если что-то случится?", petSize = 100.dp)
             }
         }
         return
@@ -121,10 +116,7 @@ internal fun ReserveGame(
     val freed = task.spendings.filter { it.id in dropped }.sumOf { it.price }
 
     GameScene(backdrop = Backdrop.ROOM_RAIN, onClose = onClose, money = reserve) {
-        Column(
-            Modifier.fillMaxSize().padding(top = HudHeight).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
+        SceneBody {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -170,27 +162,24 @@ internal fun ReserveGame(
                     FinneyButton(text = "Готово", onClick = { onSubmit(TaskInput.Reserve(planned, dropped)) }, enabled = freed >= shortage)
                 }
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                ScenePet(character, 100.dp, Modifier.width(100.dp))
-                Bubble(
-                    if (shortage == 0) "Хорошо, что был запас! План на неделю цел" else "Желаемое купим потом. В следующий раз оставим запас",
-                    Tail.LEFT,
-                    Modifier.weight(1f),
-                )
-            }
+            Spacer(Modifier.weight(1f))
+            PetSays(
+                character,
+                if (shortage == 0) "Хорошо, что был запас! План на неделю цел" else "Желаемое купим потом. В следующий раз оставим запас",
+                petSize = 100.dp,
+            )
         }
     }
 }
 
 /** Конверт траты: день недели не важен, важно — что это и сколько. Нужное заперто замком. */
 @Composable
-private fun Envelope(spending: Spending, checked: Boolean, onChange: (Boolean) -> Unit) {
+private fun Envelope(spending: Spending, checked: Boolean, modifier: Modifier, onChange: (Boolean) -> Unit) {
     val locked = spending.category == Category.NEEDS
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-        modifier = Modifier
-            .width(92.dp)
+        verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically),
+        modifier = modifier
             .clip(RoundedCornerShape(12.dp))
             .background(if (checked) Color.White else FinneyCream)
             .border(3.dp, if (checked) FinneyInk else FinneyInk.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
