@@ -119,7 +119,7 @@ internal fun SorterGame(
             Spacer(Modifier.height(12.dp))
 
             // Лента выше всего остального: вещь, которую тянут вниз, рисуется поверх питомца и корзин.
-            Box(Modifier.zIndex(1f)) {
+            Box(Modifier.zIndex(1f).bleed()) {
                 Belt(
                     current = item?.takeIf { mistake == null },
                     upcoming = task.items.drop(index + 1).take(3),
@@ -132,10 +132,7 @@ internal fun SorterGame(
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 val wrong = mistake
                 if (wrong == null) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        ScenePet(character, 140.dp, Modifier.weight(1f))
-                        item?.let { Bubble("«${it.label}» — это что?", Tail.LEFT, Modifier.weight(1f)) }
-                    }
+                    if (item != null) PetSays(character, "«${item.label}» — это что?", petSize = 140.dp)
                 } else {
                     MistakePanel(wrong, onMove = ::moveOver)
                 }
@@ -230,7 +227,7 @@ private fun Belt(
             }
         }
         Row(
-            modifier = Modifier.fillMaxWidth().height(84.dp).padding(horizontal = 12.dp),
+            modifier = Modifier.fillMaxWidth().height(84.dp).padding(horizontal = SceneEdge + 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(18.dp),
         ) {
@@ -241,7 +238,7 @@ private fun Belt(
             }
             upcoming.forEach { ItemPicture(it, it.label, 52.dp) }
         }
-        if (showHint) GestureHint("смахни вниз ↓", Modifier.align(Alignment.BottomStart).offset(x = 4.dp, y = 22.dp))
+        if (showHint) GestureHint("смахни вниз ↓", Modifier.align(Alignment.BottomStart).offset(x = SceneEdge + 4.dp, y = 22.dp))
     }
 }
 

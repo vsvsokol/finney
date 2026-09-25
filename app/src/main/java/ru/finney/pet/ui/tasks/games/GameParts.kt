@@ -248,6 +248,19 @@ internal fun Stepper(
     }
 }
 
+/** Число со словом в нужном падеже: 1 стакан, 2 стакана, 5 стаканов, 11 стаканов. */
+internal fun plural(n: Int, one: String, few: String, many: String): String {
+    val word = when {
+        n % 100 in 11..14 -> many
+        n % 10 == 1 -> one
+        n % 10 in 2..4 -> few
+        else -> many
+    }
+    return "$n $word"
+}
+
+internal fun cupCount(n: Int) = plural(n, "стакан", "стакана", "стаканов")
+
 /** Строка «подпись — число» для итогов и расчётов. */
 @Composable
 internal fun SumRow(label: String, value: String, modifier: Modifier = Modifier, strong: Boolean = false) {

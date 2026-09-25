@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,10 +20,9 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -94,11 +95,9 @@ private fun Morning(
 ) {
     val i = task.ingredient
     GameScene(backdrop = Backdrop.SKY, onClose = onClose, money = task.budget - count * i.price) {
-        Column(
-            Modifier.fillMaxSize().padding(top = HudHeight).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            ScenePet(character, 110.dp, Modifier.width(110.dp))
+        // Закупка сверху, питомец внизу на траве, «Открыть лавку» у края экрана.
+        // Раньше питомец висел в небе, а под панелью оставалось полэкрана пустой травы.
+        SceneBody(bottom = { FinneyButton(text = "Открыть лавку", onClick = onOpen, enabled = count > 0) }) {
             ScenePanel(title = "Закупка", modifier = Modifier.fillMaxWidth()) {
                 Text(task.forecast, style = MaterialTheme.typography.titleMedium, color = FinneyInk)
                 Row(
@@ -122,14 +121,15 @@ private fun Morning(
                         what = i.label,
                     )
                 }
-                SumRow("1 ${i.label.lowercase()} = ${i.yields} стакана", "${count * i.yields} стаканов")
+                SumRow("1 ${i.label.lowercase()} = ${cupCount(i.yields)}", cupCount(count * i.yields))
                 SumRow("${i.label} стоит ${i.price}", "${i.price} × $count = ${count * i.price}")
                 Row(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(FinneyYellow).padding(horizontal = 6.dp),
                 ) { SumRow("стакан продаём за", task.cupPrice.toString()) }
                 if (inputError != null) Note(inputErrorText(inputError), color = FinneyPeach)
-                FinneyButton(text = "Открыть лавку", onClick = onOpen, enabled = count > 0)
             }
+            Spacer(Modifier.weight(1f))
+            PetSays(character, "Сколько взять, чтобы хватило всем гостям?", petSize = 130.dp)
         }
     }
 }
@@ -152,7 +152,7 @@ private fun Day(task: StandTask, character: PetCharacter, count: Int, money: Int
             }
 
             when {
-                waiting == 0 && cupsLeft > 0 -> Note("Гости кончились, а стаканов осталось $cupsLeft.", color = FinneyPeach)
+                waiting == 0 && cupsLeft > 0 -> Note("Гости кончились, а осталось ${cupCount(cupsLeft)}.", color = FinneyPeach)
                 cupsLeft == 0 && waiting > 0 -> Note("Лимонад кончился! Без лимонада ушли $waiting.", color = FinneyPeach)
                 done -> Note("Всем хватило, и ничего не осталось!", color = FinneyGreen)
             }
@@ -187,8 +187,9 @@ private fun CupStrip(cups: Int, poured: Int) {
             .padding(6.dp)
             .semantics { contentDescription = "Налито $poured из $cups стаканов" },
     ) {
+        // Стакан сжимается, если их много: четырнадцать по 20 dp упирались в край на 360 dp.
         repeat(cups.coerceAtMost(14)) { n ->
-            Canvas(Modifier.size(width = 20.dp, height = 26.dp)) {
+            Canvas(Modifier.weight(1f, fill = false).widthIn(max = 20.dp).aspectRatio(20f / 26f)) {
                 val cup = Path().apply {
                     moveTo(0f, 0f); lineTo(size.width, 0f); lineTo(size.width * 0.85f, size.height); lineTo(size.width * 0.15f, size.height); close()
                 }

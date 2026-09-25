@@ -67,7 +67,13 @@ fun PeriodResultScreen(
 
 @Composable
 private fun PeriodResultContent(state: PeriodResultUiState.Ready, onBack: () -> Unit) {
-    FinneyScreen(scrollable = true, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    // «На главный» закреплена внизу: разбор длиннее экрана, и в конце прокрутки
+    // кнопку не находили — выйти можно было только системным «назад».
+    FinneyScreen(
+        scrollable = true,
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        bottom = { FinneyButton(text = "На главный", onClick = onBack) },
+    ) {
         OutlinedText("Итоги периода ${state.periodNumber}", style = MaterialTheme.typography.headlineLarge)
 
         FinneyPanel(title = "Как вышло") {
@@ -133,8 +139,6 @@ private fun PeriodResultContent(state: PeriodResultUiState.Ready, onBack: () -> 
             style = MaterialTheme.typography.bodyLarge,
             color = FinneyInk,
         )
-
-        FinneyButton(text = "На главный", onClick = onBack)
     }
 }
 

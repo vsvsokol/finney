@@ -2,14 +2,10 @@ package ru.finney.pet.ui.tasks
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -28,13 +24,11 @@ import ru.finney.pet.ui.components.Coin
 import ru.finney.pet.ui.components.FinneyButton
 import ru.finney.pet.ui.components.FinneyScreen
 import ru.finney.pet.ui.components.OutlinedText
-import ru.finney.pet.ui.tasks.games.Bubble
 import ru.finney.pet.ui.tasks.games.GameScene
-import ru.finney.pet.ui.tasks.games.HudHeight
+import ru.finney.pet.ui.tasks.games.PetSays
 import ru.finney.pet.ui.tasks.games.ResultBody
+import ru.finney.pet.ui.tasks.games.SceneBody
 import ru.finney.pet.ui.tasks.games.ScenePanel
-import ru.finney.pet.ui.tasks.games.ScenePet
-import ru.finney.pet.ui.tasks.games.Tail
 import ru.finney.pet.ui.tasks.games.TaskGame
 import ru.finney.pet.ui.tasks.games.backdropFor
 import ru.finney.pet.ui.theme.FinneyInk
@@ -87,31 +81,28 @@ fun TaskScreen(
 @Composable
 private fun TaskIntro(state: TaskUiState.Ready, onStart: () -> Unit, onBack: () -> Unit) {
     GameScene(backdrop = backdropFor(state.task), onClose = onBack, money = state.balance) {
-        Column(
-            Modifier.fillMaxSize().padding(top = HudHeight).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+        // Питомец стоит внизу, на полу сцены, а «Играть» прижата к краю —
+        // раньше всё собиралось наверху, и под кнопкой оставалось полэкрана пустоты.
+        SceneBody(
             horizontalAlignment = Alignment.CenterHorizontally,
+            bottom = { if (state.available) FinneyButton(text = "Играть", onClick = onStart) },
         ) {
             OutlinedText(state.task.title, style = MaterialTheme.typography.headlineLarge, textAlign = TextAlign.Center)
             ScenePanel(title = "Что делать", modifier = Modifier.fillMaxWidth()) {
                 Text(state.task.intro, style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
                 Text(state.task.theme.label(), style = MaterialTheme.typography.labelLarge, color = FinneyInk.copy(alpha = 0.75f))
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                ScenePet(state.character, 140.dp, Modifier.width(140.dp))
-                Bubble(
-                    if (state.completed) {
-                        "Уже получалось! Сыграем ещё — просто так?"
-                    } else {
-                        "Получится — дам ${state.reward.success} монет. А за первую попытку — ${state.reward.fail}."
-                    },
-                    Tail.LEFT,
-                    Modifier.weight(1f),
-                )
-            }
-            if (state.available) {
-                FinneyButton(text = "Играть", onClick = onStart)
-            } else {
+            Spacer(Modifier.weight(1f))
+            PetSays(
+                state.character,
+                if (state.completed) {
+                    "Уже получалось! Сыграем ещё — просто так?"
+                } else {
+                    "Получится — дам ${state.reward.success} монет. А за первую попытку — ${state.reward.fail}."
+                },
+                petSize = 160.dp,
+            )
+            if (!state.available) {
                 ScenePanel(title = null, modifier = Modifier.fillMaxWidth()) {
                     Text(
                         if (state.lockedUntilLevel != null) {
@@ -137,9 +128,15 @@ private fun TaskResultScene(state: TaskUiState.Ready, onReplay: () -> Unit, onDo
     val result = state.result ?: return
     val success = result.outcome == TaskOutcome.SUCCESS
     GameScene(backdrop = backdropFor(state.task, finished = true), onClose = onDone, money = state.balance) {
-        Column(
-            Modifier.fillMaxSize().padding(top = HudHeight).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+        // Разбор бывает длиннее экрана — прокручивается он, а «Ещё раз» и «Дальше»
+        // всегда видны: раньше они уезжали вниз, и ребёнок не знал, как выйти.
+        SceneBody(
+            bottom = {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    FinneyButton(text = "Ещё раз", onClick = onReplay, modifier = Modifier.weight(1f))
+                    FinneyButton(text = "Дальше", onClick = onDone, modifier = Modifier.weight(1f))
+                }
+            },
         ) {
             ScenePanel(title = if (success) "Готово!" else "Почти!", modifier = Modifier.fillMaxWidth()) {
                 ResultBody(state.task, result.details, result.input)
@@ -162,12 +159,8 @@ private fun TaskResultScene(state: TaskUiState.Ready, onReplay: () -> Unit, onDo
                     }
                 }
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                ScenePet(state.character, 120.dp, Modifier.width(120.dp))
-                Bubble(if (success) "Получилось! Ура!" else "Ничего страшного — попробуем ещё раз?", Tail.LEFT, Modifier.weight(1f))
-            }
-            FinneyButton(text = "Ещё раз", onClick = onReplay)
-            FinneyButton(text = "Дальше", onClick = onDone)
+            Spacer(Modifier.weight(1f))
+            PetSays(state.character, if (success) "Получилось! Ура!" else "Ничего страшного — попробуем ещё раз?", petSize = 120.dp)
         }
     }
 }

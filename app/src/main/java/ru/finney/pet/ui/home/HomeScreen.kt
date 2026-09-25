@@ -65,6 +65,7 @@ import ru.finney.pet.ui.components.FinneyIcons
 import ru.finney.pet.ui.components.LevelBadge
 import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.components.FinneyNeedButton
+import ru.finney.pet.ui.components.FinneyPanel
 import ru.finney.pet.ui.components.HappinessBar
 import ru.finney.pet.ui.pet.PetMood
 import ru.finney.pet.ui.pet.PetView
@@ -198,6 +199,10 @@ private fun HomeContent(
 
     // Панель отладки: долгое нажатие на уровень, только в отладочной сборке.
     var debugOpen by rememberSaveable { mutableStateOf(false) }
+
+    // Подтверждение перед закрытием периода: шаг необратимый, случайное
+    // нажатие не должно подводить итоги за ребёнка.
+    var confirmClose by rememberSaveable { mutableStateOf(false) }
 
     // Игра ухода: что выбрали в панели и теперь бросают в рот или трут о питомца.
     // Покупка — в конце игры, см. ui/room/CareGame.kt.
@@ -410,6 +415,23 @@ private fun HomeContent(
                 width = barWidth,
                 modifier = Modifier.offset(x = -HappinessEdgeShift),
             )
+
+            // Конец периода — главный шаг игрового цикла: без него не растёт
+            // уровень и не приходит новый доход. Кнопка стоит на полу под
+            // питомцем, над кнопками комнат; шкала настроения до низа не
+            // доходит (0.55 высоты), так что места хватает.
+            //
+            // До подтверждения плана период закрыть нельзя (Rejection.PlanNotConfirmed),
+            // и на месте кнопки — путь к плану: ребёнок видит следующий шаг, а не отказ.
+            // Во время игры ухода кнопку убираем, а не гасим: погашенная ловила бы нажатия.
+            if (playing == null) {
+                FinneyButton(
+                    text = if (state.canClosePeriod) "Закончить период" else "Составить план",
+                    onClick = if (state.canClosePeriod) ({ confirmClose = true }) else onOpenBudget,
+                    fillWidth = false,
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                )
+            }
         }
 
         // ---------- Низ: комнаты ----------
@@ -549,6 +571,34 @@ private fun HomeContent(
             }
         }
 
+        if (confirmClose) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(FinneyInk.copy(alpha = 0.45f))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClickLabel = "Не заканчивать",
+                        onClick = { confirmClose = false },
+                    )
+                    .systemBarsPadding()
+                    .padding(16.dp),
+                contentAlignment = Alignment.BottomCenter,
+            ) {
+                ClosePeriodPanel(
+                    petName = state.petName,
+                    periodNumber = state.periodNumber,
+                    onConfirm = {
+                        confirmClose = false
+                        onClosePeriod()
+                    },
+                    onDismiss = { confirmClose = false },
+                    modifier = Modifier.pointerInput(Unit) { detectTapGestures { } },
+                )
+            }
+        }
+
         if (debugOpen && isDebuggable) {
             Box(
                 modifier = Modifier
@@ -569,6 +619,36 @@ private fun HomeContent(
                 )
             }
         }
+    }
+}
+
+/**
+ * «Точно закончить период?» Объясняет, что будет дальше, до нажатия:
+ * итоги, очки и новый доход. Вернуть период нельзя — поэтому и спрашиваем.
+ */
+@Composable
+private fun ClosePeriodPanel(
+    petName: String,
+    periodNumber: Int,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    FinneyPanel(title = "Закончить период?", modifier = modifier) {
+        Text(
+            "$petName подведёт итоги периода $periodNumber: что получилось по плану, " +
+                "сколько отложено в копилку и сколько очков заработано.",
+            style = MaterialTheme.typography.bodyLarge,
+            color = FinneyInk,
+        )
+        Text(
+            "Потом начнётся период ${periodNumber + 1} и придут новые деньги. " +
+                "Вернуться в этот период уже не получится.",
+            style = MaterialTheme.typography.bodyLarge,
+            color = FinneyInk,
+        )
+        FinneyButton(text = "Закончить", onClick = onConfirm)
+        FinneyButton(text = "Ещё поиграю", onClick = onDismiss)
     }
 }
 

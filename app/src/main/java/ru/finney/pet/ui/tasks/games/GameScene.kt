@@ -6,16 +6,21 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,6 +37,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
@@ -75,7 +81,7 @@ internal fun GameScene(
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         BackdropLayer(backdrop)
-        Box(modifier = Modifier.fillMaxSize().systemBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp)) {
+        Box(modifier = Modifier.fillMaxSize().systemBarsPadding().padding(horizontal = SceneEdge, vertical = 8.dp)) {
             content()
             Row(
                 modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter),
@@ -91,8 +97,54 @@ internal fun GameScene(
     }
 }
 
+/** Поле сцены по бокам. Кнопки и панели держатся в нём, а лента и полки выходят за него — см. [bleed]. */
+internal val SceneEdge: Dp = 12.dp
+
+/**
+ * Растянуть на всю ширину экрана, за поле сцены. Для того, что по смыслу
+ * уходит за край: лента конвейера, доска полки. С полем они обрывались
+ * в 12 dp от края и выглядели недорисованными.
+ */
+internal fun Modifier.bleed(): Modifier = layout { measurable, constraints ->
+    val extra = (SceneEdge * 2).roundToPx()
+    val width = constraints.maxWidth + extra
+    val placeable = measurable.measure(constraints.copy(minWidth = width, maxWidth = width))
+    layout(constraints.maxWidth, placeable.height) { placeable.place(-extra / 2, 0) }
+}
+
 /** Высота верхней полосы: содержимое сцены начинается ниже, чтобы не залезть под крестик. */
 internal val HudHeight: Dp = 60.dp
+
+/**
+ * Содержимое сцены под верхней полосой. Середина прокручивается, если не влезла,
+ * а [bottom] — кнопки — всегда у нижнего края: их видно без прокрутки, и они
+ * не уезжают из-под пальца, когда середина растёт.
+ *
+ * Короткая середина растягивается на всю высоту, поэтому `Spacer(Modifier.weight(1f))`
+ * в ней работает: он забирает свободное место, а при прокрутке сжимается в ноль.
+ */
+@Composable
+internal fun SceneBody(
+    modifier: Modifier = Modifier,
+    horizontalAlignment: Alignment.Horizontal = Alignment.Start,
+    bottom: @Composable ColumnScope.() -> Unit = {},
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Column(modifier.fillMaxSize().padding(top = HudHeight), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .heightIn(min = maxHeight),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalAlignment = horizontalAlignment,
+                content = content,
+            )
+        }
+        bottom()
+    }
+}
 
 @Composable
 private fun MoneyPill(amount: Int) {
@@ -115,7 +167,8 @@ private fun BackdropLayer(backdrop: Backdrop) {
             RoomScene(spot = RoomSpot.LIVING, modifier = Modifier.fillMaxSize())
             Rain()
         }
-        Backdrop.SHOP -> Split(top = Color(0xFFF9E2B8), bottom = Color(0xFFC99A76), at = 0.72f, dots = true)
+        // Пол — под нижней полкой: полки прижаты к тележке, и стеллаж стоит на полу.
+        Backdrop.SHOP -> Split(top = Color(0xFFF9E2B8), bottom = Color(0xFFC99A76), at = 0.85f, dots = true)
         Backdrop.FIELD -> Canvas(Modifier.fillMaxSize()) {
             drawRect(FinneyGreen)
             drawCircle(Color(0xFF9BD8A2), size.width * 0.55f, Offset(size.width * 0.3f, size.height * 0.2f))
@@ -205,6 +258,18 @@ internal fun Guest(character: PetCharacter, size: Dp, modifier: Modifier = Modif
 }
 
 private val StillPose: () -> PetPose = { PetPose() }
+
+/**
+ * Питомец и его реплика. Пузырь стоит вплотную к питомцу и не шире, чем нужно
+ * тексту: растянутый на всю строку, он отъезжал к краю, и хвостик смотрел в пустоту.
+ */
+@Composable
+internal fun PetSays(character: PetCharacter, text: String, modifier: Modifier = Modifier, petSize: Dp = 120.dp) {
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        ScenePet(character, petSize, Modifier.width(petSize))
+        Bubble(text, Tail.LEFT, Modifier.weight(1f, fill = false), maxWidth = 240.dp)
+    }
+}
 
 /** Куда смотрит хвостик реплики — в сторону того, кто говорит. */
 enum class Tail { LEFT, RIGHT, DOWN_LEFT, DOWN_RIGHT }

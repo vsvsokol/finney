@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.runtime.Composable
@@ -24,6 +25,10 @@ private val ScreenPadding = 16.dp
 /**
  * [scrollable] — экран длиннее высоты устройства: содержимое можно прокручивать.
  *
+ * [bottom] — то, что должно быть видно всегда, обычно кнопка выхода. Прокручивается
+ * только содержимое над ним. Без этого кнопка в конце длинного экрана уезжала за
+ * нижний край, и ребёнок не находил, как уйти дальше.
+ *
  * Прокрутка включается флагом, а не `Modifier.verticalScroll()` снаружи: порядок
  * модификаторов важен, и снаружи она встала бы раньше отступов под системные панели —
  * содержимое уезжало бы под строку состояния. Здесь порядок задан один раз и верно.
@@ -34,19 +39,41 @@ fun FinneyScreen(
     scrollable: Boolean = false,
     verticalArrangement: Arrangement.Vertical = Arrangement.spacedBy(16.dp),
     horizontalAlignment: Alignment.Horizontal = Alignment.CenterHorizontally,
+    bottom: (@Composable ColumnScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val scroll = if (scrollable) Modifier.verticalScroll(rememberScrollState()) else Modifier
+    if (bottom == null) {
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .background(FinneyCream)
+                // Системные панели: под строкой состояния и кнопками навигации
+                // содержимое оказаться не должно.
+                .systemBarsPadding()
+                .padding(ScreenPadding)
+                .then(scroll),
+            verticalArrangement = verticalArrangement,
+            horizontalAlignment = horizontalAlignment,
+            content = content,
+        )
+        return
+    }
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(FinneyCream)
-            // Системные панели: под строкой состояния и кнопками навигации
-            // содержимое оказаться не должно.
             .systemBarsPadding()
-            .padding(ScreenPadding)
-            .then(if (scrollable) Modifier.verticalScroll(rememberScrollState()) else Modifier),
-        verticalArrangement = verticalArrangement,
+            .padding(ScreenPadding),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
         horizontalAlignment = horizontalAlignment,
-        content = content,
-    )
+    ) {
+        Column(
+            modifier = Modifier.weight(1f).fillMaxWidth().then(scroll),
+            verticalArrangement = verticalArrangement,
+            horizontalAlignment = horizontalAlignment,
+            content = content,
+        )
+        bottom()
+    }
 }

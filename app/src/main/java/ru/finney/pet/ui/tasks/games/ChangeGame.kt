@@ -126,8 +126,11 @@ internal fun ChangeGame(task: ChangeTask, character: PetCharacter, onClose: () -
                     }
                 }
 
+                // Поднос и подсказка прокручиваются, а ящик с монетами и кнопка стоят
+                // у нижнего края. Раньше поднос рос с каждой монетой и сталкивал ящик
+                // вниз — следующее нажатие попадало мимо монеты.
                 Column(
-                    Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(top = 30.dp),
+                    Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(top = 30.dp, bottom = 10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Text("Раунд ${round + 1} из ${task.rounds.size}", style = MaterialTheme.typography.labelLarge, color = FinneyInk)
@@ -143,6 +146,8 @@ internal fun ChangeGame(task: ChangeTask, character: PetCharacter, onClose: () -
                             Text(explain(give, current.price, current.paid ?: 0, current.target, tray.sum()), style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
                         }
                     }
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     if (give) Drawer(task.coins, enabled = !solved) { tray = tray + it; checked = null }
                     else Wallet(current.wallet, tray, enabled = !solved) { tray = tray + it; checked = null }
 
