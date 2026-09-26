@@ -59,7 +59,7 @@ class ShopViewModelTest : ViewModelTest() {
         assertEquals(50, money.before)
         assertEquals(45, money.after)
         assertTrue("шкала питомца тоже в итоге", feedback.lines.any { it.label == "Радость" })
-        assertTrue(feedback.why.contains("желаемое"))
+        assertTrue(feedback.why.contains("хочется"))
 
         viewModel.dismissFeedback()
         settle()

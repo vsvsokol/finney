@@ -89,8 +89,8 @@ class GoalsViewModel(
             ActionFeedback(
                 title = "Отложили $amount",
                 lines = changesBetween(before, after),
-                why = "Деньги в копилке не тратятся случайно и копятся на цель.",
-                next = "откладывай понемногу каждый период — так цель ближе.",
+                why = "Копилка растёт — цель ближе.",
+                next = "Откладывай каждый период.",
             )
         },
     ) { session.execute { deposit(it, amount) } }
@@ -121,8 +121,8 @@ class GoalsViewModel(
                 ActionFeedback(
                     title = "Сняли ${pending.amount} из копилки",
                     lines = changesBetween(before, after),
-                    why = "Деньги вернулись на баланс, а до цели стало дальше.",
-                    next = "если передумаешь — отложи их снова.",
+                    why = "До цели стало дальше.",
+                    next = "Передумаешь — отложи снова.",
                 )
             },
         ) { session.execute { withdraw(it, pending.amount) } }
@@ -133,8 +133,8 @@ class GoalsViewModel(
             ActionFeedback(
                 title = "Цель достигнута!",
                 lines = changesBetween(before, after),
-                why = "Ты копил несколько периодов — и получилось.",
-                next = "выбери новую цель.",
+                why = "Ты копил — и получилось!",
+                next = "Выбери новую цель.",
             )
         },
     ) { session.execute { completeGoal(it) } }

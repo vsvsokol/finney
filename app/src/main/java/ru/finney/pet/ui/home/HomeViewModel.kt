@@ -121,8 +121,8 @@ class HomeViewModel(
                                 ActionFeedback(
                                     title = "Купили: ${item.label}",
                                     lines = changesBetween(before, result.state),
-                                    why = "Еда и мытьё — нужное: без них питомцу плохо.",
-                                    next = "следи за кольцами на кнопках — они показывают, что нужно.",
+                                    why = "Еда и мытьё — это нужное.",
+                                    next = "Кольца у кнопок покажут, что ещё нужно.",
                                 ),
                             ),
                         )

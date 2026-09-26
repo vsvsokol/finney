@@ -38,23 +38,23 @@ data class RejectionMessage(val problem: String, val next: String)
 fun rejectionMessage(rejection: Rejection): RejectionMessage = when (rejection) {
     is Rejection.InsufficientFunds -> RejectionMessage(
         "Не хватает ${rejection.shortage} финок.",
-        "Пройди мини-игру, отложи покупку или закрой период — придёт новый доход.",
+        "Сыграй в мини-игру или подожди новый период.",
     )
     is Rejection.InsufficientSavings -> RejectionMessage(
         "В копилке пока только ${rejection.saved}.",
-        "Сними меньше или сначала отложи ещё.",
+        "Сними меньше.",
     )
     Rejection.PlanNotConfirmed -> RejectionMessage(
         "План периода ещё не готов.",
-        "Распредели деньги в плане — после этого можно покупать и копить.",
+        "Сначала составь план.",
     )
     Rejection.PlanAlreadyConfirmed -> RejectionMessage(
         "План этого периода уже подтверждён.",
-        "Новый план можно составить в следующем периоде.",
+        "Новый план — в следующем периоде.",
     )
     is Rejection.PlanExceedsBudget -> RejectionMessage(
         "В плане ${rejection.planned}, а есть только ${rejection.budget}.",
-        "Убери лишнее: больше, чем есть, потратить нельзя.",
+        "Убери лишнее.",
     )
     Rejection.NoActiveGoal -> RejectionMessage(
         "Цель не выбрана.",
@@ -66,7 +66,7 @@ fun rejectionMessage(rejection: Rejection): RejectionMessage = when (rejection) 
     )
     is Rejection.GoalNotReached -> RejectionMessage(
         "Накоплено ${rejection.saved} из ${rejection.price}.",
-        "Откладывай понемногу каждый период — цель станет ближе.",
+        "Откладывай понемногу — и получится.",
     )
     Rejection.AlreadyOwned -> RejectionMessage(
         "Это у тебя уже есть.",
@@ -82,7 +82,7 @@ fun rejectionMessage(rejection: Rejection): RejectionMessage = when (rejection) 
     )
     Rejection.TaskLocked -> RejectionMessage(
         "Это задание ещё закрыто.",
-        "Расти питомца — задание откроется на следующих уровнях.",
+        "Откроется на следующих уровнях.",
     )
     Rejection.InvalidAmount,
     is Rejection.UnknownGoal,
@@ -150,7 +150,7 @@ fun ActionFeedbackCard(feedback: ActionFeedback, modifier: Modifier = Modifier) 
             }
         }
         Text(feedback.why, style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
-        Text("Дальше: ${feedback.next}", style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
+        Text(feedback.next, style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
     }
 }
 
@@ -208,8 +208,8 @@ private fun FeedbackPreview() {
                 ActionFeedback(
                     title = "Купили мячик",
                     lines = listOf(ChangeLine("Деньги", 40, 25), ChangeLine("Радость", 50, 80)),
-                    why = "Мячик — желаемое: он радует, но без него можно обойтись.",
-                    next = "проверь, хватает ли на нужное.",
+                    why = "Это «хочется»: радует, но можно и без него.",
+                    next = "Хватит ли на нужное?",
                 ),
             )
             RejectionNote(Rejection.InsufficientFunds(needed = 25, balance = 10))

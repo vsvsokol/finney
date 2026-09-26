@@ -588,8 +588,7 @@ private fun HomeContent(
                         null
                     } else {
                         CareBlock(
-                            reason = "Сначала распредели деньги в плане расходов — " +
-                                "после этого можно покупать",
+                            reason = "Сначала составь план — потом покупки",
                             actionLabel = "К плану расходов",
                             onAction = onOpenBudget,
                         )
@@ -711,14 +710,12 @@ private fun ClosePeriodPanel(
 ) {
     FinneyPanel(title = "Закончить период?", modifier = modifier) {
         Text(
-            "$petName подведёт итоги периода $periodNumber: что получилось по плану, " +
-                "сколько отложено в копилку и сколько очков заработано.",
+            "$petName посмотрит, как прошёл период: план, копилка и очки.",
             style = MaterialTheme.typography.bodyLarge,
             color = FinneyInk,
         )
         Text(
-            "Потом начнётся период ${periodNumber + 1} и придут новые деньги. " +
-                "Вернуться в этот период уже не получится.",
+            "Потом придут новые деньги. Назад вернуться нельзя.",
             style = MaterialTheme.typography.bodyLarge,
             color = FinneyInk,
         )

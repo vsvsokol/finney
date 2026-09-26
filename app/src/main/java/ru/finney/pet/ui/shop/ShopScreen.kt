@@ -93,7 +93,7 @@ private fun ShopContent(
             null
         } else {
             CareBlock(
-                reason = "Сначала распредели деньги в плане — после этого можно покупать",
+                reason = "Сначала составь план — потом покупки",
                 actionLabel = "К плану расходов",
                 onAction = onOpenBudget,
             )
@@ -101,8 +101,8 @@ private fun ShopContent(
 
         ShopSection(
             title = "Нужное",
-            hint = state.needsLeft?.let { "По плану на нужное осталось $it" }
-                ?: "Еда и уход — без них питомцу плохо",
+            hint = state.needsLeft?.let { "По плану осталось $it" }
+                ?: "Еда и мытьё",
             previews = state.needs,
             selectedId = state.selectedId,
             block = block,
@@ -111,8 +111,8 @@ private fun ShopContent(
         )
         ShopSection(
             title = "Хочется",
-            hint = state.wantsLeft?.let { "По плану на желаемое осталось $it" }
-                ?: "Радует, но можно и без этого",
+            hint = state.wantsLeft?.let { "По плану осталось $it" }
+                ?: "Игрушки и сладости",
             previews = state.wants,
             selectedId = state.selectedId,
             block = block,

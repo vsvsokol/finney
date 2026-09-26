@@ -94,7 +94,7 @@ private fun WithdrawConfirmDialog(
     Dialog(onDismissRequest = onCancel) {
         FinneyPanel(title = "Снять ${pending.amount}?") {
             Text(
-                text = "Это деньги на цель «$goalLabel». Если снять, до неё станет дальше.",
+                text = "Это деньги на «$goalLabel». Если снять, до цели дальше.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = FinneyInk,
             )

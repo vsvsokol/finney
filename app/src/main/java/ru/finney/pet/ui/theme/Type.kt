@@ -14,6 +14,10 @@ import ru.finney.pet.R
 
 // Кегли подобраны под ТЗ п. 3.6: основной текст не мельче 16 sp, ничего мельче 12 sp
 // в интерфейсе нет вообще.
+//
+// Glina на треть уже Roboto при той же высоте букв (замер: фраза «нужное и желаемое» —
+// 673 против 925 у Arial при кегле 100). Поэтому текст того же кегля смотрится мельче,
+// и кегли подняты на ступень: основной 19 sp, мелкие подписи 16 sp.
 
 /**
  * Толщина обводки текста по правилу из макета: 15 при кегле 200.
@@ -61,39 +65,39 @@ val Typography = Typography(
     titleLarge = TextStyle(
         fontFamily = Display,
         fontWeight = FontWeight.Normal,
-        fontSize = 22.sp,
-        lineHeight = 30.sp,
+        fontSize = 24.sp,
+        lineHeight = 32.sp,
     ),
     titleMedium = TextStyle(
         fontFamily = Display,
         fontWeight = FontWeight.Normal,
-        fontSize = 18.sp,
-        lineHeight = 26.sp,
+        fontSize = 20.sp,
+        lineHeight = 28.sp,
     ),
     // Основной текст. Минимум по ТЗ п. 3.6 — с него и начинаем.
     bodyLarge = TextStyle(
         fontFamily = Display,
         fontWeight = FontWeight.Normal,
-        fontSize = 17.sp,
-        lineHeight = 24.sp,
+        fontSize = 19.sp,
+        lineHeight = 27.sp,
     ),
     bodyMedium = TextStyle(
         fontFamily = Display,
         fontWeight = FontWeight.Normal,
-        fontSize = 16.sp,
-        lineHeight = 22.sp,
+        fontSize = 18.sp,
+        lineHeight = 25.sp,
     ),
-    // Подписи под иконками и суммами. Ниже 14 sp не опускаемся.
+    // Подписи под иконками и суммами. Ниже 16 sp не опускаемся.
     labelLarge = TextStyle(
         fontFamily = Display,
         fontWeight = FontWeight.Normal,
-        fontSize = 16.sp,
-        lineHeight = 22.sp,
+        fontSize = 18.sp,
+        lineHeight = 25.sp,
     ),
     labelMedium = TextStyle(
         fontFamily = Display,
         fontWeight = FontWeight.Normal,
-        fontSize = 14.sp,
-        lineHeight = 20.sp,
+        fontSize = 16.sp,
+        lineHeight = 22.sp,
     ),
 )

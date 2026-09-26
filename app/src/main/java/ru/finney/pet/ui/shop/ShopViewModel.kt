@@ -99,13 +99,13 @@ class ShopViewModel(
             }
         } == true
         val why = when (item.category) {
-            Category.NEEDS -> "${item.label} — нужное: без этого питомцу плохо."
-            Category.WANTS -> "${item.label} — желаемое: радует, но без этого можно обойтись."
-        } + if (overPlan) " Эта покупка уже сверх плана." else ""
+            Category.NEEDS -> "Это нужное: без него питомцу плохо."
+            Category.WANTS -> "Это «хочется»: радует, но можно и без него."
+        } + if (overPlan) " Это уже сверх плана." else ""
         val next = when {
-            overPlan -> "в следующем периоде заложи на это больше или откажись от лишнего."
-            item.category == Category.WANTS -> "проверь, хватает ли денег на нужное и на копилку."
-            else -> "посмотри, что ещё нужно питомцу."
+            overPlan -> "В следующий раз заложи больше или купи меньше."
+            item.category == Category.WANTS -> "Хватит ли на нужное?"
+            else -> "Что ещё нужно питомцу?"
         }
         return ActionFeedback(
             title = "Купили: ${item.label}",
