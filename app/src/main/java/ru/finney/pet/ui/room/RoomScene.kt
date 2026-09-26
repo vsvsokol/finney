@@ -4,13 +4,13 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.StartOffset
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -68,10 +68,13 @@ import kotlin.random.Random
 private val PetFooting = Footing(feetX = 0.5f, feetY = 0.87f)
 
 /**
- * Сколько едет комната при переходе. Дольше — ребёнок ждёт, короче — сдвиг
- * не читается и выглядит как мигание.
+ * Переход между комнатами — затемнение: комната гаснет в чёрное, пока темно,
+ * меняется, и проступает новая. Как смена сцены в мультфильме: ясно, что
+ * попали в другое место, и две комнаты не видны одновременно.
+ * Гаснет быстрее, чем проступает, — новая комната важнее старой.
  */
-private const val SLIDE_MS = 420
+private const val FADE_OUT_MS = 180
+private const val FADE_IN_MS = 280
 
 /**
  * Прогулка по залу: раз в несколько секунд питомец сам скачет в случайное место.
@@ -136,9 +139,8 @@ private val UfoPauseMs = 20_000L..45_000L
  * Если экран шире холста (планшет), холст подгоняется по ширине и срезается
  * сверху — пол, стол и ванна нужны целиком, а верх стены пустой.
  *
- * Комнаты три — зал, кухня, ванная, — и при переключении [spot] они
- * въезжают сбоку, как листаемые страницы: слева направо в порядке кнопок
- * внизу. В каждой свой набор: в зале торшер, окно и капсула, на кухне стол
+ * Комнаты три — зал, кухня, ванная, — и при переключении [spot] одна
+ * гаснет в чёрное и проступает другая. В каждой свой набор: в зале торшер, окно и капсула, на кухне стол
  * у окна без торшера, в ванной ванна под торшером без окна. Свет у каждой
  * комнаты свой, потому что источники в них разные.
  *
@@ -224,7 +226,17 @@ fun RoomScene(
         val visibleRight = (maxWidth - shiftX) / canvasW
         val strollMin = visibleLeft - home.left - home.width * PET_MARGIN
         val strollMax = visibleRight - home.right + home.width * PET_MARGIN
-        val canWander = wander && spot == RoomSpot.LIVING && !asleep
+        // Какая комната на экране сейчас: во время затемнения это ещё старая.
+        var shown by remember { mutableStateOf(spot) }
+        val dark = remember { Animatable(0f) }
+        LaunchedEffect(spot) {
+            if (spot == shown) return@LaunchedEffect
+            dark.animateTo(1f, tween(FADE_OUT_MS, easing = FastOutLinearInEasing))
+            shown = spot
+            dark.animateTo(0f, tween(FADE_IN_MS, easing = LinearOutSlowInEasing))
+        }
+
+        val canWander = wander && spot == RoomSpot.LIVING && shown == RoomSpot.LIVING && !asleep
         LaunchedEffect(canWander, strollMin, strollMax) {
             if (!canWander || strollMax <= strollMin) return@LaunchedEffect
             while (true) {
@@ -243,36 +255,26 @@ fun RoomScene(
             }
         }
 
-        // Переход — сдвиг: новая комната въезжает с той стороны, где её кнопка,
-        // старая уезжает в другую. У каждой комнаты значение — где она сейчас
-        // относительно экрана: 0 — на месте, −1 — левее, 1 — правее.
-        val transition = updateTransition(targetState = spot, label = "spot")
-        val screenW = maxWidth
-        for (current in RoomSpot.entries) {
-            val place = transition.animateFloat(
-                transitionSpec = { tween(SLIDE_MS, easing = FastOutSlowInEasing) },
-                label = "place",
-            ) { target -> (current.ordinal - target.ordinal).coerceIn(-1, 1).toFloat() }
-            if (current != transition.currentState && current != transition.targetState) continue
-            key(current) {
-                RoomCanvas(
-                    room = current,
-                    lighting = lights.getValue(current),
-                    canvasW = canvasW,
-                    canvasH = canvasH,
-                    shiftX = shiftX,
-                    shiftY = shiftY,
-                    ufo = ufo,
-                    capsule = capsule,
-                    walk = { walk.value },
-                    stroll = { stroll.value },
-                    door = { door.value },
-                    onTapItem = onTapItem,
-                    pet = pet,
-                    modifier = Modifier.graphicsLayer { translationX = place.value * screenW.toPx() },
-                )
-            }
+        key(shown) {
+            RoomCanvas(
+                room = shown,
+                lighting = lights.getValue(shown),
+                canvasW = canvasW,
+                canvasH = canvasH,
+                shiftX = shiftX,
+                shiftY = shiftY,
+                ufo = ufo,
+                capsule = capsule,
+                walk = { walk.value },
+                stroll = { stroll.value },
+                door = { door.value },
+                onTapItem = onTapItem,
+                pet = pet,
+            )
         }
+        // Затемнение поверх комнаты, но под интерфейсом: RoomScene — фон экрана.
+        // Прозрачность читается на отрисовке и не пересобирает комнату.
+        Box(modifier = Modifier.fillMaxSize().drawBehind { drawRect(Color.Black, alpha = dark.value) })
     }
 }
 
