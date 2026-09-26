@@ -29,6 +29,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -40,6 +41,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -68,13 +72,18 @@ import kotlin.random.Random
 private val PetFooting = Footing(feetX = 0.5f, feetY = 0.87f)
 
 /**
- * Переход между комнатами — затемнение: комната гаснет в чёрное, пока темно,
- * меняется, и проступает новая. Как смена сцены в мультфильме: ясно, что
- * попали в другое место, и две комнаты не видны одновременно.
- * Гаснет быстрее, чем проступает, — новая комната важнее старой.
+ * Переход между комнатами — чёрная шторка с мягким краем. Она едет в ту
+ * сторону, куда идёт питомец: в комнату справа — наползает справа, закрывает
+ * экран и уходит влево, открывая новую комнату тоже справа. В комнату слева —
+ * зеркально. Как смена сцены в мультфильме: ясно, куда перешли, и две комнаты
+ * не видны одновременно. Закрывается быстрее, чем открывается, — новая комната
+ * важнее старой.
  */
-private const val FADE_OUT_MS = 180
-private const val FADE_IN_MS = 280
+private const val WIPE_COVER_MS = 260
+private const val WIPE_REVEAL_MS = 340
+
+/** Ширина мягкого края шторки, доля ширины экрана. */
+private const val WIPE_SOFT = 0.35f
 
 /**
  * Прогулка по залу: раз в несколько секунд питомец сам скачет в случайное место.
@@ -228,12 +237,19 @@ fun RoomScene(
         val strollMax = visibleRight - home.right + home.width * PET_MARGIN
         // Какая комната на экране сейчас: во время затемнения это ещё старая.
         var shown by remember { mutableStateOf(spot) }
-        val dark = remember { Animatable(0f) }
+        // Шторка: 0 — нет её, 0..1 — наползает, 1 — экран чёрный, 1..2 — уходит.
+        // Направление: 1 — идём вправо, шторка едет справа налево; −1 — наоборот.
+        val wipe = remember { Animatable(0f) }
+        var wipeDir by remember { mutableIntStateOf(1) }
         LaunchedEffect(spot) {
             if (spot == shown) return@LaunchedEffect
-            dark.animateTo(1f, tween(FADE_OUT_MS, easing = FastOutLinearInEasing))
+            // Передумали посреди открытия — шторка закрывается заново с того же места.
+            if (wipe.value > 1f) wipe.snapTo(2f - wipe.value)
+            wipeDir = if (spot.ordinal > shown.ordinal) 1 else -1
+            wipe.animateTo(1f, tween(WIPE_COVER_MS, easing = FastOutLinearInEasing))
             shown = spot
-            dark.animateTo(0f, tween(FADE_IN_MS, easing = LinearOutSlowInEasing))
+            wipe.animateTo(2f, tween(WIPE_REVEAL_MS, easing = LinearOutSlowInEasing))
+            wipe.snapTo(0f)
         }
 
         val canWander = wander && spot == RoomSpot.LIVING && shown == RoomSpot.LIVING && !asleep
@@ -274,7 +290,7 @@ fun RoomScene(
         }
         // Затемнение поверх комнаты, но под интерфейсом: RoomScene — фон экрана.
         // Прозрачность читается на отрисовке и не пересобирает комнату.
-        Box(modifier = Modifier.fillMaxSize().drawBehind { drawRect(Color.Black, alpha = dark.value) })
+        Box(modifier = Modifier.fillMaxSize().drawBehind { drawWipe(wipe.value, wipeDir) })
     }
 }
 
@@ -776,5 +792,36 @@ private fun RoomSceneLivingPreview() {
 private fun RoomSceneLampOffPreview() {
     FinneyTheme {
         RoomScene(spot = RoomSpot.LIVING, lampOn = false, modifier = Modifier.size(412.dp, 892.dp))
+    }
+}
+
+/**
+ * Чёрная шторка перехода на позиции [progress] (см. [WIPE_SOFT]). Рисуется как
+ * для хода вправо — шторка едет справа налево, — а ход влево зеркалит её.
+ */
+private fun DrawScope.drawWipe(progress: Float, direction: Int) {
+    if (progress <= 0f || progress >= 2f) return
+    val w = size.width
+    val soft = w * WIPE_SOFT
+    scale(scaleX = direction.toFloat(), scaleY = 1f) {
+        if (progress <= 1f) {
+            // Наползает: сплошное чёрное справа от края, мягкий переход левее него.
+            val edge = w + soft - progress * (w + 2 * soft)
+            drawRect(
+                Brush.horizontalGradient(listOf(Color.Transparent, Color.Black), startX = edge - soft, endX = edge),
+                topLeft = Offset(edge - soft, 0f),
+                size = Size(soft, size.height),
+            )
+            drawRect(Color.Black, topLeft = Offset(edge, 0f), size = Size(w - edge, size.height))
+        } else {
+            // Уходит влево: чёрное остаётся слева от края, справа уже новая комната.
+            val edge = w - (progress - 1f) * (w + soft)
+            drawRect(Color.Black, size = Size(edge.coerceAtLeast(0f), size.height))
+            drawRect(
+                Brush.horizontalGradient(listOf(Color.Black, Color.Transparent), startX = edge, endX = edge + soft),
+                topLeft = Offset(edge, 0f),
+                size = Size(soft, size.height),
+            )
+        }
     }
 }
