@@ -4,7 +4,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.StartOffset
 import androidx.compose.animation.core.animateFloat
@@ -76,11 +75,10 @@ private val PetFooting = Footing(feetX = 0.5f, feetY = 0.87f)
  * сторону, куда идёт питомец: в комнату справа — наползает справа, закрывает
  * экран и уходит влево, открывая новую комнату тоже справа. В комнату слева —
  * зеркально. Как смена сцены в мультфильме: ясно, куда перешли, и две комнаты
- * не видны одновременно. Закрывается быстрее, чем открывается, — новая комната
- * важнее старой.
+ * не видны одновременно. Закрывается и открывается с одной скоростью и ровно,
+ * без разгона и торможения: шторка идёт одним движением через весь экран.
  */
-private const val WIPE_COVER_MS = 260
-private const val WIPE_REVEAL_MS = 340
+private const val WIPE_HALF_MS = 170
 
 /** Ширина мягкого края шторки, доля ширины экрана. */
 private const val WIPE_SOFT = 0.35f
@@ -246,9 +244,9 @@ fun RoomScene(
             // Передумали посреди открытия — шторка закрывается заново с того же места.
             if (wipe.value > 1f) wipe.snapTo(2f - wipe.value)
             wipeDir = if (spot.ordinal > shown.ordinal) 1 else -1
-            wipe.animateTo(1f, tween(WIPE_COVER_MS, easing = FastOutLinearInEasing))
+            wipe.animateTo(1f, tween(WIPE_HALF_MS, easing = LinearEasing))
             shown = spot
-            wipe.animateTo(2f, tween(WIPE_REVEAL_MS, easing = LinearOutSlowInEasing))
+            wipe.animateTo(2f, tween(WIPE_HALF_MS, easing = LinearEasing))
             wipe.snapTo(0f)
         }
 
