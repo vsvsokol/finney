@@ -227,7 +227,7 @@ private fun EffectLine(label: String, before: Int, after: Int) {
 @Composable
 private fun CarePanelPreview() {
     val apple = ShopItem("food_apple", "Яблоко", 10, Category.NEEDS, effect = StatEffect(satiety = 20))
-    val bowl = ShopItem("food_bowl", "Миска корма", 20, Category.NEEDS, effect = StatEffect(satiety = 45))
+    val bowl = ShopItem("food_bowl", "Суп", 20, Category.NEEDS, effect = StatEffect(satiety = 45))
     val stats = PetStats(satiety = 30, hygiene = 60, mood = 70, energy = 40)
 
     FinneyTheme {

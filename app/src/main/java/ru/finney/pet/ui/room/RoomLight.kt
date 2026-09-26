@@ -160,6 +160,11 @@ private object Lighting {
     const val LAMP_REACH = 1.5f
     const val BLOOM_RADIUS = 0.16f
 
+    /** Лампа под потолком на кухне: над серединой стола, выше кадра. */
+    const val CEILING_X = 0.44f
+    const val CEILING_Y = -0.02f
+    const val CEILING_REACH = 1.2f
+
     /** Круг света у подставки, сплющенный перспективой пола. От него же падают тени торшера. */
     const val POOL_X = 0.160f
     const val POOL_Y = 0.500f
@@ -310,6 +315,13 @@ internal class RoomLighting(
     private val breath: State<Float>,
     /** Середина НЛО в долях холста и насколько оно сейчас в проёме, 0..1. */
     private val ufo: () -> Pair<Offset, Float>?,
+    /** Есть ли в комнате окно. Нет — нет ни света из него, ни луны, ни НЛО. */
+    private val window: Boolean = true,
+    /**
+     * Свет лампы не от торшера, а сверху, из-за кадра: ни шара с ореолом,
+     * ни круга на полу у подставки, ни теней от него.
+     */
+    val ceiling: Boolean = false,
 ) {
     val occluders = mutableStateListOf<Occluder>()
 
@@ -343,31 +355,42 @@ internal class RoomLighting(
         )
     }
 
-    fun ufoNow(): Pair<Offset, Float>? = ufo()
+    fun ufoNow(): Pair<Offset, Float>? = if (window) ufo() else null
 
     fun glows(): List<Glow> = buildList {
-        add(
-            Glow(
-                LightKind.LAMP, Lighting.SHADE_X, Lighting.SHADE_Y, LampWarm,
-                reach = Lighting.LAMP_REACH, core = 0.3f, strength = lampLevel,
-                shadow = ShadowSource(Lighting.POOL_X, Lighting.POOL_Y, length = 0.75f),
-                caster = Caster.Point(LampPoint),
-            ),
-        )
-        add(
-            Glow(
-                LightKind.WINDOW, Lighting.WINDOW_GLOW_X, Lighting.WINDOW_GLOW_Y, WindowCool,
-                reach = Lighting.WINDOW_REACH, core = 0.4f, strength = 1f,
-            ),
-        )
-        add(
-            Glow(
-                LightKind.MOON, Lighting.BEAM_X, Lighting.BEAM_Y, MoonBeam,
-                reach = Lighting.BEAM_REACH, core = 0.5f, strength = 0.8f,
-                shadow = ShadowSource(Lighting.MOON_FROM_X, Lighting.MOON_FROM_Y, length = 0.5f),
-                caster = Caster.Parallel(Lighting.MoonRay),
-            ),
-        )
+        if (ceiling) {
+            add(
+                Glow(
+                    LightKind.LAMP, Lighting.CEILING_X, Lighting.CEILING_Y, LampWarm,
+                    reach = Lighting.CEILING_REACH, core = 0.35f, strength = lampLevel,
+                ),
+            )
+        } else {
+            add(
+                Glow(
+                    LightKind.LAMP, Lighting.SHADE_X, Lighting.SHADE_Y, LampWarm,
+                    reach = Lighting.LAMP_REACH, core = 0.3f, strength = lampLevel,
+                    shadow = ShadowSource(Lighting.POOL_X, Lighting.POOL_Y, length = 0.75f),
+                    caster = Caster.Point(LampPoint),
+                ),
+            )
+        }
+        if (window) {
+            add(
+                Glow(
+                    LightKind.WINDOW, Lighting.WINDOW_GLOW_X, Lighting.WINDOW_GLOW_Y, WindowCool,
+                    reach = Lighting.WINDOW_REACH, core = 0.4f, strength = 1f,
+                ),
+            )
+            add(
+                Glow(
+                    LightKind.MOON, Lighting.BEAM_X, Lighting.BEAM_Y, MoonBeam,
+                    reach = Lighting.BEAM_REACH, core = 0.5f, strength = 0.8f,
+                    shadow = ShadowSource(Lighting.MOON_FROM_X, Lighting.MOON_FROM_Y, length = 0.5f),
+                    caster = Caster.Parallel(Lighting.MoonRay),
+                ),
+            )
+        }
         ufoNow()?.let { (centre, presence) ->
             add(
                 Glow(
@@ -384,7 +407,12 @@ internal class RoomLighting(
 }
 
 @Composable
-internal fun rememberRoomLighting(lampOn: Boolean, ufo: () -> Pair<Offset, Float>?): RoomLighting {
+internal fun rememberRoomLighting(
+    lampOn: Boolean,
+    ufo: () -> Pair<Offset, Float>?,
+    window: Boolean = true,
+    ceiling: Boolean = false,
+): RoomLighting {
     val lamp = animateFloatAsState(
         targetValue = if (lampOn) 1f else 0f,
         animationSpec = tween(LAMP_SWITCH_MS),
@@ -399,7 +427,7 @@ internal fun rememberRoomLighting(lampOn: Boolean, ufo: () -> Pair<Offset, Float
         ),
         label = "breath",
     )
-    return remember(lamp, breath) { RoomLighting(lamp, breath, ufo) }
+    return remember(lamp, breath, window, ceiling) { RoomLighting(lamp, breath, ufo, window, ceiling) }
 }
 
 /**
@@ -486,7 +514,7 @@ internal fun Modifier.roomLight(lighting: RoomLighting): Modifier = drawWithCach
         }
         drawLayer(light)
 
-        if (on > 0f) {
+        if (on > 0f && !lighting.ceiling) {
             drawCircle(bloom, w * Lighting.BLOOM_RADIUS, shade, alpha = on, blendMode = BlendMode.Screen)
         }
         lighting.ufoNow()?.let { (centre, presence) ->

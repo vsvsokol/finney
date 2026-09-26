@@ -67,6 +67,31 @@ import kotlin.random.Random
 /** Как питомец стоит на полу: см. [Footing]. Ступни на 0.87 квадрата. Мебель — в [Solids]. */
 private val PetFooting = Footing(feetX = 0.5f, feetY = 0.87f)
 
+/**
+ * Сколько едет комната при переходе. Дольше — ребёнок ждёт, короче — сдвиг
+ * не читается и выглядит как мигание.
+ */
+private const val SLIDE_MS = 420
+
+/**
+ * Прогулка по залу: раз в несколько секунд питомец сам скачет в случайное место.
+ * Пауза случайная — по часам его прыжков не ждут, и он выглядит живым, а не заведённым.
+ */
+private val StrollPauseMs = 6_000L..14_000L
+
+/** Длина одного скачка, доля ширины холста: дальние перебежки — несколько скачков подряд. */
+private const val HOP_LENGTH = 0.09f
+
+/** Скачок по времени совпадает с прыжком [ru.finney.pet.ui.pet.PetAnimation.playJoy]: присел, взлетел, приземлился. */
+private const val HOP_CROUCH_MS = 140L
+private const val HOP_FLIGHT_MS = 530
+
+/**
+ * Прозрачные поля вокруг питомца в его квадрате, доля стороны: край квадрата
+ * может уйти за край экрана, а сам питомец — нет.
+ */
+private const val PET_MARGIN = 0.12f
+
 /** Сколько комната дышит: пена колышется в этих пределах от своего размера. */
 private const val FOAM_SWELL = 0.02f
 private const val FOAM_PERIOD_MS = 3400
@@ -111,20 +136,27 @@ private val UfoPauseMs = 20_000L..45_000L
  * Если экран шире холста (планшет), холст подгоняется по ширине и срезается
  * сверху — пол, стол и ванна нужны целиком, а верх стены пустой.
  *
- * Предмет в комнате ровно один — тот, что выбран в [spot]. Стены, окно и лампа
- * общие для всех комнат и не перерисовываются при переключении.
+ * Комнаты три — зал, кухня, ванная, — и при переключении [spot] они
+ * въезжают сбоку, как листаемые страницы: слева направо в порядке кнопок
+ * внизу. В каждой свой набор: в зале торшер, окно и капсула, на кухне стол
+ * у окна без торшера, в ванной ванна под торшером без окна. Свет у каждой
+ * комнаты свой, потому что источники в них разные.
  *
  * В комнате ночь (см. RoomLight.kt): светят торшер, окно и пролетающее НЛО.
  * Стены и пол освещаются одним слоем, питомец и мебель — каждый своим,
  * и у каждого своя тень.
  *
- * @param lampOn горит ли торшер. Выключателя пока нет, и торшер горит всегда.
+ * @param lampOn горит ли торшер. Выключателя нет, торшер горит всегда — и во сне:
+ *   ночь и так видна за окном, а тёмная комната пугала.
  * @param capsule стоит ли в зале капсула для сна. Мини-играм комната нужна
  *   фоном, и капсула во весь экран там только мешает.
  * @param asleep питомец спит: уходит в капсулу, торшер гаснет, дверь закрывается.
  *   Проснулся — всё в обратном порядке.
  * @param pet встаёт туда, где ему положено быть в текущей комнате.
  * @param onTapItem нажатие по самому предмету: тому же, что делает нижняя кнопка.
+ * @param wander гулять ли питомцу по залу самому. Выключается, пока с ним что-то
+ *   делают: во сне, в играх ухода, в других комнатах.
+ * @param onHop питомец скакнул — запустить прыжок в его анимации: поза живёт снаружи.
  */
 @Composable
 fun RoomScene(
@@ -134,10 +166,25 @@ fun RoomScene(
     capsule: Boolean = true,
     asleep: Boolean = false,
     onTapItem: (() -> Unit)? = null,
+    wander: Boolean = false,
+    onHop: () -> Unit = {},
     pet: @Composable BoxScope.() -> Unit = {},
 ) {
+    // Где питомец в зале сейчас: сдвиг от его обычного места, доля ширины холста.
+    val stroll = remember { Animatable(0f) }
     val ufo = remember { UfoState() }
-    val lighting = rememberRoomLighting(lampOn && !asleep, ufo::light)
+    // Свет у каждой комнаты свой: источники в них разные. Во время перехода
+    // видны две комнаты сразу, и каждая освещена по-своему.
+    val lights = RoomSpot.entries.associateWith { room ->
+        rememberRoomLighting(
+            lampOn = lampOn && (room.hasLamp || room.ceilingLight),
+            ufo = ufo::light,
+            window = room.hasWindow,
+            ceiling = room.ceilingLight,
+        )
+    }
+    // НЛО летает одно на все комнаты: окна во время перехода два, а пролёт один.
+    LaunchedEffect(ufo) { ufo.fly() }
 
     // Отход ко сну: питомец идёт в капсулу (walk 0 → 1), потом закрывается дверь.
     // Живёт на всю сцену, а не на зал: переход между комнатами его не сбрасывает.
@@ -169,9 +216,91 @@ fun RoomScene(
         // и сдвиг нулевой; выше экрана он бывает только на широких экранах.
         val shiftY = maxHeight - canvasH
 
-        // wrapContentSize обязателен: холст больше экрана, и requiredSize без него
-        // центрирует его в родителе — комната уезжала влево ещё на полразницы
-        // ширин (около 40 dp) мимо shiftX, и торшер срезало наполовину.
+        // Куда можно скакать: только в пределах видимой части холста, чтобы
+        // питомец не ушёл за край экрана.
+        val home = Room.petGround(RoomSpot.LIVING)
+        // Слева у края экрана шкала настроения: за неё питомец не заходит.
+        val visibleLeft = (-shiftX + 56.dp) / canvasW
+        val visibleRight = (maxWidth - shiftX) / canvasW
+        val strollMin = visibleLeft - home.left - home.width * PET_MARGIN
+        val strollMax = visibleRight - home.right + home.width * PET_MARGIN
+        val canWander = wander && spot == RoomSpot.LIVING && !asleep
+        LaunchedEffect(canWander, strollMin, strollMax) {
+            if (!canWander || strollMax <= strollMin) return@LaunchedEffect
+            while (true) {
+                delay(Random.nextLong(StrollPauseMs.first, StrollPauseMs.last))
+                val target = Random.nextFloat() * (strollMax - strollMin) + strollMin
+                val from = stroll.value
+                val hops = maxOf(1, kotlin.math.ceil(kotlin.math.abs(target - from) / HOP_LENGTH).toInt())
+                for (i in 1..hops) {
+                    onHop()
+                    delay(HOP_CROUCH_MS)
+                    stroll.animateTo(
+                        from + (target - from) * i / hops,
+                        tween(HOP_FLIGHT_MS, easing = FastOutSlowInEasing),
+                    )
+                }
+            }
+        }
+
+        // Переход — сдвиг: новая комната въезжает с той стороны, где её кнопка,
+        // старая уезжает в другую. У каждой комнаты значение — где она сейчас
+        // относительно экрана: 0 — на месте, −1 — левее, 1 — правее.
+        val transition = updateTransition(targetState = spot, label = "spot")
+        val screenW = maxWidth
+        for (current in RoomSpot.entries) {
+            val place = transition.animateFloat(
+                transitionSpec = { tween(SLIDE_MS, easing = FastOutSlowInEasing) },
+                label = "place",
+            ) { target -> (current.ordinal - target.ordinal).coerceIn(-1, 1).toFloat() }
+            if (current != transition.currentState && current != transition.targetState) continue
+            key(current) {
+                RoomCanvas(
+                    room = current,
+                    lighting = lights.getValue(current),
+                    canvasW = canvasW,
+                    canvasH = canvasH,
+                    shiftX = shiftX,
+                    shiftY = shiftY,
+                    ufo = ufo,
+                    capsule = capsule,
+                    walk = { walk.value },
+                    stroll = { stroll.value },
+                    door = { door.value },
+                    onTapItem = onTapItem,
+                    pet = pet,
+                    modifier = Modifier.graphicsLayer { translationX = place.value * screenW.toPx() },
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Одна комната целиком: стены, её окно и торшер, мебель и питомец.
+ *
+ * wrapContentSize обязателен: холст больше экрана, и requiredSize без него
+ * центрирует его в родителе — комната уезжала влево ещё на полразницы
+ * ширин (около 40 dp) мимо shiftX, и торшер срезало наполовину.
+ */
+@Composable
+private fun RoomCanvas(
+    room: RoomSpot,
+    lighting: RoomLighting,
+    canvasW: Dp,
+    canvasH: Dp,
+    shiftX: Dp,
+    shiftY: Dp,
+    ufo: UfoState,
+    capsule: Boolean,
+    walk: () -> Float,
+    stroll: () -> Float,
+    door: () -> Float,
+    onTapItem: (() -> Unit)?,
+    pet: @Composable BoxScope.() -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier = modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
                 .wrapContentSize(Alignment.TopStart, unbounded = true)
@@ -180,71 +309,50 @@ fun RoomScene(
         ) {
             Box(modifier = Modifier.fillMaxSize().roomLight(lighting)) {
                 Layer(Room.Back, canvasW, canvasH)
-                Window(canvasW, canvasH, ufo)
-                Layer(Room.Lamp, canvasW, canvasH)
+                if (room.hasWindow) Window(canvasW, canvasH, ufo)
+                if (room.hasLamp) Layer(Room.Lamp, canvasW, canvasH)
             }
 
-            // Предмет не подменяется мгновенно: ребёнок нажал кнопку внизу, и
-            // комната должна успеть показать, что изменилась. Питомец внутри
-            // перехода, поэтому он переезжает вместе с обстановкой.
-            //
-            // Переход свой, а не Crossfade: прозрачность предмета нужна ещё и его
-            // тени, а Crossfade её наружу не отдаёт. Тени лежат в свете пола, и
-            // с Crossfade старая держалась в полную силу, пока предмет гас, а потом
-            // пропадала рывком; новая так же рывком появлялась.
-            val transition = updateTransition(targetState = spot, label = "spot")
-            for (current in RoomSpot.entries) {
-                val shown = transition.animateFloat(
-                    transitionSpec = { tween() },
-                    label = "shown",
-                ) { if (it == current) 1f else 0f }
-                if (current != transition.currentState && current != transition.targetState) continue
+            val visibility = { 1f }
+            val ground = Room.petGround(room).let { if (room == RoomSpot.LIVING) it.shiftedX(stroll()) else it }
 
-                val visibility = { shown.value }
-                key(current) {
-                    Box(modifier = Modifier.fillMaxSize().graphicsLayer { alpha = shown.value }) {
-                        val ground = Room.petGround(current)
+            // Тень у питомца только в зале: за столом и в ванне она
+            // упала бы на мебель, а мебель пола не знает.
+            when (room) {
+                RoomSpot.LIVING -> if (capsule) {
+                    // Капсула в углу, питомец перед ней. Засыпая, он уходит
+                    // в капсулу и становится меньше — она дальше от зрителя.
+                    // Дверь закрывается перед ним, стекло у неё полупрозрачное,
+                    // и спящего видно. Тень на полу — только пока он стоит на месте.
+                    LitLayer(Room.Capsule, canvasW, canvasH, lighting, Solids.Capsule, visibility)
+                    TapZone(Room.Capsule.rect, canvasW, canvasH, "Уложить спать", onTapItem)
+                    val t = walk()
+                    val footing = if (t == 0f) PetFooting else null
+                    Pet(ground.lerp(Room.PetInCapsule, t), canvasW, canvasH, lighting, footing, visibility, pet)
+                    CapsuleDoor(canvasW, canvasH, lighting, shut = door)
+                } else {
+                    Pet(ground, canvasW, canvasH, lighting, PetFooting, visibility, pet)
+                }
 
-                        // Тень у питомца только в зале: за столом и в ванне она
-                        // упала бы на мебель, а мебель пола не знает.
-                        when (current) {
-                            RoomSpot.LIVING -> if (capsule) {
-                                // Капсула в углу, питомец перед ней. Засыпая, он уходит
-                                // в капсулу и становится меньше — она дальше от зрителя.
-                                // Дверь закрывается перед ним, стекло у неё полупрозрачное,
-                                // и спящего видно. Тень на полу — только пока он стоит на месте.
-                                LitLayer(Room.Capsule, canvasW, canvasH, lighting, Solids.Capsule, visibility)
-                                TapZone(Room.Capsule.rect, canvasW, canvasH, "Уложить спать", onTapItem)
-                                val t = walk.value
-                                val footing = if (t == 0f) PetFooting else null
-                                Pet(ground.lerp(Room.PetInCapsule, t), canvasW, canvasH, lighting, footing, visibility, pet)
-                                CapsuleDoor(canvasW, canvasH, lighting, shut = { door.value })
-                            } else {
-                                Pet(ground, canvasW, canvasH, lighting, PetFooting, visibility, pet)
-                            }
+                // Питомец рисуется раньше стола: столешница перекрывает
+                // ему низ, и получается, что он сидит за столом, а не на нём.
+                RoomSpot.KITCHEN -> {
+                    Pet(ground, canvasW, canvasH, lighting, footing = null, visibility, pet)
+                    LitLayer(Room.Table, canvasW, canvasH, lighting, Solids.Table, visibility)
+                    TapZone(Room.Table.rect, canvasW, canvasH, "Покормить", onTapItem)
+                }
 
-                            // Питомец рисуется раньше стола: столешница перекрывает
-                            // ему низ, и получается, что он сидит за столом, а не на нём.
-                            RoomSpot.KITCHEN -> {
-                                Pet(ground, canvasW, canvasH, lighting, footing = null, visibility, pet)
-                                LitLayer(Room.Table, canvasW, canvasH, lighting, Solids.Table, visibility)
-                                TapZone(Room.Table.rect, canvasW, canvasH, "Покормить", onTapItem)
-                            }
-
-                            // Питомец сидит в ванне, а не перед ней, поэтому чаша
-                            // рисуется поверх него: она непрозрачна ниже 0.664
-                            // и прячет всё, что должно быть под водой. Пена заходит
-                            // выше борта (0.527 против 0.619) и делится на две:
-                            // задняя за питомцем, передняя перед ним.
-                            RoomSpot.BATH -> {
-                                Foam(Room.BathFoamBack, canvasW, canvasH, lighting, phase = 0f)
-                                Pet(ground, canvasW, canvasH, lighting, footing = null, visibility, pet)
-                                LitLayer(Room.Bath, canvasW, canvasH, lighting, Solids.Bath, visibility)
-                                Foam(Room.BathFoamFront, canvasW, canvasH, lighting, phase = 0.5f)
-                                TapZone(Room.Bath.rect, canvasW, canvasH, "Помыть", onTapItem)
-                            }
-                        }
-                    }
+                // Питомец сидит в ванне, а не перед ней, поэтому чаша
+                // рисуется поверх него: она непрозрачна ниже 0.664
+                // и прячет всё, что должно быть под водой. Пена заходит
+                // выше борта (0.527 против 0.619) и делится на две:
+                // задняя за питомцем, передняя перед ним.
+                RoomSpot.BATH -> {
+                    Foam(Room.BathFoamBack, canvasW, canvasH, lighting, phase = 0f)
+                    Pet(ground, canvasW, canvasH, lighting, footing = null, visibility, pet)
+                    LitLayer(Room.Bath, canvasW, canvasH, lighting, Solids.Bath, visibility)
+                    Foam(Room.BathFoamFront, canvasW, canvasH, lighting, phase = 0.5f)
+                    TapZone(Room.Bath.rect, canvasW, canvasH, "Помыть", onTapItem)
                 }
             }
         }
@@ -326,7 +434,6 @@ private fun Window(canvasW: Dp, canvasH: Dp, ufo: UfoState) {
                 }
             },
     ) {
-        LaunchedEffect(ufo) { ufo.fly() }
 
         val size = Room.WindowUfo.rect
         ufo.flight?.let { current ->

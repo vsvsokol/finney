@@ -42,15 +42,25 @@ data class RoomLayer(@DrawableRes val image: Int, val rect: RelRect) {
  * и лежат на холсте дизайнера в одном месте: показывать их вместе никто
  * и не собирался.
  */
-enum class RoomSpot {
+enum class RoomSpot(
+    /** Стоит ли в комнате торшер. На кухне его нет: там стол у окна. */
+    val hasLamp: Boolean,
+    /**
+     * Тёплый свет сверху, от лампы под потолком за кадром. На кухне без него
+     * было темно и грустно, а торшер рядом со столом ставить некуда.
+     */
+    val ceilingLight: Boolean = false,
+    /** Есть ли окно. В ванной его нет: светит только торшер. */
+    val hasWindow: Boolean,
+) {
     /** Зал с капсулой: здесь спят. */
-    LIVING,
+    LIVING(hasLamp = true, hasWindow = true),
 
     /** Стол: здесь кормят. */
-    KITCHEN,
+    KITCHEN(hasLamp = false, hasWindow = true, ceilingLight = true),
 
     /** Ванна с пеной: здесь моют. */
-    BATH,
+    BATH(hasLamp = true, hasWindow = false),
 }
 
 /**

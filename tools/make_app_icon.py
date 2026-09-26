@@ -4,9 +4,11 @@
 258 × 261: лицо питомца крупно. Кадр считается из той же матрицы, а не
 промеряется вручную, — поменяют значок в Figma, скрипт возьмёт новый кадр.
 
-Адаптивный значок — слой 108 dp, из которого лаунчер показывает середину 72 dp,
-а остальное оставляет на параллакс. Поэтому кадр значка — это средние 2/3 слоя,
-и вырез берётся в полтора раза шире: вокруг лица остаётся рисунок из того же PNG.
+Адаптивный значок — слой 108 dp, из которого лаунчер показывает середину,
+а остальное оставляет на параллакс. По спецификации это 72 dp (2/3 слоя), но
+Pixel Launcher в круглой маске показывает больше — около 0.72 слоя, промерено
+по скриншоту эмулятора. Кадр макета ложится ровно в эту видимую часть: значок
+на телефоне такой же, как в icon.svg, без лишней каймы вокруг лица.
 
 Выход (WebP без потерь, PNG в ресурсы не кладём):
     mipmap-*dpi/ic_launcher_foreground.webp  — питомец на прозрачном
@@ -29,6 +31,9 @@ ROOT = Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "design/icon.svg"
 RES = ROOT / "app/src/main/res"
 
+# Какая доля слоя видна в маске лаунчера (см. выше).
+VISIBLE_SHARE = 0.72
+
 DENSITIES = {"mdpi": 108, "hdpi": 162, "xhdpi": 216, "xxhdpi": 324, "xxxhdpi": 432}
 
 # Тёмнее этого — линия обводки или тёмные пряди: из них и складывается
@@ -50,7 +55,7 @@ def load_icon() -> tuple[Image.Image, tuple[float, float, float, float]]:
 def crop_layer(icon: Image.Image, frame: tuple[float, float, float, float]) -> Image.Image:
     left, top, right, bottom = frame
     cx, cy = (left + right) / 2, (top + bottom) / 2
-    half = max(right - left, bottom - top) * 108 / 72 / 2
+    half = max(right - left, bottom - top) / VISIBLE_SHARE / 2
     return icon.crop(tuple(round(v) for v in (cx - half, cy - half, cx + half, cy + half)))
 
 

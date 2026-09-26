@@ -17,7 +17,7 @@
       { "id": "candy", "label": "Леденец", "category": "wants", "art": "item_treat_candy", "why": "Леденец — сладость. Это приятно, но не обязательно." },
       { "id": "coat_winter", "label": "Тёплая куртка зимой", "category": "needs", "art": "item_wear_coat_winter", "why": "Зимой без тёплой куртки холодно — это нужное." },
       { "id": "coat_second", "label": "Вторая куртка", "category": "wants", "art": "item_wear_coat_light", "why": "Одна куртка уже есть. Вторая — это «хочется»." },
-      { "id": "bowl", "label": "Миска корма", "category": "needs", "art": "item_food_bowl", "why": "Корм — главная еда Финни." },
+      { "id": "bowl", "label": "Суп", "category": "needs", "art": "item_food_bowl", "why": "Суп — главная еда Финни." },
       { "id": "chocolate", "label": "Шоколадка", "category": "wants", "art": "item_treat_chocolate", "why": "Шоколадка — вкусняшка, без неё можно обойтись." },
       { "id": "toothbrush", "label": "Зубная щётка", "category": "needs", "art": "item_care_toothbrush", "why": "Чистить зубы нужно каждый день." },
       { "id": "stickers", "label": "Наклейки", "category": "wants", "art": "item_toy_stickers", "why": "Наклейки красивые, но это «хочется»." }
