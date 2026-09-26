@@ -55,6 +55,11 @@ import ru.finney.pet.domain.model.PetAppearance
 import ru.finney.pet.domain.model.PetCharacter
 import ru.finney.pet.domain.model.PetStats
 import ru.finney.pet.domain.pet.Emotion
+import ru.finney.pet.ui.components.FeedbackDialog
+import ru.finney.pet.ui.components.ActionFeedbackCard
+import ru.finney.pet.ui.components.ActionFeedback
+import ru.finney.pet.domain.game.Rejection
+import kotlinx.coroutines.delay
 import ru.finney.pet.domain.model.TaskDefinition
 import ru.finney.pet.ui.components.Coin
 import ru.finney.pet.ui.components.buttonFill
@@ -131,11 +136,23 @@ fun HomeScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
+    // Итог покупки ухода висит несколько секунд и сам уходит: игра не прерывается окном,
+    // а ребёнок успевает увидеть, что стало с деньгами и шкалой (ТЗ п. 2.5.9).
+    var purchased by remember { mutableStateOf<ActionFeedback?>(null) }
+    var rejected by remember { mutableStateOf<Rejection?>(null) }
+    LaunchedEffect(purchased) {
+        if (purchased != null) {
+            delay(PurchaseFeedbackMillis)
+            purchased = null
+        }
+    }
+
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
             when (event) {
                 is HomeEvent.PeriodClosed -> onPeriodClosed(event.periodNumber)
-                is HomeEvent.Rejected -> Unit // кнопка и так неактивна до подтверждения плана
+                is HomeEvent.Rejected -> rejected = event.reason
+                is HomeEvent.Purchased -> purchased = event.feedback
             }
         }
     }
@@ -160,6 +177,42 @@ fun HomeScreen(
             onBuy = viewModel::buy,
         )
     }
+
+    purchased?.let { feedback ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .systemBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 96.dp),
+            contentAlignment = Alignment.TopCenter,
+        ) {
+            ActionFeedbackCard(
+                feedback = feedback,
+                modifier = Modifier.clickable(onClickLabel = "Скрыть") { purchased = null },
+            )
+        }
+    }
+    FeedbackDialog(
+        feedback = null,
+        rejection = rejected,
+        onDismiss = { rejected = null },
+        actionLabel = if (rejected is Rejection.PlanNotConfirmed) "К плану расходов" else null,
+        onAction = onOpenBudget,
+    )
+}
+
+private const val PurchaseFeedbackMillis = 5_000L
+
+/**
+ * Почему питомцу так — ТЗ п. 2.5.10: краткое объяснение причины эмоции и что сделать.
+ * Спокойное состояние не комментируем: всё в порядке, лишний текст ни к чему.
+ */
+private fun emotionReason(name: String, emotion: Emotion): String? = when (emotion) {
+    Emotion.HUNGRY -> "$name голоден: сытость низкая. Покорми на кухне"
+    Emotion.DIRTY -> "$name испачкался. Помой в ванной"
+    Emotion.SAD -> "$name грустит: мало радости. Загляни в магазин за «хочется»"
+    Emotion.HAPPY -> "$name доволен: о нём хорошо заботятся"
+    Emotion.CALM -> null
 }
 
 @Composable
@@ -259,6 +312,7 @@ private fun HomeContent(
             // лёг бы квадратом вокруг.
             PetView(
                 character = state.appearance.character,
+                bodyColor = state.appearance.bodyColor,
                 mood = state.emotion.toMood(),
                 pose = rememberPoseProvider(animation),
                 modifier = Modifier
@@ -300,6 +354,7 @@ private fun HomeContent(
                 MoneyButton(balance = state.balance, onClick = onOpenShop)
             }
 
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
             LevelBadge(
                 level = state.level,
                 size = 56.dp,
@@ -315,6 +370,11 @@ private fun HomeContent(
                     Modifier
                 },
             )
+            // Тестовый профиль видно сразу: эксперт знает, почему все игры открыты.
+            if (state.isDemo) {
+                Text("демо", style = MaterialTheme.typography.bodyMedium, color = FinneyInk)
+            }
+            }
 
             Row(
                 modifier = Modifier.weight(1f),
@@ -385,6 +445,21 @@ private fun HomeContent(
                     modifier = Modifier.weight(1f),
                 )
             }
+        }
+
+        emotionReason(state.petName, state.emotion)?.let { reason ->
+            Text(
+                text = reason,
+                style = MaterialTheme.typography.bodyMedium,
+                color = FinneyInk,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer { alpha = hudAlpha }
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(FinneyCream.copy(alpha = 0.9f))
+                    .border(2.dp, FinneyInk, RoundedCornerShape(16.dp))
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+            )
         }
 
         // ---------- Середина: сама комната ----------

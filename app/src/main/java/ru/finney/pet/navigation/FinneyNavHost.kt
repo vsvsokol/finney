@@ -12,13 +12,18 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
+import ru.finney.pet.ui.adult.AdultScreen
 import ru.finney.pet.ui.adult.ResetProgressScreen
 import ru.finney.pet.ui.budget.BudgetScreen
 import ru.finney.pet.ui.goals.GoalsScreen
 import ru.finney.pet.ui.home.HomeScreen
+import ru.finney.pet.ui.onboarding.OnboardingScreen
 import ru.finney.pet.ui.onboarding.PetSetupScreen
 import ru.finney.pet.ui.period.PeriodResultScreen
 import ru.finney.pet.ui.pet.PetLabScreen
+import ru.finney.pet.ui.progress.GlossaryScreen
+import ru.finney.pet.ui.progress.ProgressScreen
+import ru.finney.pet.ui.shop.ShopScreen
 import ru.finney.pet.ui.tasks.TaskScreen
 import ru.finney.pet.ui.tasks.TasksScreen
 
@@ -46,13 +51,12 @@ fun FinneyNavHost(
 
         composable<OnboardingRoute> { entry ->
             val route = entry.toRoute<OnboardingRoute>()
-            StubScreen(
-                "Знакомство с игрой",
-                if (route.isReplay) {
-                    "Понятно" to { navController.popBackStack() }
-                } else {
-                    "Создать питомца" to { navController.navigate(PetSetupRoute()) }
+            OnboardingScreen(
+                isReplay = route.isReplay,
+                onFinish = {
+                    if (route.isReplay) navController.popBackStack() else navController.navigate(PetSetupRoute())
                 },
+                onStartDemo = { navController.navigate(PetSetupRoute(isDemo = true)) },
             )
         }
 
@@ -60,6 +64,7 @@ fun FinneyNavHost(
             val route = entry.toRoute<PetSetupRoute>()
             PetSetupScreen(
                 isEditing = route.isEditing,
+                isDemo = route.isDemo,
                 onSaved = {
                     if (route.isEditing) navController.popBackStack() else navController.openGame()
                 },
@@ -93,7 +98,11 @@ fun FinneyNavHost(
         }
 
         composable<ShopRoute> {
-            StubScreen("Магазин", "Назад" to { navController.popBackStack() })
+            ShopScreen(
+                onBack = { navController.popBackStack() },
+                onOpenBudget = { navController.navigate(BudgetRoute) },
+                onOpenHistory = { navController.navigate(ProgressRoute) },
+            )
         }
 
         composable<GoalsRoute> {
@@ -122,25 +131,25 @@ fun FinneyNavHost(
         }
 
         composable<ProgressRoute> {
-            StubScreen(
-                "Прогресс",
-                "Справочник" to { navController.navigate(GlossaryRoute) },
-                "Назад" to { navController.popBackStack() },
+            ProgressScreen(
+                onBack = { navController.popBackStack() },
+                onOpenGlossary = { navController.navigate(GlossaryRoute) },
+                onOpenPeriodResult = { number -> navController.navigate(PeriodResultRoute(number)) },
             )
         }
 
         composable<GlossaryRoute> {
-            StubScreen("Справочник", "Назад" to { navController.popBackStack() })
+            GlossaryScreen(onBack = { navController.popBackStack() })
         }
 
         // ---------- Взрослый ----------
 
         composable<AdultRoute> {
-            StubScreen(
-                "Раздел взрослого",
-                "Имя и внешность питомца" to { navController.navigate(PetSetupRoute(isEditing = true)) },
-                "Начать игру заново" to { navController.navigate(ResetProgressRoute) },
-                "Назад" to { navController.popBackStack() },
+            AdultScreen(
+                onBack = { navController.popBackStack() },
+                onEditPet = { navController.navigate(PetSetupRoute(isEditing = true)) },
+                onResetProgress = { navController.navigate(ResetProgressRoute) },
+                onProfileDeleted = { hasProfile -> navController.restart(hasProfile) },
             )
         }
 

@@ -75,6 +75,10 @@ data class CareBlock(
  *
  * [confirmLabel] — что случится по нажатию. На главном это «Купить и покормить»:
  * дальше идёт игра, а деньги уходят, когда еда попала в рот.
+ *
+ * [allowShortage] — кнопку можно нажать и при нехватке денег. Так в магазине:
+ * домен откажет, и экран покажет, чего не хватает и что делать (шаг 7
+ * Приложения А — «попытка покупки при нехватке средств»).
  */
 @Composable
 fun CarePanel(
@@ -82,10 +86,12 @@ fun CarePanel(
     options: List<CareOption>,
     onPick: (itemId: String) -> Unit,
     onConfirm: (itemId: String) -> Unit,
-    onDismiss: () -> Unit,
+    /** null — панель без кнопки «Закрыть»: так она стоит на экране магазина. */
+    onDismiss: (() -> Unit)?,
     modifier: Modifier = Modifier,
     block: CareBlock? = null,
     confirmLabel: String = "Купить",
+    allowShortage: Boolean = false,
 ) {
     val selected = options.firstOrNull { it.isSelected }
 
@@ -121,7 +127,7 @@ fun CarePanel(
         FinneyButton(
             text = if (selected == null) "Выбери, что купить" else confirmLabel,
             onClick = { selected?.let { onConfirm(it.item.id) } },
-            enabled = selected != null && selected.preview.shortage == 0,
+            enabled = selected != null && (allowShortage || selected.preview.shortage == 0),
         )
     }
 }

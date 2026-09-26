@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
@@ -30,6 +31,8 @@ import ru.finney.pet.domain.model.ShopItem
 import ru.finney.pet.domain.model.TaskDefinition
 import ru.finney.pet.domain.model.TaskOutcome
 import ru.finney.pet.domain.pet.Emotion
+import ru.finney.pet.ui.components.ActionFeedback
+import ru.finney.pet.ui.components.changesBetween
 
 sealed interface HomeUiState {
     data object Loading : HomeUiState
@@ -76,6 +79,9 @@ sealed interface HomeEvent {
     data class PeriodClosed(val periodNumber: Int) : HomeEvent
 
     data class Rejected(val reason: Rejection) : HomeEvent
+
+    /** Покупка ухода прошла: что изменилось и что дальше (ТЗ п. 2.5.9). */
+    data class Purchased(val feedback: ActionFeedback) : HomeEvent
 }
 
 class HomeViewModel(
@@ -105,8 +111,23 @@ class HomeViewModel(
     /** Купить предмет ухода. Состояние обновится само — оно читается из сохранённой игры. */
     fun buy(itemId: String) {
         viewModelScope.launch {
+            val before = session.activeGame.first()?.state
             when (val result = session.execute { buy(it, itemId) }) {
-                is GameResult.Ok -> Unit
+                is GameResult.Ok -> {
+                    val item = content.item(itemId)
+                    if (before != null && item != null) {
+                        _events.send(
+                            HomeEvent.Purchased(
+                                ActionFeedback(
+                                    title = "Купили: ${item.label}",
+                                    lines = changesBetween(before, result.state),
+                                    why = "Еда и мытьё — нужное: без них питомцу плохо.",
+                                    next = "следи за кольцами на кнопках — они показывают, что нужно.",
+                                ),
+                            ),
+                        )
+                    }
+                }
                 is GameResult.Rejected -> _events.send(HomeEvent.Rejected(result.reason))
             }
         }

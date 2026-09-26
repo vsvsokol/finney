@@ -10,6 +10,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
@@ -25,6 +26,7 @@ import ru.finney.pet.ui.components.FinneyButton
 import ru.finney.pet.ui.components.FinneyScreen
 import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.tasks.games.GameScene
+import ru.finney.pet.ui.tasks.games.LocalPlayerBodyColor
 import ru.finney.pet.ui.tasks.games.PetSays
 import ru.finney.pet.ui.tasks.games.ResultBody
 import ru.finney.pet.ui.tasks.games.SceneBody
@@ -58,7 +60,8 @@ fun TaskScreen(
             FinneyButton(text = "Назад", onClick = onBack)
         }
 
-        is TaskUiState.Ready -> when (s.phase) {
+        is TaskUiState.Ready -> CompositionLocalProvider(LocalPlayerBodyColor provides s.bodyColor) {
+            when (s.phase) {
             TaskPhase.INTRO -> TaskIntro(s, onStart = viewModel::start, onBack = onBack)
             // Крестик и системное «назад» посреди игры закрывают её: до итога ничего не засчитано.
             TaskPhase.PLAY -> key(s.attempt) {
@@ -73,6 +76,7 @@ fun TaskScreen(
                 )
             }
             TaskPhase.RESULT -> TaskResultScene(s, onReplay = viewModel::replay, onDone = onBack)
+            }
         }
     }
 }

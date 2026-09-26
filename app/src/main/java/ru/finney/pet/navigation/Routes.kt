@@ -11,9 +11,12 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class OnboardingRoute(val isReplay: Boolean = false)
 
-/** Имя и внешность питомца. [isEditing] — повторная настройка существующего профиля (ТЗ п. 2.5.2). */
+/**
+ * Имя и внешность питомца. [isEditing] — повторная настройка существующего профиля (ТЗ п. 2.5.2).
+ * [isDemo] — тестовый профиль для проверки: все задания открыты сразу (ТЗ п. 2.5.13).
+ */
 @Serializable
-data class PetSetupRoute(val isEditing: Boolean = false)
+data class PetSetupRoute(val isEditing: Boolean = false, val isDemo: Boolean = false)
 
 // ---------- Игра ----------
 

@@ -45,6 +45,8 @@ sealed interface PetSetupEvent {
 class PetSetupViewModel(
     private val session: Session,
     isEditing: Boolean,
+    /** Создать тестовый профиль демо-режима (ТЗ п. 2.5.13). При редактировании не действует. */
+    private val isDemo: Boolean = false,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PetSetupUiState(isEditing = isEditing))
@@ -85,7 +87,7 @@ class PetSetupViewModel(
             val result = if (current.isEditing) {
                 session.updateProfile(current.name, current.appearance)
             } else {
-                session.createProfile(current.name, current.appearance)
+                session.createProfile(current.name, current.appearance, isDemo)
             }
             when (result) {
                 is ProfileResult.Saved -> _events.send(PetSetupEvent.Saved)
@@ -96,8 +98,8 @@ class PetSetupViewModel(
     }
 
     companion object {
-        fun factory(isEditing: Boolean) = viewModelFactory {
-            initializer { PetSetupViewModel(appContainer().session, isEditing) }
+        fun factory(isEditing: Boolean, isDemo: Boolean = false) = viewModelFactory {
+            initializer { PetSetupViewModel(appContainer().session, isEditing, isDemo) }
         }
     }
 }

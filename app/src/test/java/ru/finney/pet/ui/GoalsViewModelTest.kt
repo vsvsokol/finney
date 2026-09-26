@@ -56,11 +56,42 @@ class GoalsViewModelTest : ViewModelTest() {
         assertEquals(20, state.progress?.saved)
         assertEquals(30, state.balance)
 
-        viewModel.withdraw(5)
+        viewModel.askWithdraw(5)
+        settle()
+        state = viewModel.uiState.value as GoalsUiState.Ready
+        assertEquals("до подтверждения деньги не двигаются", 20, state.progress?.saved)
+        val pending = checkNotNull(state.pendingWithdraw) { "окно подтверждения не открылось" }
+        assertEquals(20, pending.preview.savedBefore)
+        assertEquals(15, pending.preview.savedAfter)
+
+        viewModel.confirmWithdraw()
         settle()
         state = viewModel.uiState.value as GoalsUiState.Ready
         assertEquals(15, state.progress?.saved)
         assertEquals(35, state.balance)
+        assertNull(state.pendingWithdraw)
+        assertTrue("после снятия видно, что изменилось", state.feedback?.lines?.any { it.label == "Копилка" } == true)
+    }
+
+    @Test
+    fun `отмена снятия ничего не меняет`() = test {
+        val viewModel = viewModel()
+        backgroundScope.launch { viewModel.uiState.collect {} }
+        viewModel.selectGoal(bike)
+        settle()
+        session.execute { confirmPlan(it, needs = 0, wants = 0, savings = 0) }
+        viewModel.deposit(10)
+        settle()
+
+        viewModel.askWithdraw(5)
+        settle()
+        viewModel.cancelWithdraw()
+        settle()
+
+        val state = viewModel.uiState.value as GoalsUiState.Ready
+        assertNull(state.pendingWithdraw)
+        assertEquals(10, state.progress?.saved)
+        assertEquals(40, state.balance)
     }
 
     @Test

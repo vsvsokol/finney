@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -232,10 +233,12 @@ fun FinneyTextField(
     supportingText: String? = null,
     singleLine: Boolean = true,
     enabled: Boolean = true,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
 ) {
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
+        keyboardOptions = keyboardOptions,
         modifier = modifier.fillMaxWidth(),
         label = label?.let { { Text(it, style = MaterialTheme.typography.bodyMedium) } },
         placeholder = placeholder?.let {
