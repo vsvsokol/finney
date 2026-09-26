@@ -78,6 +78,13 @@ import ru.finney.pet.ui.pet.rememberPoseProvider
 import ru.finney.pet.ui.pet.rememberPetAnimation
 import ru.finney.pet.ui.debug.DebugPanel
 import androidx.compose.animation.core.animateFloatAsState
+import ru.finney.pet.ui.components.OutlinedText
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.Animatable
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Rect
@@ -131,7 +138,6 @@ fun HomeScreen(
     onOpenHelp: () -> Unit,
     onPeriodClosed: (periodNumber: Int) -> Unit,
     onOpenPetLab: () -> Unit,
-    onOpenOnboarding: () -> Unit,
     viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -172,7 +178,6 @@ fun HomeScreen(
             onOpenAdult = onOpenAdult,
             onOpenHelp = onOpenHelp,
             onOpenPetLab = onOpenPetLab,
-            onOpenOnboarding = onOpenOnboarding,
             onClosePeriod = viewModel::closePeriod,
             onBuy = viewModel::buy,
         )
@@ -227,7 +232,6 @@ private fun HomeContent(
     onOpenAdult: () -> Unit,
     onOpenHelp: () -> Unit,
     onOpenPetLab: () -> Unit,
-    onOpenOnboarding: () -> Unit,
     onClosePeriod: () -> Unit,
     onBuy: (itemId: String) -> Unit,
 ) {
@@ -354,40 +358,50 @@ private fun HomeContent(
                 MoneyButton(balance = state.balance, onClick = onOpenShop)
             }
 
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            LevelBadge(
-                level = state.level,
-                size = 56.dp,
-                progress = state.levelProgress,
-                modifier = if (isDebuggable) {
-                    Modifier.combinedClickable(
-                        onClickLabel = null,
-                        onLongClickLabel = "Отладка",
-                        onLongClick = { debugOpen = true },
-                        onClick = {},
+            // Уровень — главный показатель роста, поэтому вдвое крупнее кнопок по краям.
+            // Центры всех трёх на одной линии: ряд выравнивается по вертикали.
+            Box(contentAlignment = Alignment.Center) {
+                LevelBadge(
+                    level = state.level,
+                    size = LevelBadgeSize,
+                    progress = state.levelProgress,
+                    modifier = if (isDebuggable) {
+                        Modifier.combinedClickable(
+                            onClickLabel = null,
+                            onLongClickLabel = "Отладка",
+                            onLongClick = { debugOpen = true },
+                            onClick = {},
+                        )
+                    } else {
+                        Modifier
+                    },
+                )
+                // Тестовый профиль видно сразу: эксперт знает, почему все игры открыты.
+                // Метка лежит на нижнем краю значка, а не под ним — ряд не вырастает.
+                if (state.isDemo) {
+                    Text(
+                        text = "демо",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = FinneyInk,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .offset(y = 6.dp)
+                            .clip(RoundedCornerShape(percent = 50))
+                            .background(FinneySand)
+                            .border(StrokeThin, FinneyInk, RoundedCornerShape(percent = 50))
+                            .padding(horizontal = 8.dp),
                     )
-                } else {
-                    Modifier
-                },
-            )
-            // Тестовый профиль видно сразу: эксперт знает, почему все игры открыты.
-            if (state.isDemo) {
-                Text("демо", style = MaterialTheme.typography.bodyMedium, color = FinneyInk)
-            }
+                }
             }
 
             Row(
                 modifier = Modifier.weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                FinneyIconButton(
-                    onClick = onOpenHelp,
-                    contentDescription = "Подсказка",
-                    size = 56.dp,
-                ) {
-                    FinneyIcon(FinneyIcons.Help, size = 26.dp)
-                }
+                // Отдельной кнопки «?» нет: подсказка — первый пункт меню («Как играть»).
+                // Она по-прежнему доступна в любой момент (ТЗ п. 2.5.1), а верхний ряд
+                // остаётся симметричным: монета — уровень — меню.
                 // «Бургер» — всё, что не про уход за питомцем: знакомство с игрой,
                 // активное задание, план, копилка, прогресс и раздел взрослого.
                 // Низ экрана из-за этого остался про комнаты, а не про меню.
@@ -405,7 +419,7 @@ private fun HomeContent(
                         onDismiss = { menuOpen = false },
                         task = state.nextTask,
                         onOpenTask = onOpenTask,
-                        onOpenOnboarding = onOpenOnboarding,
+                        onOpenHelp = onOpenHelp,
                         onOpenBudget = onOpenBudget,
                         onOpenTasks = onOpenTasks,
                         onOpenProgress = onOpenProgress,
@@ -736,7 +750,7 @@ private fun HomeMenu(
     onDismiss: () -> Unit,
     task: TaskDefinition?,
     onOpenTask: (String) -> Unit,
-    onOpenOnboarding: () -> Unit,
+    onOpenHelp: () -> Unit,
     onOpenBudget: () -> Unit,
     onOpenTasks: () -> Unit,
     onOpenProgress: () -> Unit,
@@ -755,7 +769,8 @@ private fun HomeMenu(
                 onOpenTask(active.id)
             }
         }
-        HomeMenuItem("Знакомство с игрой") { onDismiss(); onOpenOnboarding() }
+        // Знакомство в режиме подсказки: в конце «Понятно» и назад, без «Создать питомца».
+        HomeMenuItem("Как играть") { onDismiss(); onOpenHelp() }
         HomeMenuItem("План расходов") { onDismiss(); onOpenBudget() }
         HomeMenuItem("Мини-игры") { onDismiss(); onOpenTasks() }
         HomeMenuItem("Прогресс") { onDismiss(); onOpenProgress() }
@@ -788,7 +803,30 @@ private fun HomeMenuItem(text: String, onClick: () -> Unit) {
 private fun MoneyButton(balance: Int, onClick: () -> Unit) {
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) 0.92f else 1f, label = "coinPress")
+    val pressScale by animateFloatAsState(if (pressed) 0.92f else 1f, label = "coinPress")
+
+    // «Поп», когда монет стало больше: монета вздувается и пружинит обратно,
+    // над ней всплывает «+N». Какая сумма уже показана, помнит rememberSaveable:
+    // он переживает уход на другой экран, и вернувшись с мини-игры или итогов
+    // периода, ребёнок видит прибавку. При первом открытии и при тратах — без попа.
+    var shown by rememberSaveable { mutableStateOf<Int?>(null) }
+    val pop = remember { Animatable(1f) }
+    val rise = remember { Animatable(0f) }
+    var gain by remember { mutableIntStateOf(0) }
+    LaunchedEffect(balance) {
+        val before = shown
+        shown = balance
+        if (before == null || balance <= before) return@LaunchedEffect
+        gain = balance - before
+        launch {
+            pop.animateTo(1.35f, tween(durationMillis = 110))
+            pop.animateTo(1f, spring(dampingRatio = 0.35f, stiffness = Spring.StiffnessMedium))
+        }
+        rise.snapTo(0f)
+        rise.animateTo(1f, tween(durationMillis = 1100))
+        gain = 0
+    }
+    val scale = pressScale * pop.value
 
     // Один контейнер размером с монету: плашка привязана к его правому нижнему
     // углу и выходит за край смещением, поэтому ряд не раздвигается от длины суммы.
@@ -830,11 +868,29 @@ private fun MoneyButton(balance: Int, onClick: () -> Unit) {
                 .clickable(onClick = onClick)
                 .padding(horizontal = 7.dp),
         )
+        if (gain > 0) {
+            OutlinedText(
+                text = "+$gain",
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = 24.dp, y = (-4).dp)
+                    .graphicsLayer {
+                        translationY = -rise.value * 28.dp.toPx()
+                        // Первую половину пути видна целиком, потом тает.
+                        alpha = (2f - rise.value * 2f).coerceIn(0f, 1f)
+                    }
+                    .clearAndSetSemantics { contentDescription = "Получено $gain финок" },
+            )
+        }
     }
 }
 
-/** Монета того же размера, что «бургер» и подсказка справа. */
+/** Монета того же размера, что «бургер» справа. */
 private val MoneyCoinSize = 56.dp
+
+/** Уровень вдвое крупнее кнопок по краям верхнего ряда. */
+private val LevelBadgeSize = 112.dp
 
 /**
  * Плашка-кнопка с фактом: копилка, активное задание.
@@ -912,7 +968,7 @@ private fun HomeContentPreview() {
                 care = emptyList(),
             ),
             onOpenBudget = {}, onOpenShop = {}, onOpenGoals = {}, onOpenTasks = {}, onOpenTask = {},
-            onOpenProgress = {}, onOpenAdult = {}, onOpenHelp = {}, onOpenPetLab = {}, onOpenOnboarding = {},
+            onOpenProgress = {}, onOpenAdult = {}, onOpenHelp = {}, onOpenPetLab = {},
             onClosePeriod = {}, onBuy = {},
         )
     }
