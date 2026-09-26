@@ -28,7 +28,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -40,9 +39,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.scale
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -71,17 +67,10 @@ import kotlin.random.Random
 private val PetFooting = Footing(feetX = 0.5f, feetY = 0.87f)
 
 /**
- * Переход между комнатами — чёрная шторка с мягким краем. Она едет в ту
- * сторону, куда идёт питомец: в комнату справа — наползает справа, закрывает
- * экран и уходит влево, открывая новую комнату тоже справа. В комнату слева —
- * зеркально. Как смена сцены в мультфильме: ясно, куда перешли, и две комнаты
- * не видны одновременно. Закрывается и открывается с одной скоростью и ровно,
- * без разгона и торможения: шторка идёт одним движением через весь экран.
+ * Переход между комнатами — новая комната проступает поверх старой. Без
+ * чёрного: затемнение во весь экран мигало. Ровно, без разгона и торможения.
  */
-private const val WIPE_HALF_MS = 170
-
-/** Ширина мягкого края шторки, доля ширины экрана. */
-private const val WIPE_SOFT = 0.35f
+private const val APPEAR_MS = 300
 
 /**
  * Прогулка по залу: раз в несколько секунд питомец сам скачет в случайное место.
@@ -146,8 +135,8 @@ private val UfoPauseMs = 20_000L..45_000L
  * Если экран шире холста (планшет), холст подгоняется по ширине и срезается
  * сверху — пол, стол и ванна нужны целиком, а верх стены пустой.
  *
- * Комнаты три — зал, кухня, ванная, — и при переключении [spot] одна
- * гаснет в чёрное и проступает другая. В каждой свой набор: в зале торшер, окно и капсула, на кухне стол
+ * Комнаты три — зал, кухня, ванная, — и при переключении [spot] новая
+ * проступает поверх старой. В каждой свой набор: в зале торшер, окно и капсула, на кухне стол
  * у окна без торшера, в ванной ванна под торшером без окна. Свет у каждой
  * комнаты свой, потому что источники в них разные.
  *
@@ -233,21 +222,26 @@ fun RoomScene(
         val visibleRight = (maxWidth - shiftX) / canvasW
         val strollMin = visibleLeft - home.left - home.width * PET_MARGIN
         val strollMax = visibleRight - home.right + home.width * PET_MARGIN
-        // Какая комната на экране сейчас: во время затемнения это ещё старая.
+        // Какая комната на экране сейчас: во время перехода это ещё старая.
         var shown by remember { mutableStateOf(spot) }
-        // Шторка: 0 — нет её, 0..1 — наползает, 1 — экран чёрный, 1..2 — уходит.
-        // Направление: 1 — идём вправо, шторка едет справа налево; −1 — наоборот.
-        val wipe = remember { Animatable(0f) }
-        var wipeDir by remember { mutableIntStateOf(1) }
+        // Проступающая комната и насколько она уже видна. Пока она проступает,
+        // под ней остаётся старая, [shown].
+        var incoming by remember { mutableStateOf<RoomSpot?>(null) }
+        val appear = remember { Animatable(0f) }
         LaunchedEffect(spot) {
-            if (spot == shown) return@LaunchedEffect
-            // Передумали посреди открытия — шторка закрывается заново с того же места.
-            if (wipe.value > 1f) wipe.snapTo(2f - wipe.value)
-            wipeDir = if (spot.ordinal > shown.ordinal) 1 else -1
-            wipe.animateTo(1f, tween(WIPE_HALF_MS, easing = LinearEasing))
+            // Передумали посреди перехода — недопроявленная комната становится основой.
+            incoming?.let { shown = it }
+            if (spot == shown) {
+                incoming = null
+                appear.snapTo(0f)
+                return@LaunchedEffect
+            }
+            appear.snapTo(0f)
+            incoming = spot
+            appear.animateTo(1f, tween(APPEAR_MS, easing = LinearEasing))
             shown = spot
-            wipe.animateTo(2f, tween(WIPE_HALF_MS, easing = LinearEasing))
-            wipe.snapTo(0f)
+            incoming = null
+            appear.snapTo(0f)
         }
 
         val canWander = wander && spot == RoomSpot.LIVING && shown == RoomSpot.LIVING && !asleep
@@ -269,26 +263,30 @@ fun RoomScene(
             }
         }
 
-        key(shown) {
-            RoomCanvas(
-                room = shown,
-                lighting = lights.getValue(shown),
-                canvasW = canvasW,
-                canvasH = canvasH,
-                shiftX = shiftX,
-                shiftY = shiftY,
-                ufo = ufo,
-                capsule = capsule,
-                walk = { walk.value },
-                stroll = { stroll.value },
-                door = { door.value },
-                onTapItem = onTapItem,
-                pet = pet,
-            )
+        for (room in listOfNotNull(shown, incoming)) {
+            key(room) {
+                RoomCanvas(
+                    room = room,
+                    lighting = lights.getValue(room),
+                    canvasW = canvasW,
+                    canvasH = canvasH,
+                    shiftX = shiftX,
+                    shiftY = shiftY,
+                    ufo = ufo,
+                    capsule = capsule,
+                    walk = { walk.value },
+                    stroll = { stroll.value },
+                    door = { door.value },
+                    onTapItem = onTapItem,
+                    pet = pet,
+                    // Питомец в старой комнате тает, пока проступает новая: иначе
+                    // посреди перехода на экране два питомца разного размера.
+                    petVisibility = if (room == shown && incoming != null) ({ 1f - appear.value }) else ({ 1f }),
+                    // Прозрачность читается на отрисовке и не пересобирает комнату.
+                    modifier = if (room == incoming) Modifier.graphicsLayer { alpha = appear.value } else Modifier,
+                )
+            }
         }
-        // Затемнение поверх комнаты, но под интерфейсом: RoomScene — фон экрана.
-        // Прозрачность читается на отрисовке и не пересобирает комнату.
-        Box(modifier = Modifier.fillMaxSize().drawBehind { drawWipe(wipe.value, wipeDir) })
     }
 }
 
@@ -315,6 +313,7 @@ private fun RoomCanvas(
     onTapItem: (() -> Unit)?,
     pet: @Composable BoxScope.() -> Unit,
     modifier: Modifier = Modifier,
+    petVisibility: () -> Float = { 1f },
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         Box(
@@ -329,7 +328,7 @@ private fun RoomCanvas(
                 if (room.hasLamp) Layer(Room.Lamp, canvasW, canvasH)
             }
 
-            val visibility = { 1f }
+            val visibility = petVisibility
             val ground = Room.petGround(room).let { if (room == RoomSpot.LIVING) it.shiftedX(stroll()) else it }
 
             // Тень у питомца только в зале: за столом и в ванне она
@@ -394,6 +393,7 @@ private fun Pet(
         pad = PET_PAD,
         modifier = Modifier
             .offset(canvasW * ground.left, canvasH * ground.top)
+            .graphicsLayer { alpha = visibility() }
             .requiredSize(canvasW * ground.width),
         content = pet,
     )
@@ -790,36 +790,5 @@ private fun RoomSceneLivingPreview() {
 private fun RoomSceneLampOffPreview() {
     FinneyTheme {
         RoomScene(spot = RoomSpot.LIVING, lampOn = false, modifier = Modifier.size(412.dp, 892.dp))
-    }
-}
-
-/**
- * Чёрная шторка перехода на позиции [progress] (см. [WIPE_SOFT]). Рисуется как
- * для хода вправо — шторка едет справа налево, — а ход влево зеркалит её.
- */
-private fun DrawScope.drawWipe(progress: Float, direction: Int) {
-    if (progress <= 0f || progress >= 2f) return
-    val w = size.width
-    val soft = w * WIPE_SOFT
-    scale(scaleX = direction.toFloat(), scaleY = 1f) {
-        if (progress <= 1f) {
-            // Наползает: сплошное чёрное справа от края, мягкий переход левее него.
-            val edge = w + soft - progress * (w + 2 * soft)
-            drawRect(
-                Brush.horizontalGradient(listOf(Color.Transparent, Color.Black), startX = edge - soft, endX = edge),
-                topLeft = Offset(edge - soft, 0f),
-                size = Size(soft, size.height),
-            )
-            drawRect(Color.Black, topLeft = Offset(edge, 0f), size = Size(w - edge, size.height))
-        } else {
-            // Уходит влево: чёрное остаётся слева от края, справа уже новая комната.
-            val edge = w - (progress - 1f) * (w + soft)
-            drawRect(Color.Black, size = Size(edge.coerceAtLeast(0f), size.height))
-            drawRect(
-                Brush.horizontalGradient(listOf(Color.Black, Color.Transparent), startX = edge, endX = edge + soft),
-                topLeft = Offset(edge, 0f),
-                size = Size(soft, size.height),
-            )
-        }
     }
 }
