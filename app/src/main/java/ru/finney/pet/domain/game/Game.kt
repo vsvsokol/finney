@@ -104,7 +104,8 @@ class Game(
 
     fun stage(state: GameState): Int = Progression.stage(level(state), economy)
 
-    fun emotion(state: GameState): Emotion = PetRules.emotion(state.pet, economy.pet)
+    /** Эмоция по шкалам сейчас: у спящего сон растёт, см. [energyAt]. */
+    fun emotion(state: GameState): Emotion = PetRules.emotion(state.pet.copy(energy = energyAt(state)), economy.pet)
 
     /** Сколько минимально стоит закрыть нужное при текущих шкалах. */
     fun needsHint(state: GameState): Int? =
@@ -182,6 +183,7 @@ class Game(
      * Поэтому план с копилкой без выбранной цели не принимается: откладывать некуда.
      */
     fun confirmPlan(state: GameState, needs: Int, wants: Int, savings: Int): GameResult {
+        if (state.sleepingSince != null) return reject(Rejection.Asleep)
         val period = state.currentPeriod
         if (period.phase != PeriodPhase.PLANNING) return reject(Rejection.PlanAlreadyConfirmed)
         if (needs < 0 || wants < 0 || savings < 0) return reject(Rejection.InvalidAmount)
@@ -195,6 +197,7 @@ class Game(
     // ---------- Покупки ----------
 
     fun buy(state: GameState, itemId: String): GameResult {
+        if (state.sleepingSince != null) return reject(Rejection.Asleep)
         val item = content.item(itemId) ?: return reject(Rejection.UnknownItem(itemId))
         if (state.currentPeriod.phase != PeriodPhase.ACTIVE) return reject(Rejection.PlanNotConfirmed)
         if (item.kind == ItemKind.ACCESSORY && state.owns(item.id)) return reject(Rejection.AlreadyOwned)
@@ -208,17 +211,61 @@ class Game(
         )
     }
 
+    // ---------- Сон ----------
+
+    /** Сколько длится полный сон: час, в демо-режиме — секунды, чтобы эксперт увидел весь цикл. */
+    fun sleepMillis(state: GameState): Long =
+        if (state.isDemo) economy.pet.demoSleepSeconds * 1_000L else economy.pet.sleepMinutes * 60_000L
+
+    /** Когда питомец проснётся сам; null — не спит. */
+    fun sleepEndsAt(state: GameState): Long? = state.sleepingSince?.plus(sleepMillis(state))
+
+    /**
+     * Сон сейчас. У спящего растёт ровно от того, с чем уснул, до 100 за [sleepMillis];
+     * в [GameState.pet] лежит значение на момент засыпания.
+     */
+    fun energyAt(state: GameState, now: Long = clock()): Int {
+        val since = state.sleepingSince ?: return state.pet.energy
+        val slept = ((now - since).toDouble() / sleepMillis(state)).coerceIn(0.0, 1.0)
+        return state.pet.energy + ((PetRules.STAT_MAX - state.pet.energy) * slept).toInt()
+    }
+
+    /**
+     * Уложить питомца спать в капсулу. Бесплатно и в любой фазе периода — сон не покупают.
+     * Выспавшегося не уложить: ребёнок видит, что сон нужен, только когда шкала просела.
+     * Пока спит, остальные команды отклоняются ([Rejection.Asleep]) — только ждать или будить.
+     */
+    fun sleep(state: GameState): GameResult {
+        if (state.sleepingSince != null) return reject(Rejection.Asleep)
+        if (state.pet.energy >= PetRules.STAT_MAX) return reject(Rejection.NotSleepy)
+        return ok(state.copy(sleepingSince = clock()))
+    }
+
+    /** Разбудить: сон — сколько успел набрать. Разбудили раньше — прибавка меньше. */
+    fun wake(state: GameState): GameResult {
+        if (state.sleepingSince == null) return reject(Rejection.NotAsleep)
+        return ok(state.copy(pet = state.pet.copy(energy = energyAt(state)), sleepingSince = null))
+    }
+
+    /** Если срок сна вышел, питомец уже проснулся. Хранилище вызывает перед каждой командой. */
+    fun settleSleep(state: GameState): GameState {
+        val ends = sleepEndsAt(state) ?: return state
+        return if (clock() >= ends) (wake(state) as GameResult.Ok).state else state
+    }
+
     // ---------- Гардероб ----------
 
     /** Надеть купленный аксессуар вместо текущего. Бесплатно и в любой фазе периода. */
     fun wear(state: GameState, itemId: String): GameResult {
+        if (state.sleepingSince != null) return reject(Rejection.Asleep)
         val item = content.item(itemId) ?: return reject(Rejection.UnknownItem(itemId))
         if (item.kind != ItemKind.ACCESSORY) return reject(Rejection.NotWearable(itemId))
         if (!state.owns(itemId)) return reject(Rejection.NotOwned(itemId))
         return ok(state.copy(wornItemId = itemId))
     }
 
-    fun takeOff(state: GameState): GameResult = ok(state.copy(wornItemId = null))
+    fun takeOff(state: GameState): GameResult =
+        if (state.sleepingSince != null) reject(Rejection.Asleep) else ok(state.copy(wornItemId = null))
 
     /** Купленные аксессуары в порядке магазина. */
     fun wardrobe(state: GameState): List<ShopItem> =
@@ -227,12 +274,14 @@ class Game(
     // ---------- Накопления ----------
 
     fun selectGoal(state: GameState, goalId: String): GameResult {
+        if (state.sleepingSince != null) return reject(Rejection.Asleep)
         if (content.goal(goalId) == null) return reject(Rejection.UnknownGoal(goalId))
         if (state.isGoalCompleted(goalId)) return reject(Rejection.GoalAlreadyCompleted)
         return ok(state.copy(activeGoalId = goalId))
     }
 
     fun deposit(state: GameState, amount: Int): GameResult {
+        if (state.sleepingSince != null) return reject(Rejection.Asleep)
         if (state.currentPeriod.phase != PeriodPhase.ACTIVE) return reject(Rejection.PlanNotConfirmed)
         if (amount <= 0) return reject(Rejection.InvalidAmount)
         val goalId = state.activeGoalId ?: return reject(Rejection.NoActiveGoal)
@@ -244,6 +293,7 @@ class Game(
 
     /** UI обязан показать [previewWithdraw] и получить отдельное подтверждение (ТЗ п. 2.5.7). */
     fun withdraw(state: GameState, amount: Int): GameResult {
+        if (state.sleepingSince != null) return reject(Rejection.Asleep)
         if (state.currentPeriod.phase != PeriodPhase.ACTIVE) return reject(Rejection.PlanNotConfirmed)
         if (amount <= 0) return reject(Rejection.InvalidAmount)
         val goalId = state.activeGoalId ?: return reject(Rejection.NoActiveGoal)
@@ -255,6 +305,7 @@ class Game(
     }
 
     fun completeGoal(state: GameState): GameResult {
+        if (state.sleepingSince != null) return reject(Rejection.Asleep)
         val goal = state.activeGoalId?.let(content::goal) ?: return reject(Rejection.NoActiveGoal)
         val saved = state.goalSaved(goal.id)
         if (saved < goal.price) return reject(Rejection.GoalNotReached(goal.price, saved))
@@ -284,6 +335,7 @@ class Game(
     }
 
     fun submitTask(state: GameState, taskId: String, input: TaskInput): TaskResult {
+        if (state.sleepingSince != null) return TaskResult.Rejected(Rejection.Asleep)
         val task = content.task(taskId) ?: return TaskResult.Rejected(Rejection.UnknownTask(taskId))
         if (!isTaskAvailable(state, task)) return TaskResult.Rejected(Rejection.TaskLocked)
         val evaluation = when (val e = TaskEngines.evaluate(task, input)) {
@@ -315,6 +367,7 @@ class Game(
 
     /** Итоги закрытого периода — `periods[size - 2].result` в новом состоянии. */
     fun closePeriod(state: GameState): GameResult {
+        if (state.sleepingSince != null) return reject(Rejection.Asleep)
         val period = state.currentPeriod
         val plan = period.plan
         if (period.phase != PeriodPhase.ACTIVE || plan == null) return reject(Rejection.PlanNotConfirmed)

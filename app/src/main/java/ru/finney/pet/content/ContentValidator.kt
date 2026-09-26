@@ -31,6 +31,9 @@ object ContentValidator {
         if (e.pointsPerLevel <= 0) add("economy.json: pointsPerLevel должен быть > 0")
         if (e.parentBonus.step <= 0) add("economy.json: parentBonus.step должен быть > 0")
         if (e.incomeByStage.any { it <= 0 }) add("economy.json: доход должен быть > 0")
+        // Сон не покупают, поэтому в магазине его не проверить: потребность держится только на спаде.
+        if (e.pet.decayByStage.any { it.energy <= 0 }) add("economy.json: pet.decayByStage — сон должен убывать за период")
+        if (e.pet.sleepMinutes <= 0 || e.pet.demoSleepSeconds <= 0) add("economy.json: pet.sleepMinutes и demoSleepSeconds должны быть > 0")
 
         duplicates(content.shop.map { it.id }).forEach { add("shop.json: повторяется id $it") }
         content.shop.filter { it.price <= 0 }.forEach { add("shop.json: ${it.id} — цена должна быть > 0") }

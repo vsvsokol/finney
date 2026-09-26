@@ -66,9 +66,22 @@ sealed interface HomeUiState {
         val worn: String? = null,
         /** Купленные аксессуары: их можно надеть в гардеробе. */
         val wardrobe: List<ShopItem> = emptyList(),
+        /** Питомец спит; null — не спит. */
+        val sleep: SleepInfo? = null,
     ) : HomeUiState {
         /** Период закрывается только после подтверждения плана. */
         val canClosePeriod: Boolean get() = phase == PeriodPhase.ACTIVE
+    }
+}
+
+/**
+ * Сон идёт по часам: [energyFrom] — с чем уснул, к [endsAt] сон дорастёт до 100.
+ * Экран сам двигает кольцо сна по времени и будит питомца в [endsAt].
+ */
+data class SleepInfo(val since: Long, val endsAt: Long, val energyFrom: Int) {
+    fun energyAt(now: Long): Int {
+        val slept = ((now - since).toFloat() / (endsAt - since)).coerceIn(0f, 1f)
+        return energyFrom + ((100 - energyFrom) * slept).toInt()
     }
 }
 
@@ -86,6 +99,9 @@ sealed interface HomeEvent {
 
     /** Покупка ухода прошла: что изменилось и что дальше (ТЗ п. 2.5.9). */
     data class Purchased(val feedback: ActionFeedback) : HomeEvent
+
+    /** Питомец проснулся — сам или разбудили: сколько выспался (ТЗ п. 2.5.9). */
+    data class Woke(val feedback: ActionFeedback) : HomeEvent
 }
 
 class HomeViewModel(
@@ -137,6 +153,41 @@ class HomeViewModel(
         }
     }
 
+    /** Уложить спать в капсулу. Бесплатно: сон не покупают. */
+    fun sleep() {
+        viewModelScope.launch {
+            (session.execute { sleep(it) } as? GameResult.Rejected)?.let {
+                _events.send(HomeEvent.Rejected(it.reason))
+            }
+        }
+    }
+
+    /**
+     * Разбудить — или отметить, что проснулся сам: срок вышел, и хранилище уже
+     * разбудило его перед командой (тогда `wake` отвечает NotAsleep). Итог в обоих
+     * случаях считается от состояния до пробуждения.
+     */
+    fun wake() {
+        viewModelScope.launch {
+            val before = session.activeGame.first()?.state?.takeIf { it.sleepingSince != null } ?: return@launch
+            val after = when (val result = session.execute { wake(it) }) {
+                is GameResult.Ok -> result.state
+                is GameResult.Rejected -> (game.wake(before) as? GameResult.Ok)?.state ?: return@launch
+            }
+            val full = after.pet.energy >= 100
+            _events.send(
+                HomeEvent.Woke(
+                    ActionFeedback(
+                        title = if (full) "Выспался!" else "Проснулся раньше",
+                        lines = changesBetween(before, after),
+                        why = if (full) "Сон — это нужное. И он бесплатный." else "Сон набирается постепенно: чем дольше спит, тем больше.",
+                        next = "За период сон снова убудет — следи за кольцом у кнопки зала.",
+                    ),
+                ),
+            )
+        }
+    }
+
     /** Надеть купленную вещь. Бесплатно: деньги ушли при покупке. */
     fun wear(itemId: String) {
         viewModelScope.launch {
@@ -176,6 +227,9 @@ class HomeViewModel(
             care = previews(state) { it.effect.hygiene > 0 },
             worn = state.wornItemId,
             wardrobe = game.wardrobe(state),
+            sleep = state.sleepingSince?.let { since ->
+                SleepInfo(since = since, endsAt = game.sleepEndsAt(state)!!, energyFrom = state.pet.energy)
+            },
         )
     }
 

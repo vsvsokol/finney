@@ -63,6 +63,10 @@ LAYERS = {
     "bath": "room_bath",
     "bath_foam": "room_bath_foam_back",
     "bath_foam_2": "room_bath_foam_front",
+    # Капсула для сна в зале и её дверь: питомец спит между ними, стекло двери
+    # полупрозрачное, и спящего видно сквозь него.
+    "sleep_capsule": "room_capsule",
+    "sleep_capsule_door": "room_capsule_door",
 }
 
 

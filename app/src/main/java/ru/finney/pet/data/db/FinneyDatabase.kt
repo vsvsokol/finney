@@ -10,7 +10,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 /**
  * Схема каждой версии экспортируется в app/schemas и коммитится.
  *
- * С версии 3 изменения переносятся миграциями — сейчас это [MIGRATION_3_4]. Базы версий 1–2
+ * С версии 3 изменения переносятся миграциями — [MIGRATION_3_4], [MIGRATION_4_5]. Базы версий 1–2
  * пересоздаются с нуля: версия 3 переименовала питомцев, а перенести старые значения было бы
  * возможно только храня прежние имена прямо в коде.
  */
@@ -22,7 +22,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         LedgerEntryEntity::class,
         TaskAttemptEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class FinneyDatabase : RoomDatabase() {
@@ -34,7 +34,7 @@ abstract class FinneyDatabase : RoomDatabase() {
 
         fun create(context: Context): FinneyDatabase =
             Room.databaseBuilder(context.applicationContext, FinneyDatabase::class.java, NAME)
-                .addMigrations(MIGRATION_3_4)
+                .addMigrations(MIGRATION_3_4, MIGRATION_4_5)
                 .fallbackToDestructiveMigration(dropAllTables = true)
                 .build()
 
@@ -45,6 +45,20 @@ abstract class FinneyDatabase : RoomDatabase() {
         val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE profiles ADD COLUMN wornItemId TEXT")
+            }
+        }
+
+        /**
+         * Сон у питомцев, созданных до версии 5. Столько же, сколько у нового питомца после
+         * первого спада (90 − 60): потребность уже видна, но питомец ещё не «устал».
+         */
+        const val ENERGY_ON_MIGRATION = "30"
+
+        /** 4 → 5: шкала сна и время, когда питомец лёг спать (никто не спит). Остальное не трогается. */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE pet_state ADD COLUMN energy INTEGER NOT NULL DEFAULT $ENERGY_ON_MIGRATION")
+                db.execSQL("ALTER TABLE pet_state ADD COLUMN sleepingSince INTEGER")
             }
         }
     }

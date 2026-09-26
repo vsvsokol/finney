@@ -14,14 +14,16 @@
   "maxLevel": 9,
   "stageStartLevels": [1, 4, 7],
   "pet": {
-    "start": { "satiety": 70, "hygiene": 70, "mood": 70 },
+    "start": { "satiety": 70, "hygiene": 70, "mood": 70, "energy": 90 },
     "decayByStage": [
-      { "satiety": 40, "hygiene": 30, "mood": 20 },
-      { "satiety": 50, "hygiene": 35, "mood": 25 },
-      { "satiety": 60, "hygiene": 40, "mood": 30 }
+      { "satiety": 40, "hygiene": 30, "mood": 20, "energy": 60 },
+      { "satiety": 50, "hygiene": 35, "mood": 25, "energy": 65 },
+      { "satiety": 60, "hygiene": 40, "mood": 30, "energy": 70 }
     ],
     "needsThreshold": 50,
     "emotionLow": 30,
-    "emotionHappy": 60
+    "emotionHappy": 60,
+    "sleepMinutes": 60,
+    "demoSleepSeconds": 10
   }
 }

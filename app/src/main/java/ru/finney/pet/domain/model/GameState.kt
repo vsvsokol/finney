@@ -8,6 +8,8 @@ data class PetStats(
     val satiety: Int,
     val hygiene: Int,
     val mood: Int,
+    /** Сон: бодрость питомца. Восстанавливается бесплатно — сном в капсуле, см. [ru.finney.pet.domain.game.Game.sleep]. */
+    val energy: Int,
 )
 
 enum class PeriodPhase {
@@ -104,6 +106,8 @@ data class GameState(
     val attempts: List<TaskAttempt>,
     /** Аксессуар, который сейчас на питомце. Только из купленных; null — ничего не надето. */
     val wornItemId: String? = null,
+    /** Когда питомец лёг спать, мс; null — не спит. Сколько он уже выспался — [ru.finney.pet.domain.game.Game.energyAt]. */
+    val sleepingSince: Long? = null,
 ) {
     val currentPeriod: Period get() = periods.last()
 

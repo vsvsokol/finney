@@ -24,6 +24,7 @@ data class StatEffect(
     val satiety: Int = 0,
     val hygiene: Int = 0,
     val mood: Int = 0,
+    val energy: Int = 0,
 )
 
 @Serializable

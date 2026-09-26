@@ -72,6 +72,14 @@ fun rejectionMessage(rejection: Rejection): RejectionMessage = when (rejection) 
         "Это у тебя уже есть.",
         "Выбери что-нибудь другое.",
     )
+    Rejection.Asleep -> RejectionMessage(
+        "Финни спит.",
+        "Подожди или разбуди его.",
+    )
+    Rejection.NotSleepy -> RejectionMessage(
+        "Спать пока не хочется.",
+        "Уложи спать, когда шкала сна станет меньше.",
+    )
     is Rejection.NotOwned -> RejectionMessage(
         "Этой вещи у тебя пока нет.",
         "Её можно купить в магазине.",
@@ -94,6 +102,7 @@ fun rejectionMessage(rejection: Rejection): RejectionMessage = when (rejection) 
     is Rejection.NotWearable,
     is Rejection.UnknownTask,
     is Rejection.InvalidTaskInput,
+    Rejection.NotAsleep,
     -> RejectionMessage("Так не получится.", "Попробуй по-другому.")
 }
 
@@ -129,6 +138,7 @@ fun changesBetween(before: GameState, after: GameState): List<ChangeLine> = list
     ChangeLine("Копилка", before.totalSavings, after.totalSavings),
     ChangeLine("Сытость", before.pet.satiety, after.pet.satiety),
     ChangeLine("Чистота", before.pet.hygiene, after.pet.hygiene),
+    ChangeLine("Сон", before.pet.energy, after.pet.energy),
     ChangeLine("Радость", before.pet.mood, after.pet.mood),
 ).filter { it.delta != 0 }
 

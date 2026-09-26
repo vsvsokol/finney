@@ -42,6 +42,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -96,6 +97,8 @@ import ru.finney.pet.ui.room.WashingGame
 import ru.finney.pet.ui.room.CareBlock
 import ru.finney.pet.ui.room.CareOption
 import ru.finney.pet.ui.room.CarePanel
+import ru.finney.pet.ui.room.DOOR_MS
+import ru.finney.pet.ui.room.WALK_MS
 import ru.finney.pet.ui.room.WardrobePanel
 import ru.finney.pet.ui.room.RoomScene
 import ru.finney.pet.ui.room.RoomSpot
@@ -147,6 +150,7 @@ fun HomeScreen(
     // а ребёнок успевает увидеть, что стало с деньгами и шкалой (ТЗ п. 2.5.9).
     var purchased by remember { mutableStateOf<ActionFeedback?>(null) }
     var rejected by remember { mutableStateOf<Rejection?>(null) }
+
     LaunchedEffect(purchased) {
         if (purchased != null) {
             delay(PurchaseFeedbackMillis)
@@ -160,6 +164,8 @@ fun HomeScreen(
                 is HomeEvent.PeriodClosed -> onPeriodClosed(event.periodNumber)
                 is HomeEvent.Rejected -> rejected = event.reason
                 is HomeEvent.Purchased -> purchased = event.feedback
+                // Итог сна — уже проснувшемуся, той же карточкой, что и покупка.
+                is HomeEvent.Woke -> purchased = event.feedback
             }
         }
     }
@@ -183,6 +189,8 @@ fun HomeScreen(
             onBuy = viewModel::buy,
             onWear = viewModel::wear,
             onTakeOff = viewModel::takeOff,
+            onSleep = viewModel::sleep,
+            onWake = viewModel::wake,
         )
     }
 
@@ -211,6 +219,9 @@ fun HomeScreen(
 
 private const val PurchaseFeedbackMillis = 5_000L
 
+/** Во сне всё, кроме «Разбудить», приглушено и не нажимается. */
+private const val NightDim = 0.45f
+
 /**
  * Почему питомцу так — ТЗ п. 2.5.10: краткое объяснение причины эмоции и что сделать.
  * Спокойное состояние не комментируем: всё в порядке, лишний текст ни к чему.
@@ -218,6 +229,7 @@ private const val PurchaseFeedbackMillis = 5_000L
 private fun emotionReason(name: String, emotion: Emotion): String? = when (emotion) {
     Emotion.HUNGRY -> "$name голоден: сытость низкая. Покорми на кухне"
     Emotion.DIRTY -> "$name испачкался. Помой в ванной"
+    Emotion.TIRED -> "$name устал и хочет спать. Уложи его в капсулу в зале"
     Emotion.SAD -> "$name грустит: мало радости. Загляни в магазин за «хочется»"
     Emotion.HAPPY -> "$name доволен: о нём хорошо заботятся"
     Emotion.CALM -> null
@@ -239,7 +251,38 @@ private fun HomeContent(
     onBuy: (itemId: String) -> Unit,
     onWear: (itemId: String) -> Unit = {},
     onTakeOff: () -> Unit = {},
+    onSleep: () -> Unit = {},
+    onWake: () -> Unit = {},
 ) {
+    // Питомец спит — это ночь: он в капсуле, свет выключен, можно только ждать
+    // или разбудить. Глаза закрываются, когда он уже внутри, и открываются,
+    // как только проснулся. Открыли приложение, а он спит, — глаза закрыты сразу.
+    val sleep = state.sleep
+    val sleeping = sleep != null
+    var eyesClosed by remember { mutableStateOf(sleeping) }
+    LaunchedEffect(sleeping) {
+        if (!sleeping) {
+            eyesClosed = false
+        } else if (!eyesClosed) {
+            delay((WALK_MS + DOOR_MS).toLong())
+            eyesClosed = true
+        }
+    }
+
+    // Часы сна: раз в секунду — кольцо сна растёт, минуты до пробуждения тают.
+    val now by produceState(System.currentTimeMillis(), sleep) {
+        while (sleep != null) {
+            value = System.currentTimeMillis()
+            delay(1_000)
+        }
+    }
+    // Срок вышел — просыпается сам, даже если экран открыт весь час.
+    LaunchedEffect(sleep?.endsAt) {
+        val ends = sleep?.endsAt ?: return@LaunchedEffect
+        delay((ends - System.currentTimeMillis()).coerceAtLeast(0))
+        onWake()
+    }
+    val energyNow = sleep?.energyAt(now) ?: state.stats.energy
     var menuOpen by rememberSaveable { mutableStateOf(false) }
 
     // Отладочная сборка — та, что ставится как ru.finney.pet.debug. Флаг читается
@@ -258,7 +301,7 @@ private fun HomeContent(
     // а не в игре: пока не нажали «Купить», ничего не произошло.
     var care by rememberSaveable { mutableStateOf<CareTarget?>(null) }
 
-    // Гардероб — панель зала: вторым нажатием на «Зал» или по пункту меню.
+    // Гардероб — по пункту меню: второе нажатие на «Зал» укладывает спать.
     var wardrobeOpen by rememberSaveable { mutableStateOf(false) }
     var picked by rememberSaveable { mutableStateOf<String?>(null) }
 
@@ -295,8 +338,10 @@ private fun HomeContent(
     // открывает выбор: по макету её дело — «появляется стол», «появляется ванна».
     // Ребёнок сперва видит, куда попал, и лишь потом тратит деньги.
     fun goTo(next: RoomSpot, target: CareTarget) {
+        if (sleeping) return
         if (spot == next) openCare(target) else spot = next
     }
+
 
     // FinneyScreen тут не подходит: он заливает фон кремовым и сам растит колонку,
     // а под интерфейсом должна быть видна комната. Свой корень — ровно поэтому,
@@ -310,9 +355,10 @@ private fun HomeContent(
                 when (spot) {
                     RoomSpot.KITCHEN -> openCare(CareTarget.FOOD)
                     RoomSpot.BATH -> openCare(CareTarget.BATH)
-                    RoomSpot.LIVING -> wardrobeOpen = true
+                    RoomSpot.LIVING -> if (sleeping) onWake() else onSleep()
                 }
             },
+            asleep = sleeping,
         ) {
             // Нажатие — питомец подпрыгивает: это игра, а не меню. Черновик
             // анимаций, который раньше открывался здесь же, ушёл на долгое
@@ -325,7 +371,7 @@ private fun HomeContent(
                 character = state.appearance.character,
                 bodyColor = state.appearance.bodyColor,
                 accessory = state.worn,
-                mood = state.emotion.toMood(),
+                mood = if (eyesClosed) PetMood.SLEEP else state.emotion.toMood(),
                 pose = rememberPoseProvider(animation),
                 modifier = Modifier
                     .fillMaxSize()
@@ -336,7 +382,7 @@ private fun HomeContent(
                         onClickLabel = "Погладить питомца",
                         onLongClick = if (isDebuggable) onOpenPetLab else null,
                         onLongClickLabel = if (isDebuggable) "Черновик анимаций" else null,
-                        onClick = animation::playJoy,
+                        onClick = { if (!sleeping) animation.playJoy() },
                     ),
             )
         }
@@ -362,8 +408,11 @@ private fun HomeContent(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                MoneyButton(balance = state.balance, onClick = onOpenShop)
+            Box(
+                modifier = Modifier.weight(1f).graphicsLayer { alpha = if (sleeping) NightDim else 1f },
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                MoneyButton(balance = state.balance, onClick = { if (!sleeping) onOpenShop() })
             }
 
             // Уровень — главный показатель роста, поэтому в полтора раза крупнее кнопок по краям.
@@ -403,7 +452,7 @@ private fun HomeContent(
             }
 
             Row(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).graphicsLayer { alpha = if (sleeping) NightDim else 1f },
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -415,7 +464,7 @@ private fun HomeContent(
                 // Низ экрана из-за этого остался про комнаты, а не про меню.
                 Box {
                     FinneyIconButton(
-                        onClick = { menuOpen = true },
+                        onClick = { if (!sleeping) menuOpen = true },
                         contentDescription = "Меню",
                         size = 56.dp,
                     ) {
@@ -444,7 +493,7 @@ private fun HomeContent(
         // лампы, и второй ряд его бы срезал. Сытость, чистота и настроение сюда
         // не попадают — они переехали в кольца кнопок и в шкалу слева.
         Row(
-            modifier = Modifier.fillMaxWidth().graphicsLayer { alpha = hudAlpha },
+            modifier = Modifier.fillMaxWidth().graphicsLayer { alpha = if (sleeping) NightDim else hudAlpha },
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             InfoChip(
@@ -453,7 +502,7 @@ private fun HomeContent(
                     ?.let { "${it.goal.label}: ${it.saved} из ${it.goal.price}" }
                     ?: "Копилка: ${state.totalSavings}",
                 action = "Копилка и цель",
-                onClick = onOpenGoals,
+                onClick = { if (!sleeping) onOpenGoals() },
                 modifier = Modifier.weight(1f),
             )
 
@@ -464,13 +513,13 @@ private fun HomeContent(
                     icon = FinneyIcons.Star,
                     text = task.title,
                     action = "Задание: ${task.title}",
-                    onClick = { onOpenTask(task.id) },
+                    onClick = { if (!sleeping) onOpenTask(task.id) },
                     modifier = Modifier.weight(1f),
                 )
             }
         }
 
-        emotionReason(state.petName, state.emotion)?.let { reason ->
+        emotionReason(state.petName, state.emotion)?.takeIf { !sleeping }?.let { reason ->
             Text(
                 text = reason,
                 style = MaterialTheme.typography.bodyMedium,
@@ -522,7 +571,15 @@ private fun HomeContent(
             // До подтверждения плана период закрыть нельзя (Rejection.PlanNotConfirmed),
             // и на месте кнопки — путь к плану: ребёнок видит следующий шаг, а не отказ.
             // Во время игры ухода кнопку убираем, а не гасим: погашенная ловила бы нажатия.
-            if (playing == null) {
+            if (sleep != null) {
+                SleepPanel(
+                    petName = state.petName,
+                    minutesLeft = ((sleep.endsAt - now + 59_999) / 60_000).toInt(),
+                    secondsLeft = ((sleep.endsAt - now + 999) / 1_000).toInt(),
+                    onWake = onWake,
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                )
+            } else if (playing == null) {
                 FinneyButton(
                     text = if (state.canClosePeriod) "Закончить период" else "Составить план",
                     onClick = if (state.canClosePeriod) ({ confirmClose = true }) else onOpenBudget,
@@ -535,10 +592,8 @@ private fun HomeContent(
         // ---------- Низ: комнаты ----------
         // Три кнопки из макета. Каждая переключает комнату, а кольцо вокруг
         // показывает потребность, которую в этой комнате закрывают, — так они
-        // нарисованы в ките («опускание/поднятие шкал потребностей»).
-        //
-        // У зала кольца нет: отдельной шкалы сна в домене не существует,
-        // а рисовать пустое кольцо ради симметрии — врать про данные.
+        // нарисованы в ките («опускание/поднятие шкал потребностей»). В зале
+        // закрывают сон.
         Row(
             modifier = Modifier.fillMaxWidth().graphicsLayer { alpha = hudAlpha },
             horizontalArrangement = Arrangement.SpaceEvenly,
@@ -546,8 +601,16 @@ private fun HomeContent(
             FinneyNeedButton(
                 icon = FinneyIcons.Lamp,
                 label = "Зал и сон",
-                // Как у кухни и ванной: первое нажатие — комната, второе — её панель.
-                onClick = { if (spot == RoomSpot.LIVING) wardrobeOpen = true else spot = RoomSpot.LIVING },
+                // Как у кухни и ванной: первое нажатие — комната, второе — уложить
+                // спать. Гардероб — в меню.
+                onClick = {
+                    when {
+                        sleeping -> onWake()
+                        spot == RoomSpot.LIVING -> onSleep()
+                        else -> spot = RoomSpot.LIVING
+                    }
+                },
+                value = energyNow,
                 selected = spot == RoomSpot.LIVING,
             )
             FinneyNeedButton(
@@ -744,6 +807,38 @@ private fun HomeContent(
                 )
             }
         }
+    }
+}
+
+
+/**
+ * Ночь: сколько ещё спать и «Разбудить». Стоит на месте кнопки периода —
+ * во сне это единственное, что можно сделать.
+ */
+@Composable
+private fun SleepPanel(
+    petName: String,
+    minutesLeft: Int,
+    secondsLeft: Int,
+    onWake: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(FinneyCream.copy(alpha = 0.9f))
+            .border(2.dp, FinneyInk, RoundedCornerShape(16.dp))
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            // Сокращения вместо слов: «минут/минуты/минуту» без склонений.
+            text = if (secondsLeft < 60) "$petName спит · ещё $secondsLeft с" else "$petName спит · ещё $minutesLeft мин",
+            style = MaterialTheme.typography.titleMedium,
+            color = FinneyInk,
+        )
+        FinneyButton(text = "Разбудить", onClick = onWake, fillWidth = false)
     }
 }
 
@@ -982,8 +1077,9 @@ private fun InfoChip(
  */
 private fun Emotion.toMood(): PetMood = when (this) {
     Emotion.HAPPY, Emotion.CALM -> PetMood.HAPPY
-    // Голод отдельного лица не имеет: голодный питомец выглядит грустным.
-    Emotion.HUNGRY, Emotion.SAD -> PetMood.SAD
+    // Голод и усталость отдельного лица не имеют: такой питомец выглядит грустным.
+    // Лицо сна — закрытые глаза — только для настоящего сна в капсуле.
+    Emotion.HUNGRY, Emotion.TIRED, Emotion.SAD -> PetMood.SAD
     Emotion.DIRTY -> PetMood.DIRTY
 }
 
@@ -996,7 +1092,7 @@ private fun HomeContentPreview() {
                 petName = "Финни",
                 appearance = PetAppearance(PetCharacter.PUSHISTIK, BodyColor.A, EyesVariant.ROUND),
                 isDemo = false,
-                stats = PetStats(30, 40, 50),
+                stats = PetStats(30, 40, 50, 20),
                 emotion = Emotion.CALM,
                 level = 1,
                 levelProgress = 0.4f,

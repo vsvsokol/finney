@@ -1,6 +1,7 @@
 package ru.finney.pet.data.db
 
 import androidx.room.Embedded
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -40,6 +41,11 @@ data class PetStateEntity(
     val satiety: Int,
     val hygiene: Int,
     val mood: Int,
+    /** Сон. Колонка добавлена в версии 5 базы, см. [FinneyDatabase.MIGRATION_4_5]. */
+    @ColumnInfo(defaultValue = FinneyDatabase.ENERGY_ON_MIGRATION)
+    val energy: Int,
+    /** Когда лёг спать, мс; null — не спит. Тоже с версии 5. */
+    val sleepingSince: Long? = null,
 )
 
 @Entity(

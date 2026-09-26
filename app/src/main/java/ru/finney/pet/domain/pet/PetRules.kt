@@ -6,7 +6,7 @@ import ru.finney.pet.domain.model.PetStats
 import ru.finney.pet.domain.model.ShopItem
 import ru.finney.pet.domain.model.StatEffect
 
-enum class Emotion { HUNGRY, DIRTY, SAD, HAPPY, CALM }
+enum class Emotion { HUNGRY, DIRTY, TIRED, SAD, HAPPY, CALM }
 
 /** Шкалы и эмоция питомца. docs/economy.md, раздел 5. */
 object PetRules {
@@ -17,29 +17,33 @@ object PetRules {
         satiety = clamp(stats.satiety - decay.satiety),
         hygiene = clamp(stats.hygiene - decay.hygiene),
         mood = clamp(stats.mood - decay.mood),
+        energy = clamp(stats.energy - decay.energy),
     )
 
     fun apply(stats: PetStats, effect: StatEffect): PetStats = PetStats(
         satiety = clamp(stats.satiety + effect.satiety),
         hygiene = clamp(stats.hygiene + effect.hygiene),
         mood = clamp(stats.mood + effect.mood),
+        energy = clamp(stats.energy + effect.energy),
     )
 
+    /** Потребности — сытость, чистота и сон. Настроение — не потребность, а «хочется». */
     fun needsCovered(stats: PetStats, rule: PetRule): Boolean =
-        stats.satiety >= rule.needsThreshold && stats.hygiene >= rule.needsThreshold
+        minOf(stats.satiety, stats.hygiene, stats.energy) >= rule.needsThreshold
 
     /** Проверка сверху вниз, первое совпадение. */
     fun emotion(stats: PetStats, rule: PetRule): Emotion = when {
         stats.satiety < rule.emotionLow -> Emotion.HUNGRY
         stats.hygiene < rule.emotionLow -> Emotion.DIRTY
+        stats.energy < rule.emotionLow -> Emotion.TIRED
         stats.mood < rule.emotionLow -> Emotion.SAD
-        minOf(stats.satiety, stats.hygiene, stats.mood) >= rule.emotionHappy -> Emotion.HAPPY
+        minOf(stats.satiety, stats.hygiene, stats.energy, stats.mood) >= rule.emotionHappy -> Emotion.HAPPY
         else -> Emotion.CALM
     }
 
     /**
      * Минимальная стоимость довести сытость и чистоту до [threshold] обязательными товарами.
-     * Подсказка на экране плана. Шкалы считаются независимо: товар, влияющий на обе,
+     * Подсказка на экране плана. Сон сюда не входит: он бесплатный. Шкалы считаются независимо: товар, влияющий на обе,
      * учитывается в каждой — для текущего магазина таких нет.
      * null — если в магазине нет товара, поднимающего нужную шкалу.
      */

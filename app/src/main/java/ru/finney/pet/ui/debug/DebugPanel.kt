@@ -60,6 +60,7 @@ fun DebugPanel(
             onSetStat = viewModel::setStat,
             onSkipPlan = viewModel::skipPlan,
             onClosePeriod = viewModel::closePeriod,
+            onFinishSleep = viewModel::finishSleep,
             onWipe = viewModel::wipeAll,
             onDismiss = onDismiss,
             modifier = modifier,
@@ -75,6 +76,7 @@ private fun DebugContent(
     onSkipPlan: () -> Unit,
     onClosePeriod: () -> Unit,
     onWipe: () -> Unit,
+    onFinishSleep: () -> Unit = {},
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -102,6 +104,7 @@ private fun DebugContent(
                     DebugStat.SATIETY -> state.stats.satiety
                     DebugStat.HYGIENE -> state.stats.hygiene
                     DebugStat.MOOD -> state.stats.mood
+                    DebugStat.ENERGY -> state.stats.energy
                 }
                 Line("${stat.label}: $value")
                 Buttons(
@@ -111,6 +114,8 @@ private fun DebugContent(
                     "100" to { onSetStat(stat, 100) },
                 )
             }
+
+            if (state.sleeping) Buttons("Досыпать сейчас" to onFinishSleep)
 
             Line("Период ${state.periodNumber}: ${state.phase.label}")
             Buttons(
@@ -170,7 +175,7 @@ private fun Context.relaunch() {
 private fun DebugContentPreview() {
     FinneyTheme {
         DebugContent(
-            state = DebugUiState(PetStats(30, 70, 50), balance = 40, periodNumber = 2, phase = PeriodPhase.ACTIVE),
+            state = DebugUiState(PetStats(30, 70, 50, 40), balance = 40, periodNumber = 2, phase = PeriodPhase.ACTIVE),
             onAddMoney = {}, onSetStat = { _, _ -> }, onSkipPlan = {}, onClosePeriod = {}, onWipe = {}, onDismiss = {},
         )
     }

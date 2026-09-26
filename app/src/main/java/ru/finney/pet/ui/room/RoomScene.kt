@@ -88,6 +88,12 @@ private val SkyColor = Color(0xFF261F46)
  * его ждать неинтересно.
  */
 private val UfoFirstPauseMs = 3_000L..8_000L
+
+/** Сколько закрывается и открывается дверь капсулы. */
+internal const val DOOR_MS = 600
+
+/** Сколько питомец идёт в капсулу и обратно. */
+internal const val WALK_MS = 900
 private val UfoPauseMs = 20_000L..45_000L
 
 /**
@@ -113,6 +119,10 @@ private val UfoPauseMs = 20_000L..45_000L
  * и у каждого своя тень.
  *
  * @param lampOn горит ли торшер. Выключателя пока нет, и торшер горит всегда.
+ * @param capsule стоит ли в зале капсула для сна. Мини-играм комната нужна
+ *   фоном, и капсула во весь экран там только мешает.
+ * @param asleep питомец спит: уходит в капсулу, торшер гаснет, дверь закрывается.
+ *   Проснулся — всё в обратном порядке.
  * @param pet встаёт туда, где ему положено быть в текущей комнате.
  * @param onTapItem нажатие по самому предмету: тому же, что делает нижняя кнопка.
  */
@@ -121,11 +131,27 @@ fun RoomScene(
     spot: RoomSpot,
     modifier: Modifier = Modifier,
     lampOn: Boolean = true,
+    capsule: Boolean = true,
+    asleep: Boolean = false,
     onTapItem: (() -> Unit)? = null,
     pet: @Composable BoxScope.() -> Unit = {},
 ) {
     val ufo = remember { UfoState() }
-    val lighting = rememberRoomLighting(lampOn, ufo::light)
+    val lighting = rememberRoomLighting(lampOn && !asleep, ufo::light)
+
+    // Отход ко сну: питомец идёт в капсулу (walk 0 → 1), потом закрывается дверь.
+    // Живёт на всю сцену, а не на зал: переход между комнатами его не сбрасывает.
+    val walk = remember { Animatable(if (asleep) 1f else 0f) }
+    val door = remember { Animatable(if (asleep) 1f else 0f) }
+    LaunchedEffect(asleep) {
+        if (asleep) {
+            walk.animateTo(1f, tween(WALK_MS, easing = FastOutSlowInEasing))
+            door.animateTo(1f, tween(DOOR_MS, easing = FastOutSlowInEasing))
+        } else {
+            door.animateTo(0f, tween(DOOR_MS, easing = FastOutSlowInEasing))
+            walk.animateTo(0f, tween(WALK_MS, easing = FastOutSlowInEasing))
+        }
+    }
 
     BoxWithConstraints(modifier = modifier.clipToBounds().background(FinneyCream)) {
         // Масштаб «накрыть экран»: холст не меньше экрана ни по одной стороне.
@@ -182,7 +208,20 @@ fun RoomScene(
                         // Тень у питомца только в зале: за столом и в ванне она
                         // упала бы на мебель, а мебель пола не знает.
                         when (current) {
-                            RoomSpot.LIVING -> Pet(ground, canvasW, canvasH, lighting, PetFooting, visibility, pet)
+                            RoomSpot.LIVING -> if (capsule) {
+                                // Капсула в углу, питомец перед ней. Засыпая, он уходит
+                                // в капсулу и становится меньше — она дальше от зрителя.
+                                // Дверь закрывается перед ним, стекло у неё полупрозрачное,
+                                // и спящего видно. Тень на полу — только пока он стоит на месте.
+                                LitLayer(Room.Capsule, canvasW, canvasH, lighting, Solids.Capsule, visibility)
+                                TapZone(Room.Capsule.rect, canvasW, canvasH, "Уложить спать", onTapItem)
+                                val t = walk.value
+                                val footing = if (t == 0f) PetFooting else null
+                                Pet(ground.lerp(Room.PetInCapsule, t), canvasW, canvasH, lighting, footing, visibility, pet)
+                                CapsuleDoor(canvasW, canvasH, lighting, shut = { door.value })
+                            } else {
+                                Pet(ground, canvasW, canvasH, lighting, PetFooting, visibility, pet)
+                            }
 
                             // Питомец рисуется раньше стола: столешница перекрывает
                             // ему низ, и получается, что он сидит за столом, а не на нём.
@@ -504,6 +543,37 @@ private fun Foam(layer: RoomLayer, canvasW: Dp, canvasH: Dp, lighting: RoomLight
                     // Пена растёт от низа: верх её края должен гулять, а посадка в ванну — нет.
                     transformOrigin = TransformOrigin(0.5f, 1f)
                 },
+        )
+    }
+}
+
+/**
+ * Дверь капсулы. Закрывается, пока питомец спит: выезжает сверху, как
+ * шторка, и проявляется. Своей тени у двери нет — её тень уже в капсуле.
+ *
+ * @param shut насколько закрыта, 0..1. Лямбдой: читается на отрисовке.
+ */
+@Composable
+private fun CapsuleDoor(canvasW: Dp, canvasH: Dp, lighting: RoomLighting, shut: () -> Float) {
+    if (shut() == 0f) return
+    val rect = Room.CapsuleDoor.rect
+    LitBody(
+        lighting = lighting,
+        place = rect,
+        footing = null,
+        modifier = Modifier
+            .offset(canvasW * rect.left, canvasH * rect.top)
+            .requiredSize(canvasW * rect.width, canvasH * rect.height)
+            .graphicsLayer {
+                alpha = shut()
+                translationY = -(1f - shut()) * size.height * 0.25f
+            },
+    ) {
+        Image(
+            painter = painterResource(Room.CapsuleDoor.image),
+            contentDescription = null,
+            contentScale = ContentScale.FillBounds,
+            modifier = Modifier.fillMaxSize(),
         )
     }
 }

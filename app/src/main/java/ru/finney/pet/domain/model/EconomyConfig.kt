@@ -43,4 +43,8 @@ data class PetRule(
     val needsThreshold: Int,
     val emotionLow: Int,
     val emotionHappy: Int,
+    /** Полный сон, минуты. */
+    val sleepMinutes: Int,
+    /** Полный сон в демо-режиме, секунды. */
+    val demoSleepSeconds: Int,
 )

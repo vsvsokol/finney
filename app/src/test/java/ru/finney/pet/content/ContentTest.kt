@@ -74,14 +74,24 @@ class ContentTest {
         val threshold = economy.pet.needsThreshold
         for (stage in 1..economy.stageStartLevels.size) {
             val income = economy.income(stage)
-            val fromZero = PetRules.needsCost(PetStats(0, 0, 0), content.shop, threshold)!!
+            val fromZero = PetRules.needsCost(PetStats(0, 0, 0, 0), content.shop, threshold)!!
             val afterDecay = PetRules.needsCost(
-                PetRules.decay(PetStats(threshold, threshold, threshold), economy.decay(stage)),
+                PetRules.decay(PetStats(threshold, threshold, threshold, threshold), economy.decay(stage)),
                 content.shop,
                 threshold,
             )!!
             assertTrue("стадия $stage: нужное из 0/0 = $fromZero > дохода $income", fromZero <= income)
             assertTrue("стадия $stage: свободно ${income - afterDecay} < 20", income - afterDecay >= 20)
+        }
+    }
+
+    /** Сон бесплатный, поэтому держится только на спаде: выспавшийся к концу периода снова хочет спать. */
+    @Test
+    fun `сон нужен каждый период на каждой стадии`() {
+        val pet = content.economy.pet
+        for (stage in 1..content.economy.stageStartLevels.size) {
+            val left = PetRules.STAT_MAX - content.economy.decay(stage).energy
+            assertTrue("стадия $stage: после сна за период остаётся $left ≥ порога", left < pet.needsThreshold)
         }
     }
 

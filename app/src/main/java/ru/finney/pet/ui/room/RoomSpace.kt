@@ -98,7 +98,7 @@ internal sealed interface Caster {
 internal class Solid(val parts: List<List<Point3>>)
 
 /**
- * Модели мебели. Числа сняты по экспортам `dinner_table.PNG` и `bath.PNG`
+ * Модели мебели. Числа сняты по экспортам `dinner_table.PNG`, `bath.PNG` и `sleep_capsule.PNG`
  * (холст 1440×2400) по сетке с шагом 50 px.
  */
 internal object Solids {
@@ -172,6 +172,35 @@ internal object Solids {
             }
 
         Solid(listOf(ring(rimLength, rimDepth, rim) + ring(bottomLength, bottomDepth, bottom)))
+    }
+
+    /**
+     * Капсула для сна: цилиндр от основания до крышки.
+     *
+     * Строится по месту капсулы в углу ([Room.Capsule]), а не по экспорту: там
+     * она стояла на весь зал. В экспорте основание шириной во всю капсулу,
+     * крышка — 720 из 1006 px, середина — на 707 из 1440 (почти посередине).
+     * Глубина, как у ванны, — половина ширины.
+     */
+    val Capsule: Solid = run {
+        val rect = Room.Capsule.rect
+        val feet = rect.bottom
+        val k = RoomSpace.scaleAt(feet)
+        val front = 1f / k
+        val top = (feet - rect.top) / k
+
+        val centreX = ((rect.left + rect.right) / 2f - Room.ROOM_AXIS_X) * Room.CANVAS_RATIO / k
+        val baseRadius = rect.width / 2f * Room.CANVAS_RATIO / k
+        val topRadius = baseRadius * 720f / 1006f
+        val depth = baseRadius / (1.5f * Room.CANVAS_RATIO) / 2f
+
+        fun ring(radius: Float, height: Float): List<Point3> =
+            (0 until 16).map { i ->
+                val a = 2f * PI.toFloat() * i / 16
+                Point3(centreX + radius * cos(a), height, front + depth + depth * radius / baseRadius * sin(a))
+            }
+
+        Solid(listOf(ring(baseRadius, 0f) + ring(topRadius, top)))
     }
 }
 

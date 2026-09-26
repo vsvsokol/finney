@@ -17,6 +17,14 @@ data class RelRect(val left: Float, val top: Float, val right: Float, val bottom
     val height: Float get() = bottom - top
 
     fun shiftedX(dx: Float) = RelRect(left + dx, top, right + dx, bottom)
+
+    /** Промежуточный прямоугольник: [t] = 0 — этот, 1 — [to]. */
+    fun lerp(to: RelRect, t: Float) = RelRect(
+        left + (to.left - left) * t,
+        top + (to.top - top) * t,
+        right + (to.right - right) * t,
+        bottom + (to.bottom - bottom) * t,
+    )
 }
 
 /** Слой комнаты: картинка и место, где она лежит на холсте. */
@@ -35,7 +43,7 @@ data class RoomLayer(@DrawableRes val image: Int, val rect: RelRect) {
  * и не собирался.
  */
 enum class RoomSpot {
-    /** Пустая комната: питомец на полу. Сюда же встанет сон, когда появится свет. */
+    /** Зал с капсулой: здесь спят. */
     LIVING,
 
     /** Стол: здесь кормят. */
@@ -117,13 +125,67 @@ object Room {
     /**
      * Сторона квадрата питомца — доля ширины холста.
      *
-     * Одна на все комнаты: персонаж не может менять рост, переходя из зала
+     * Одна на кухню и ванную: персонаж не может менять рост, переходя из кухни
      * в ванну. Размер взят от ванны — самого крупного предмета: чаша занимает
      * 0.71 ширины, силуэт питомца — 0.93 своего квадрата, то есть при 0.65
      * он заполняет чашу почти целиком и в комнате читается как главный герой,
      * а не как предмет обстановки.
      */
     const val PET_SIZE = 0.65f
+
+    /**
+     * Питомец в зале. Меньше, чем на кухне и в ванной: в зале рядом с ним
+     * капсула, а от ширины холста на телефоне видно только 0.75 — при 0.65
+     * питомец закрыл бы её целиком.
+     */
+    private const val LIVING_PET_SIZE = 0.50f
+
+    // ---------- Капсула для сна ----------
+    //
+    // Дизайнер нарисовал капсулу на весь зал, а стоять ей в углу: правый угол
+    // под окном, левый — под шкаф. Поэтому слои капсулы и двери уменьшены
+    // в CAPSULE_SCALE раз вокруг правого нижнего угла и переставлены так, что
+    // этот угол — в (CAPSULE_RIGHT, CAPSULE_BOTTOM). Числа экспорта ниже — как
+    // их печатает pack_room.py.
+
+    /** Во сколько раз капсула меньше, чем в экспорте. */
+    const val CAPSULE_SCALE = 0.80f
+
+    /** Правый край капсулы: на узких телефонах видно до 0.81 холста. */
+    private const val CAPSULE_RIGHT = 0.80f
+
+    /**
+     * Низ капсулы: основание на полу за питомцем (его ступни — 0.70), крышка
+     * (0.227) — под плашками копилки и задания, они кончаются около 0.19.
+     */
+    private const val CAPSULE_BOTTOM = 0.66f
+
+    /** Капсула в экспорте дизайнера. */
+    private val CapsuleExport = RelRect(0.1417f, 0.2525f, 0.8403f, 0.7933f)
+
+    private fun capsuleX(x: Float) = CAPSULE_RIGHT - (CapsuleExport.right - x) * CAPSULE_SCALE
+    private fun capsuleY(y: Float) = CAPSULE_BOTTOM - (CapsuleExport.bottom - y) * CAPSULE_SCALE
+
+    /** Где на холсте оказывается прямоугольник экспорта капсулы после переноса в угол. */
+    private fun inCapsuleCorner(r: RelRect) = RelRect(capsuleX(r.left), capsuleY(r.top), capsuleX(r.right), capsuleY(r.bottom))
+
+    // Объявлены после CapsuleExport: поля object инициализируются по порядку.
+    val Capsule = RoomLayer(R.drawable.room_capsule, inCapsuleCorner(CapsuleExport))
+    val CapsuleDoor = RoomLayer(R.drawable.room_capsule_door, inCapsuleCorner(RelRect(0.2389f, 0.3267f, 0.7410f, 0.7067f)))
+
+    /**
+     * Спящий питомец в капсуле. Стекло внутри рамы — от 352 до 1060 px экспорта,
+     * 0.49 его ширины, дно стекла — 1676 px: сюда встают ступни. Самый широкий
+     * силуэт (Рогатик, 0.99 квадрата) при 0.50 ширины экспорта ровно ложится в стекло.
+     */
+    val PetInCapsule: RelRect = run {
+        val size = 0.50f * CAPSULE_SCALE
+        val centre = capsuleX(0.4903f)
+        val top = capsuleY(0.6983f) - 0.87f * size * CANVAS_RATIO
+        RelRect(centre - size / 2f, top, centre + size / 2f, top + size * CANVAS_RATIO)
+    }
+
+    private fun petSize(spot: RoomSpot): Float = if (spot == RoomSpot.LIVING) LIVING_PET_SIZE else PET_SIZE
 
     /**
      * Верх квадрата питомца в каждой комнате — доля высоты холста.
@@ -134,10 +196,9 @@ object Room {
      * квадрата, макушка — на 0.12, отсюда и отсчёт.
      */
     private fun petTop(spot: RoomSpot): Float = when (spot) {
-        // По центру экрана по вертикали (0.5), а не свободного места между
-        // интерфейсом сверху и кнопками снизу — от него силуэт съезжал к низу
-        // и читался как стоящий у нижнего края.
-        RoomSpot.LIVING -> 0.305f
+        // Ступни (0.87 квадрата) на полу перед капсулой: 0.70 ближе к зрителю,
+        // чем её основание (0.66), — питомец стоит перед ней, а не в ней.
+        RoomSpot.LIVING -> 0.70f - 0.87f * LIVING_PET_SIZE * CANVAS_RATIO
 
         // Стол непрозрачен ниже своей кромки 0.5975 — за ней прячется нижняя
         // треть питомца, и получается, что он сидит за столом. Выше зала
@@ -153,7 +214,7 @@ object Room {
      * Середина питомца по горизонтали — доля ширины холста.
      *
      * Питомец стоит как можно ближе к одному месту во всех комнатах, чтобы
-     * при переключении не скакал по экрану. В зале — на оси комнаты, а стол
+     * при переключении не скакал по экрану. В зале — слева от капсулы, а стол
      * и ванна стоят левее, и там он встаёт настолько близко к оси, насколько
      * позволяют их правые края: самый широкий силуэт (Рогатик, до 0.99
      * квадрата) не должен вылезать за край стола (0.7757) и за борт ванны
@@ -161,7 +222,8 @@ object Room {
      * уже выходит за борт. В ванне к этому добавляется её сдвиг [BATH_SHIFT].
      */
     private fun petCentre(spot: RoomSpot): Float = when (spot) {
-        RoomSpot.LIVING -> ROOM_AXIS_X
+        // Левее середины экрана: справа капсула, и питомец её почти не заслоняет.
+        RoomSpot.LIVING -> 0.34f
         RoomSpot.KITCHEN -> 0.453f
         RoomSpot.BATH -> 0.453f + BATH_SHIFT
     }
@@ -175,13 +237,14 @@ object Room {
     fun petGround(spot: RoomSpot): RelRect {
         val centre = petCentre(spot)
         val top = petTop(spot)
+        val size = petSize(spot)
         return RelRect(
-            left = centre - PET_SIZE / 2f,
+            left = centre - size / 2f,
             top = top,
-            right = centre + PET_SIZE / 2f,
+            right = centre + size / 2f,
             // Квадрат по ширине: в долях высоты его сторона меньше во столько же
             // раз, во сколько холст выше своей ширины.
-            bottom = top + PET_SIZE * CANVAS_RATIO,
+            bottom = top + size * CANVAS_RATIO,
         )
     }
 

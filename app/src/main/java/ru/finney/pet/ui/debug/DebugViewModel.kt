@@ -29,12 +29,15 @@ data class DebugUiState(
     val balance: Int,
     val periodNumber: Int,
     val phase: PeriodPhase,
+    /** Питомец спит — можно досыпать сразу, не ждать час. */
+    val sleeping: Boolean = false,
 )
 
 enum class DebugStat(val label: String) {
     SATIETY("Сытость"),
     HYGIENE("Чистота"),
     MOOD("Настроение"),
+    ENERGY("Сон"),
 }
 
 sealed interface DebugEvent {
@@ -64,7 +67,7 @@ class DebugViewModel(private val session: Session) : ViewModel() {
         .filterNotNull()
         .map { saved ->
             val state = saved.state
-            DebugUiState(state.pet, state.balance, state.currentPeriod.number, state.currentPeriod.phase)
+            DebugUiState(state.pet, state.balance, state.currentPeriod.number, state.currentPeriod.phase, state.sleepingSince != null)
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
@@ -94,9 +97,16 @@ class DebugViewModel(private val session: Session) : ViewModel() {
                 DebugStat.SATIETY -> state.pet.copy(satiety = v)
                 DebugStat.HYGIENE -> state.pet.copy(hygiene = v)
                 DebugStat.MOOD -> state.pet.copy(mood = v)
+                DebugStat.ENERGY -> state.pet.copy(energy = v)
             },
         )
     }
+
+    /**
+     * Досыпать сразу: питомец будто лёг давным-давно. Хранилище разбудит его
+     * перед следующей командой, главный экран — сразу, со «Выспался!».
+     */
+    fun finishSleep() = patch { state -> if (state.sleepingSince == null) state else state.copy(sleepingSince = 0L) }
 
     /** Пустой план — чтобы сразу можно было покупать, не заходя в экран плана. */
     fun skipPlan() = command { confirmPlan(it, needs = 0, wants = 0, savings = 0) }

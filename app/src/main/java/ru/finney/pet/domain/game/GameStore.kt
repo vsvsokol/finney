@@ -58,8 +58,14 @@ class GameStore(
      * `store.execute(id) { buy(it, "food_apple") }`
      */
     suspend fun execute(profileId: Long, command: Game.(GameState) -> GameResult): GameResult = mutex.withLock {
-        val result = game.command(loadState(profileId))
-        if (result is GameResult.Ok) storage.save(profileId, result.state)
+        val stored = stored(profileId)
+        val loaded = game.settleSleep(stored)
+        val result = game.command(loaded)
+        when {
+            result is GameResult.Ok -> storage.save(profileId, result.state)
+            // Отказ, но питомец за это время проснулся сам — это надо запомнить.
+            loaded != stored -> storage.save(profileId, loaded)
+        }
         result
     }
 
@@ -84,6 +90,9 @@ class GameStore(
     /** Удаление всех локальных данных из раздела взрослого (ТЗ п. 3.5). */
     suspend fun deleteAll() = mutex.withLock { storage.deleteAll() }
 
-    private suspend fun loadState(profileId: Long): GameState =
+    /** Сон по времени: если срок вышел, команда видит уже проснувшегося питомца. */
+    private suspend fun loadState(profileId: Long): GameState = game.settleSleep(stored(profileId))
+
+    private suspend fun stored(profileId: Long): GameState =
         checkNotNull(storage.load(profileId)) { "Профиль $profileId не найден" }.state
 }

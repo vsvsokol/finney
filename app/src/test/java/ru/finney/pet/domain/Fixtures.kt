@@ -37,11 +37,13 @@ object Fixtures {
         maxLevel = 9,
         stageStartLevels = listOf(1, 4, 7),
         pet = PetRule(
-            start = PetStats(70, 70, 70),
-            decayByStage = listOf(StatEffect(40, 30, 20), StatEffect(50, 35, 25), StatEffect(60, 40, 30)),
+            start = PetStats(70, 70, 70, energy = 90),
+            decayByStage = listOf(StatEffect(40, 30, 20, 60), StatEffect(50, 35, 25, 65), StatEffect(60, 40, 30, 70)),
             needsThreshold = 50,
             emotionLow = 30,
             emotionHappy = 60,
+            sleepMinutes = 60,
+            demoSleepSeconds = 10,
         ),
     )
 
@@ -109,6 +111,7 @@ fun Game.coverNeeds(start: GameState): GameState {
     val threshold = Fixtures.economy.pet.needsThreshold
     while (s.pet.satiety < threshold) s = buy(s, if (threshold - s.pet.satiety <= 20) "apple" else "bowl").state()
     while (s.pet.hygiene < threshold) s = buy(s, if (threshold - s.pet.hygiene <= 35) "soap" else "towel").state()
+    if (s.pet.energy < threshold) s = sleepFully(s)
     return s
 }
 
@@ -127,3 +130,9 @@ fun Game.playPerfectPeriod(start: GameState): GameState {
 }
 
 private fun content(id: String) = Fixtures.content.task(id)!!
+
+/** Уложить и дать выспаться целиком: время засыпания сдвинуто на полный сон назад. */
+fun Game.sleepFully(start: GameState): GameState {
+    val asleep = sleep(start).state()
+    return wake(asleep.copy(sleepingSince = asleep.sleepingSince!! - sleepMillis(asleep))).state()
+}

@@ -164,9 +164,9 @@ private fun MoneyPill(amount: Int) {
 @Composable
 private fun BackdropLayer(backdrop: Backdrop) {
     when (backdrop) {
-        Backdrop.ROOM -> RoomScene(spot = RoomSpot.LIVING, modifier = Modifier.fillMaxSize())
+        Backdrop.ROOM -> RoomScene(spot = RoomSpot.LIVING, capsule = false, modifier = Modifier.fillMaxSize())
         Backdrop.ROOM_RAIN -> Box(Modifier.fillMaxSize()) {
-            RoomScene(spot = RoomSpot.LIVING, modifier = Modifier.fillMaxSize())
+            RoomScene(spot = RoomSpot.LIVING, capsule = false, modifier = Modifier.fillMaxSize())
             Rain()
         }
         // Пол — под нижней полкой: полки прижаты к тележке, и стеллаж стоит на полу.
