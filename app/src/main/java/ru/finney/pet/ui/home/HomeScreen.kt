@@ -4,6 +4,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import android.content.pm.ApplicationInfo
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.offset
@@ -11,11 +15,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.material3.Surface
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.foundation.layout.Arrangement
@@ -32,14 +36,12 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import ru.finney.pet.ui.theme.FinneyCream
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -62,13 +64,11 @@ import ru.finney.pet.domain.game.Rejection
 import kotlinx.coroutines.delay
 import ru.finney.pet.domain.model.TaskDefinition
 import ru.finney.pet.ui.components.Coin
-import ru.finney.pet.ui.components.buttonFill
 import ru.finney.pet.ui.components.FinneyButton
 import ru.finney.pet.ui.components.FinneyIcon
 import ru.finney.pet.ui.components.FinneyIconButton
 import ru.finney.pet.ui.components.FinneyIcons
 import ru.finney.pet.ui.components.LevelBadge
-import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.components.FinneyNeedButton
 import ru.finney.pet.ui.components.FinneyPanel
 import ru.finney.pet.ui.components.HappinessBar
@@ -779,44 +779,62 @@ private fun HomeMenuItem(text: String, onClick: () -> Unit) {
  * тогда, когда собирается что-то купить, и отдельный кружок «Магазин» внизу
  * после этого лишний. Сумма берётся из состояния и на экране не пересчитывается.
  *
- * Форма — «стадион» с обводкой и нижней полосой, как у остальных кнопок кита,
- * но по содержимому: внутри сумма и монета, а не надпись.
+ * Сама кнопка — монета-финка, круглая и того же размера, что «бургер» справа:
+ * верхний ряд читается как три круга вокруг уровня. Сумма — плашкой в правом
+ * нижнем углу монеты, как счётчик на значке: бежевая подложка, синяя обводка
+ * и синий текст, как у плашек копилки и задания.
  */
 @Composable
 private fun MoneyButton(balance: Int, onClick: () -> Unit) {
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
-    val shape = RoundedCornerShape(percent = 50)
+    val scale by animateFloatAsState(if (pressed) 0.92f else 1f, label = "coinPress")
 
-    Surface(
-        onClick = onClick,
+    // Один контейнер размером с монету: плашка привязана к его правому нижнему
+    // углу и выходит за край смещением, поэтому ряд не раздвигается от длины суммы.
+    Box(
         modifier = Modifier
-            .defaultMinSize(minWidth = 112.dp, minHeight = 56.dp)
-            .clearAndSetSemantics { contentDescription = "$balance финок, открыть магазин" },
-        shape = shape,
-        color = Color.Transparent,
-        interactionSource = interactionSource,
+            .size(MoneyCoinSize)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clearAndSetSemantics {
+                contentDescription = "$balance финок, открыть магазин"
+                role = Role.Button
+            },
     ) {
         Box(
             modifier = Modifier
-                .clip(shape)
-                .buttonFill(pressed, round = false, glare = false)
-                .padding(horizontal = 14.dp, vertical = 8.dp),
-            contentAlignment = Alignment.Center,
+                .matchParentSize()
+                .clip(CircleShape)
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = onClick,
+                ),
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                OutlinedText(
-                    balance.toString(),
-                    style = MaterialTheme.typography.titleLarge,
-                )
-                Coin(size = 26.dp)
-            }
+            Coin(size = MoneyCoinSize)
         }
+        Text(
+            text = balance.toString(),
+            style = MaterialTheme.typography.titleMedium,
+            color = FinneyInk,
+            maxLines = 1,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .offset(x = 14.dp, y = 8.dp)
+                .clip(RoundedCornerShape(percent = 50))
+                .background(FinneySand)
+                .border(StrokeThin, FinneyInk, RoundedCornerShape(percent = 50))
+                .clickable(onClick = onClick)
+                .padding(horizontal = 7.dp),
+        )
     }
 }
+
+/** Монета того же размера, что «бургер» и подсказка справа. */
+private val MoneyCoinSize = 56.dp
 
 /**
  * Плашка-кнопка с фактом: копилка, активное задание.
