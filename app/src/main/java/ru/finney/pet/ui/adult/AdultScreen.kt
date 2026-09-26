@@ -146,7 +146,7 @@ private fun AdultContent(
         FinneyPanel(title = "Бонус") {
             Body(
                 "Можно поощрить ребёнка игровыми монетками, например за помощь дома. " +
-                    "В этом периоде осталось ${state.bonusLeft}.",
+                    "На этом уровне (игровом периоде) осталось ${state.bonusLeft}.",
             )
             FinneyButton(
                 text = "Добавить ${state.bonusStep}",

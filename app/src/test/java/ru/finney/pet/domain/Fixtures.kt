@@ -33,9 +33,9 @@ object Fixtures {
         parentBonus = ParentBonusRule(step = 5, maxPerPeriod = 20),
         planTolerance = 5,
         points = PointsRule(needsCovered = 2, planMatched = 2, savingsAdded = 2, taskSuccess = 1, taskSuccessMaxPerPeriod = 2),
-        pointsPerLevel = 5,
+        conditionsToPass = 2,
         maxLevel = 9,
-        stageStartLevels = listOf(1, 4, 7),
+        stageStartLevels = listOf(1, 3, 5),
         pet = PetRule(
             start = PetStats(70, 70, 70, energy = 90),
             decayByStage = listOf(StatEffect(40, 30, 20, 60), StatEffect(50, 35, 25, 65), StatEffect(60, 40, 30, 70)),
@@ -130,6 +130,9 @@ fun Game.playPerfectPeriod(start: GameState): GameState {
 }
 
 private fun content(id: String) = Fixtures.content.task(id)!!
+
+/** Новая игра с подтверждённым пустым планом: мини-игры — только после плана. */
+fun Game.newPlannedGame(isDemo: Boolean = false): GameState = confirmPlan(newGame(isDemo), 0, 0, 0).state()
 
 /** Уложить и дать выспаться целиком: время засыпания сдвинуто на полный сон назад. */
 fun Game.sleepFully(start: GameState): GameState {

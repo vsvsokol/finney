@@ -47,6 +47,7 @@ fun TaskTheme.label(): String = when (this) {
 fun TaskScreen(
     taskId: String,
     onBack: () -> Unit,
+    onOpenBudget: () -> Unit = {},
     viewModel: TaskViewModel = viewModel(key = taskId, factory = TaskViewModel.factory(taskId)),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -66,7 +67,7 @@ fun TaskScreen(
             LocalPlayerAccessory provides s.worn,
         ) {
             when (s.phase) {
-            TaskPhase.INTRO -> TaskIntro(s, onStart = viewModel::start, onBack = onBack)
+            TaskPhase.INTRO -> TaskIntro(s, onStart = viewModel::start, onBack = onBack, onOpenBudget = onOpenBudget)
             // Крестик и системное «назад» посреди игры закрывают её: до итога ничего не засчитано.
             TaskPhase.PLAY -> key(s.attempt) {
                 TaskGame(
@@ -87,13 +88,21 @@ fun TaskScreen(
 
 /** Вступление в той же сцене, что игра: питомец рассказывает, что делать. */
 @Composable
-private fun TaskIntro(state: TaskUiState.Ready, onStart: () -> Unit, onBack: () -> Unit) {
+private fun TaskIntro(state: TaskUiState.Ready, onStart: () -> Unit, onBack: () -> Unit, onOpenBudget: () -> Unit) {
     GameScene(backdrop = backdropFor(state.task), onClose = onBack, money = state.balance) {
         // Питомец стоит внизу, на полу сцены, а «Играть» прижата к краю —
         // раньше всё собиралось наверху, и под кнопкой оставалось полэкрана пустоты.
         SceneBody(
             horizontalAlignment = Alignment.CenterHorizontally,
-            bottom = { if (state.available) FinneyButton(text = "Играть", onClick = onStart) },
+            // Без плана — не «Играть», а путь к плану: уровень начинается с него,
+            // и игры не превращаются в перебор ради монет.
+            bottom = {
+                when {
+                    !state.available -> Unit
+                    state.needsPlan -> FinneyButton(text = "Составить план", onClick = onOpenBudget)
+                    else -> FinneyButton(text = "Играть", onClick = onStart)
+                }
+            },
         ) {
             OutlinedText(state.task.title, style = MaterialTheme.typography.headlineLarge, textAlign = TextAlign.Center)
             ScenePanel(title = "Что делать", modifier = Modifier.fillMaxWidth()) {
@@ -110,13 +119,22 @@ private fun TaskIntro(state: TaskUiState.Ready, onStart: () -> Unit, onBack: () 
                 },
                 petSize = 160.dp,
             )
+            if (state.available && state.needsPlan) {
+                ScenePanel(title = null, modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        "Сначала составь план уровня — потом играть.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = FinneyInk,
+                    )
+                }
+            }
             if (!state.available) {
                 ScenePanel(title = null, modifier = Modifier.fillMaxWidth()) {
                     Text(
                         if (state.lockedUntilLevel != null) {
-                            "Эта игра откроется на уровне ${state.lockedUntilLevel}. Уровень растёт за план, копилку и задания."
+                            "Эта игра откроется на уровне ${state.lockedUntilLevel}. Проходи уровни: план, забота о питомце, копилка."
                         } else {
-                            "Эта игра откроется в следующих периодах."
+                            "Эта игра откроется на следующих уровнях."
                         },
                         style = MaterialTheme.typography.bodyLarge,
                         color = FinneyInk,

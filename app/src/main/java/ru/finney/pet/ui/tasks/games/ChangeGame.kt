@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -48,6 +47,7 @@ import ru.finney.pet.domain.model.PetCharacter
 import ru.finney.pet.domain.tasks.TaskEngines
 import ru.finney.pet.domain.tasks.TaskInput
 import ru.finney.pet.ui.components.FinneyButton
+import ru.finney.pet.ui.components.fadingScroll
 import ru.finney.pet.ui.theme.FinneyCream
 import ru.finney.pet.ui.theme.FinneyGreen
 import ru.finney.pet.ui.theme.FinneyInk
@@ -130,7 +130,7 @@ internal fun ChangeGame(task: ChangeTask, character: PetCharacter, onClose: () -
                 // у нижнего края. Раньше поднос рос с каждой монетой и сталкивал ящик
                 // вниз — следующее нажатие попадало мимо монеты.
                 Column(
-                    Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(top = 30.dp, bottom = 10.dp),
+                    Modifier.weight(1f).fadingScroll(rememberScrollState()).padding(top = 30.dp, bottom = 10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Text("Раунд ${round + 1} из ${task.rounds.size}", style = MaterialTheme.typography.labelLarge, color = FinneyInk)

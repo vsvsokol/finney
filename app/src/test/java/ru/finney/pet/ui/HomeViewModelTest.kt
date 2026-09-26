@@ -30,16 +30,19 @@ class HomeViewModelTest : ViewModelTest() {
         assertEquals(50, state.balance)
         assertEquals(PeriodPhase.PLANNING, state.phase)
         assertFalse(state.canClosePeriod)
-        assertEquals("t1", state.nextTask?.id)
+        assertFalse(state.check.planConfirmed)
+        val games = state.gamesLeft
 
-        session.submitTask("t1", Fixtures.success)
         session.execute { confirmPlan(it, needs = 0, wants = 0, savings = 0) }
+        session.submitTask("t1", Fixtures.success)
         settle()
 
         state = viewModel.uiState.value as HomeUiState.Ready
         assertEquals(65, state.balance)
-        assertEquals("t2", state.nextTask?.id)
+        assertEquals(games - 1, state.gamesLeft)
         assertTrue(state.canClosePeriod)
+        assertTrue(state.check.planConfirmed)
+        assertTrue("пустой план выполнен", state.check.planMatched)
     }
 
     @Test

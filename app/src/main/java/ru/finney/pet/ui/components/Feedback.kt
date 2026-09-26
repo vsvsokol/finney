@@ -38,19 +38,19 @@ data class RejectionMessage(val problem: String, val next: String)
 fun rejectionMessage(rejection: Rejection): RejectionMessage = when (rejection) {
     is Rejection.InsufficientFunds -> RejectionMessage(
         "Не хватает ${rejection.shortage} финок.",
-        "Сыграй в мини-игру или подожди новый период.",
+        "Сыграй в мини-игру или заверши уровень — придут новые деньги.",
     )
     is Rejection.InsufficientSavings -> RejectionMessage(
         "В копилке пока только ${rejection.saved}.",
         "Сними меньше.",
     )
     Rejection.PlanNotConfirmed -> RejectionMessage(
-        "План периода ещё не готов.",
+        "План уровня ещё не готов.",
         "Сначала составь план.",
     )
     Rejection.PlanAlreadyConfirmed -> RejectionMessage(
-        "План этого периода уже подтверждён.",
-        "Новый план — в следующем периоде.",
+        "План этого уровня уже подтверждён.",
+        "Новый план — на следующем уровне.",
     )
     is Rejection.PlanExceedsBudget -> RejectionMessage(
         "В плане ${rejection.planned}, а есть только ${rejection.budget}.",
@@ -73,7 +73,7 @@ fun rejectionMessage(rejection: Rejection): RejectionMessage = when (rejection) 
         "Выбери что-нибудь другое.",
     )
     Rejection.Asleep -> RejectionMessage(
-        "Финни спит.",
+        "Питомец спит.",
         "Подожди или разбуди его.",
     )
     Rejection.NotSleepy -> RejectionMessage(
@@ -85,8 +85,8 @@ fun rejectionMessage(rejection: Rejection): RejectionMessage = when (rejection) 
         "Её можно купить в магазине.",
     )
     is Rejection.BonusLimitExceeded -> RejectionMessage(
-        "В этом периоде можно добавить ещё ${rejection.left}.",
-        "Остальное — в следующем периоде.",
+        "На этом уровне можно добавить ещё ${rejection.left}.",
+        "Остальное — на следующем уровне.",
     )
     is Rejection.BonusNotOnStep -> RejectionMessage(
         "Бонус добавляется по ${rejection.step}.",

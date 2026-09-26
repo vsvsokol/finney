@@ -190,7 +190,7 @@ private fun CareRow(option: CareOption, onPick: () -> Unit) {
 
         if (notEnough) {
             Text(
-                text = "Не хватает ${preview.shortage}. Выполни задание или закрой период",
+                text = "Не хватает ${preview.shortage}. Сыграй в мини-игру или заверши уровень",
                 style = MaterialTheme.typography.bodyMedium,
                 color = FinneyInk,
             )

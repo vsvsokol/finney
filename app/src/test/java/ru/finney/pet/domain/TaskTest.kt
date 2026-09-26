@@ -27,7 +27,7 @@ class TaskTest {
 
     @Test
     fun `12 награда за успех выдаётся один раз, за неудачу — только за первую попытку`() {
-        var s = game.newGame()
+        var s = game.newPlannedGame()
 
         val firstFail = game.submitTask(s, "t1", Fixtures.failure).submitted()
         assertEquals(TaskOutcome.FAIL, firstFail.outcome)
@@ -46,11 +46,11 @@ class TaskTest {
 
     @Test
     fun `повторный успех не даёт очков`() {
-        var s = game.newGame()
+        var s = game.newPlannedGame()
         s = game.submitTask(s, "t1", Fixtures.success).submitted().state
-        s = game.closePeriod(game.confirmPlan(s, 0, 0, 0).state()).state()
+        s = game.confirmPlan(game.closePeriod(s).state(), 0, 0, 0).state()
         s = game.submitTask(s, "t1", Fixtures.success).submitted().state
-        s = game.closePeriod(game.confirmPlan(s, 0, 0, 0).state()).state()
+        s = game.closePeriod(s).state()
 
         assertEquals(listOf(1, 0), s.periods.dropLast(1).map { it.result!!.successfulTasks })
     }
@@ -58,18 +58,23 @@ class TaskTest {
     @Test
     fun `закрытое задание недоступно, в демо-режиме открыто`() {
         assertEquals(TaskResult.Rejected(Rejection.TaskLocked), game.submitTask(game.newGame(), "t10", Fixtures.success))
-        game.submitTask(game.newGame(isDemo = true), "t10", Fixtures.success).submitted()
+        game.submitTask(game.newPlannedGame(isDemo = true), "t10", Fixtures.success).submitted()
+    }
+
+    @Test
+    fun `мини-игра до плана отклоняется — сначала план`() {
+        assertEquals(TaskResult.Rejected(Rejection.PlanNotConfirmed), game.submitTask(game.newGame(), "t1", Fixtures.success))
     }
 
     @Test
     fun `ошибка ввода — не исход, состояние не меняется`() {
         assertEquals(
             TaskResult.Rejected(Rejection.InvalidTaskInput(TaskInputError.DepositNotOnStep(5))),
-            game.submitTask(game.newGame(), "t1", TaskInput.Deposit(7)),
+            game.submitTask(game.newPlannedGame(), "t1", TaskInput.Deposit(7)),
         )
         assertEquals(
             TaskResult.Rejected(Rejection.InvalidTaskInput(TaskInputError.WrongInputType)),
-            game.submitTask(game.newGame(), "t1", TaskInput.Basket(emptySet())),
+            game.submitTask(game.newPlannedGame(), "t1", TaskInput.Basket(emptySet())),
         )
     }
 

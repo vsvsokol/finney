@@ -250,7 +250,7 @@ class MiniGamesTest {
     @Test
     fun `мини-игра — обычное задание — награда и попытки общие`() {
         val game = ru.finney.pet.domain.game.Game(Fixtures.content.copy(tasks = Fixtures.tasks + stand))
-        val first = game.submitTask(game.newGame(), "l", TaskInput.Stock(5)).submitted()
+        val first = game.submitTask(game.newPlannedGame(), "l", TaskInput.Stock(5)).submitted()
         assertEquals(TaskOutcome.FAIL, first.outcome)
         assertEquals(5, first.reward)
         val second = game.submitTask(first.state, "l", TaskInput.Stock(4)).submitted()

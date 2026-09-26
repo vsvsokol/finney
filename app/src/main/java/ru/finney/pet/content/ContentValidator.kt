@@ -28,7 +28,7 @@ object ContentValidator {
         if (e.stageStartLevels.firstOrNull() != 1) add("economy.json: stageStartLevels должен начинаться с 1")
         if (e.stageStartLevels.zipWithNext().any { (a, b) -> a >= b }) add("economy.json: stageStartLevels должен возрастать")
         if (e.stageStartLevels.any { it > e.maxLevel }) add("economy.json: стадия начинается после maxLevel")
-        if (e.pointsPerLevel <= 0) add("economy.json: pointsPerLevel должен быть > 0")
+        if (e.conditionsToPass !in 1..3) add("economy.json: conditionsToPass должен быть от 1 до 3")
         if (e.parentBonus.step <= 0) add("economy.json: parentBonus.step должен быть > 0")
         if (e.incomeByStage.any { it <= 0 }) add("economy.json: доход должен быть > 0")
         // Сон не покупают, поэтому в магазине его не проверить: потребность держится только на спаде.

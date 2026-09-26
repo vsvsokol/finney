@@ -7,6 +7,7 @@ import org.junit.Test
 import ru.finney.pet.domain.game.Rejection
 import ru.finney.pet.domain.model.PeriodFacts
 import ru.finney.pet.domain.model.PeriodPhase
+import ru.finney.pet.domain.model.PeriodResult
 import ru.finney.pet.domain.model.Plan
 import ru.finney.pet.domain.period.PeriodRules
 import ru.finney.pet.domain.progress.Progression
@@ -45,16 +46,29 @@ class PeriodTest {
     }
 
     @Test
-    fun `9 уровень 9 — ровно за 5 периодов с максимумом очков`() {
+    fun `9 уровень — плюс один за каждый пройденный период, не выше 9`() {
         val config = Fixtures.economy
-        assertEquals(7, Progression.level(4 * config.points.maxPerPeriod, config))
-        assertEquals(9, Progression.level(5 * config.points.maxPerPeriod, config))
+        assertEquals(1, Progression.level(0, config))
+        assertEquals(5, Progression.level(4, config))
+        assertEquals(9, Progression.level(8, config))
         assertEquals(9, Progression.level(1000, config))
-        assertEquals(listOf(1, 1, 1, 2, 2, 2, 3, 3, 3), (1..9).map { Progression.stage(it, config) })
+        assertEquals(listOf(1, 1, 2, 2, 3, 3, 3, 3, 3), (1..9).map { Progression.stage(it, config) })
     }
 
     @Test
-    fun `9 полный цикл идеальной игры — стадия 3 к 4-му периоду, уровень 9 к 5-му`() {
+    fun `уровень пройден при 2 условиях из 3`() {
+        val config = Fixtures.economy
+        fun result(needs: Boolean, plan: Boolean, savings: Boolean) =
+            PeriodResult(PeriodFacts(0, 0, 0, 0), needs, plan, savings, successfulTasks = 2, points = 0)
+        assertTrue(Progression.passed(result(true, true, true), config))
+        assertTrue(Progression.passed(result(true, false, true), config))
+        assertTrue(Progression.passed(result(false, true, true), config))
+        assertFalse("одного условия мало, даже с играми", Progression.passed(result(false, true, false), config))
+        assertFalse(Progression.passed(result(false, false, false), config))
+    }
+
+    @Test
+    fun `9 полный цикл идеальной игры — все три стадии за 5 периодов демо`() {
         val game = Fixtures.game()
         var s = game.newGame()
         val levels = mutableListOf<Int>()
@@ -63,10 +77,41 @@ class PeriodTest {
             levels += game.level(s)
         }
 
-        assertEquals(listOf(2, 4, 5, 7, 9), levels)
-        assertTrue(s.periods.dropLast(1).all { it.result!!.points == 8 })
+        assertEquals(listOf(2, 3, 4, 5, 6), levels)
+        assertTrue(s.periods.dropLast(1).all { game.isPassed(it) == true })
         assertEquals(listOf(1, 1, 2, 2, 3, 3), s.periods.map { it.stage })
         assertEquals(PeriodPhase.PLANNING, s.currentPeriod.phase)
+    }
+
+    @Test
+    fun `непройденный уровень играется заново — с новыми деньгами, без потери прогресса`() {
+        val game = Fixtures.game()
+        val s = game.playPerfectPeriod(game.newGame())
+        assertEquals(2, game.level(s))
+        val balance = s.balance
+
+        // План пустой и выполнен, но питомец голоден и ничего не отложено: 1 из 3.
+        val failed = game.closePeriod(game.confirmPlan(s, 0, 0, 0).state()).state()
+        assertEquals(false, game.isPassed(failed.periods[1]))
+        assertEquals(2, game.level(failed))
+        assertTrue("доход пришёл", failed.balance > balance)
+        assertEquals(PeriodPhase.PLANNING, failed.currentPeriod.phase)
+    }
+
+    @Test
+    fun `чек-лист уровня считается на эту минуту`() {
+        val game = Fixtures.game()
+        var s = game.selectGoal(game.newGame(), "bike").state()
+        var check = game.levelCheck(s)
+        assertFalse(check.planConfirmed)
+        assertEquals(0, check.met)
+
+        s = game.confirmPlan(s, needs = game.needsHint(s)!!, wants = 0, savings = 10).state()
+        check = game.levelCheck(s)
+        assertTrue(check.planConfirmed)
+        assertTrue(check.planMatched)
+        assertTrue(check.savingsAdded)
+        assertTrue(check.willPass)
     }
 
     @Test

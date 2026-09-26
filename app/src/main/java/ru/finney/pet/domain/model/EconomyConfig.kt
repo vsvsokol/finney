@@ -10,7 +10,8 @@ data class EconomyConfig(
     val parentBonus: ParentBonusRule,
     val planTolerance: Int,
     val points: PointsRule,
-    val pointsPerLevel: Int,
+    /** Сколько из трёх условий уровня (нужное, план, копилка) нужно выполнить, чтобы его пройти. */
+    val conditionsToPass: Int,
     val maxLevel: Int,
     val stageStartLevels: List<Int>,
     val pet: PetRule,

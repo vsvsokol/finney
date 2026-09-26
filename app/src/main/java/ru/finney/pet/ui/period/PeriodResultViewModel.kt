@@ -25,26 +25,31 @@ sealed interface PeriodResultUiState {
      */
     data object Unavailable : PeriodResultUiState
 
-    /** Итоги закрытого периода: что планировали, что вышло и за что дали очки (ТЗ п. 2.5.9). */
+    /**
+     * Итоги уровня — закрытого игрового периода: что планировали, что вышло
+     * и какие условия уровня выполнены (ТЗ п. 2.5.9).
+     */
     data class Ready(
         val periodNumber: Int,
+        /** Уровень, который играли в этом периоде. */
+        val playedLevel: Int,
         val plan: Plan,
         val facts: PeriodFacts,
-        /** Три условия очков за период — показываем каждое отдельной строкой, а не одним итогом. */
+        /** Три условия уровня — каждое отдельной строкой, а не одним итогом. */
         val needsCovered: Boolean,
         val planMatched: Boolean,
         val savingsAdded: Boolean,
-        val successfulTasks: Int,
-        val pointsEarned: Int,
-        val totalPoints: Int,
+        /** Сколько условий нужно для прохождения. */
+        val toPass: Int,
+        /** Уровень пройден: следующий — на один выше. */
+        val passed: Boolean,
+        /** Уровень сейчас, после этого периода. */
         val level: Int,
-        /** Уровень вырос именно за этот период. */
+        /** Уровень вырос именно за этот период; на последнем уровне расти некуда. */
         val leveledUp: Boolean,
         /** Названия игр, которые с новым уровнем стали сложнее или открылись. */
         val harderGames: List<String>,
         val balance: Int,
-        /** Период уже открыт следующим: закрытие периода сразу начинает новый. */
-        val nextPeriodNumber: Int,
     ) : PeriodResultUiState {
         /** Перерасход по нужному и желаемому сверх плана; 0, если уложились. */
         val overspend: Int
@@ -75,24 +80,22 @@ class PeriodResultViewModel(
         val result = period?.result
         if (plan == null || result == null) return PeriodResultUiState.Unavailable
 
-        val totalPoints = state.points
+        val before = game.levelAfter(state, period.number - 1)
+        val after = game.levelAfter(state, period.number)
         return PeriodResultUiState.Ready(
             periodNumber = period.number,
+            playedLevel = before,
             plan = plan,
             facts = result.facts,
             needsCovered = result.needsCovered,
             planMatched = result.planMatched,
             savingsAdded = result.savingsAdded,
-            successfulTasks = result.successfulTasks,
-            pointsEarned = result.points,
-            totalPoints = totalPoints,
-            level = game.levelFor(totalPoints),
-            leveledUp = game.levelFor(totalPoints) > game.levelFor(totalPoints - result.points),
-            harderGames = game.tasksUnlockedBetween(game.levelFor(totalPoints - result.points), game.levelFor(totalPoints))
-                .map { it.title }
-                .distinct(),
+            toPass = game.levelCheck(state).toPass,
+            passed = game.isPassed(period) == true,
+            level = after,
+            leveledUp = after > before,
+            harderGames = game.tasksUnlockedBetween(before, after).map { it.title }.distinct(),
             balance = state.balance,
-            nextPeriodNumber = state.currentPeriod.number,
         )
     }
 

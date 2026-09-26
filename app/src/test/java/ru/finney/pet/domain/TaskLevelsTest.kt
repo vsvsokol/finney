@@ -39,16 +39,17 @@ class TaskLevelsTest {
     )
     private val game = Game(content) { 0L }
 
-    /** Очки берутся из итогов закрытых периодов — подкладываем один закрытый период с нужной суммой. */
+    /** Уровень — число пройденных периодов плюс один: подкладываем нужное число пройденных. */
     private fun GameState.atLevel(level: Int): GameState {
-        val points = (level - 1) * Fixtures.economy.pointsPerLevel
-        val closed = Period(
-            number = 0,
-            stage = 1,
-            phase = PeriodPhase.CLOSED,
-            result = PeriodResult(PeriodFacts(0, 0, 0, 0), false, false, false, 0, points),
-        )
-        return copy(periods = listOf(closed) + periods)
+        val passed = (1 until level).map { i ->
+            Period(
+                number = i - level + 1,
+                stage = 1,
+                phase = PeriodPhase.CLOSED,
+                result = PeriodResult(PeriodFacts(0, 0, 0, 0), true, true, true, 0, 6),
+            )
+        }
+        return copy(periods = passed + periods)
     }
 
     @Test
@@ -70,13 +71,13 @@ class TaskLevelsTest {
     @Test
     fun `сложный вариант закрыт до своего уровня, в демо-режиме открыт`() {
         assertEquals(TaskResult.Rejected(Rejection.TaskLocked), game.submitTask(game.newGame(), "hard", Fixtures.success))
-        game.submitTask(game.newGame().atLevel(7), "hard", Fixtures.success).submitted()
-        game.submitTask(game.newGame(isDemo = true), "hard", Fixtures.success).submitted()
+        game.submitTask(game.newPlannedGame().atLevel(7), "hard", Fixtures.success).submitted()
+        game.submitTask(game.newPlannedGame(isDemo = true), "hard", Fixtures.success).submitted()
     }
 
     @Test
     fun `награда за каждый вариант своя`() {
-        val first = game.submitTask(game.newGame().atLevel(7), "easy", Fixtures.success).submitted()
+        val first = game.submitTask(game.newPlannedGame().atLevel(7), "easy", Fixtures.success).submitted()
         val second = game.submitTask(first.state, "hard", Fixtures.success).submitted()
         assertEquals(Fixtures.economy.taskReward.success, second.reward)
     }

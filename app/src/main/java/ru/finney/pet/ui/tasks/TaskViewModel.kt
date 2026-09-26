@@ -19,6 +19,7 @@ import ru.finney.pet.domain.game.Session
 import ru.finney.pet.domain.game.TaskResult
 import ru.finney.pet.domain.model.GameContent
 import ru.finney.pet.domain.model.BodyColor
+import ru.finney.pet.domain.model.PeriodPhase
 import ru.finney.pet.domain.model.PetCharacter
 import ru.finney.pet.domain.model.SavedGame
 import ru.finney.pet.domain.model.TaskDefinition
@@ -50,6 +51,8 @@ sealed interface TaskUiState {
         val available: Boolean,
         /** Уровень, до которого питомец ещё не дорос; null — уровня хватает. */
         val lockedUntilLevel: Int?,
+        /** План уровня ещё не составлен: мини-игры — после плана. */
+        val needsPlan: Boolean = false,
         /** Уже пройдено успешно: награды за успех больше не будет, играть можно. */
         val completed: Boolean,
         val reward: TaskReward,
@@ -121,6 +124,7 @@ class TaskViewModel(
             balance = state.balance,
             available = game.isTaskAvailable(state, task),
             lockedUntilLevel = task.unlockLevel.takeIf { !state.isDemo && it > game.level(state) },
+            needsPlan = state.currentPeriod.phase != PeriodPhase.ACTIVE,
             completed = state.attempts.any { it.taskId == taskId && it.outcome == TaskOutcome.SUCCESS },
             reward = task.reward ?: content.economy.taskReward,
             phase = local.phase,

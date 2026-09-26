@@ -102,7 +102,7 @@ private fun WithdrawConfirmDialog(
             // В первом периоде темпа пополнений ещё нет — срок не показываем вовсе.
             if (p.periodsBefore != null || p.periodsAfter != null) {
                 InfoRow(
-                    "Периодов до цели",
+                    "Уровней до цели",
                     "${p.periodsBefore?.toString() ?: "—"} → ${p.periodsAfter?.toString() ?: "—"}",
                 )
             }
@@ -139,7 +139,7 @@ private fun GoalsContent(
                 InfoRow("Накоплено", "${progress.saved} из ${progress.goal.price}")
                 InfoRow("Осталось собрать", progress.remaining.toString())
                 InfoRow(
-                    "Периодов до цели",
+                    "Уровней до цели",
                     progress.periodsToGoal?.toString() ?: "пока не посчитать",
                 )
             }
@@ -171,7 +171,7 @@ private fun GoalsContent(
 
         if (!state.canMoveMoney) {
             Text(
-                text = "Сначала подтверди план периода — тогда можно будет откладывать.",
+                text = "Сначала составь план — тогда можно будет откладывать.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = FinneyInk,
             )

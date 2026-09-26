@@ -90,7 +90,7 @@ class GoalsViewModel(
                 title = "Отложили $amount",
                 lines = changesBetween(before, after),
                 why = "Копилка растёт — цель ближе.",
-                next = "Откладывай каждый период.",
+                next = "Откладывай на каждом уровне.",
             )
         },
     ) { session.execute { deposit(it, amount) } }

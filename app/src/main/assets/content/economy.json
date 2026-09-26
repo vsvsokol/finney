@@ -10,9 +10,9 @@
     "taskSuccess": 1,
     "taskSuccessMaxPerPeriod": 2
   },
-  "pointsPerLevel": 5,
+  "conditionsToPass": 2,
   "maxLevel": 9,
-  "stageStartLevels": [1, 4, 7],
+  "stageStartLevels": [1, 3, 5],
   "pet": {
     "start": { "satiety": 70, "hygiene": 70, "mood": 70, "energy": 90 },
     "decayByStage": [

@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -41,11 +40,13 @@ import ru.finney.pet.appContainer
 import ru.finney.pet.domain.game.Game
 import ru.finney.pet.domain.game.Session
 import ru.finney.pet.domain.model.GameContent
+import ru.finney.pet.domain.model.PeriodPhase
 import ru.finney.pet.domain.model.TaskDefinition
 import ru.finney.pet.domain.model.TaskOutcome
 import ru.finney.pet.ui.components.FinneyButton
 import ru.finney.pet.ui.components.FinneyScreen
 import ru.finney.pet.ui.components.OutlinedText
+import ru.finney.pet.ui.components.fadingScroll
 import ru.finney.pet.ui.tasks.games.ItemPicture
 import ru.finney.pet.ui.tasks.games.taskIcon
 import ru.finney.pet.ui.theme.FinneyCream
@@ -89,6 +90,12 @@ class TasksViewModel(session: Session, private val game: Game, private val conte
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    /** План уровня ещё не составлен — играть рано. */
+    val needsPlan: StateFlow<Boolean> = session.activeGame
+        .filterNotNull()
+        .map { it.state.currentPeriod.phase != PeriodPhase.ACTIVE }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
     companion object {
         val Factory = viewModelFactory {
             initializer { appContainer().let { TasksViewModel(it.session, it.game, it.content) } }
@@ -100,9 +107,11 @@ class TasksViewModel(session: Session, private val game: Game, private val conte
 fun TasksScreen(
     onOpenTask: (String) -> Unit,
     onBack: () -> Unit,
+    onOpenBudget: () -> Unit = {},
     viewModel: TasksViewModel = viewModel(factory = TasksViewModel.Factory),
 ) {
     val rows by viewModel.rows.collectAsStateWithLifecycle()
+    val needsPlan by viewModel.needsPlan.collectAsStateWithLifecycle()
     val list = rows
     if (list == null) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = FinneyInk) }
@@ -116,8 +125,17 @@ fun TasksScreen(
             style = MaterialTheme.typography.titleMedium,
             color = FinneyInk,
         )
+        // Игры — часть уровня, а уровень начинается с плана.
+        if (needsPlan) {
+            Text(
+                "Сначала составь план уровня — потом играть.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = FinneyInk,
+            )
+            FinneyButton(text = "Составить план", onClick = onOpenBudget)
+        }
         Column(
-            Modifier.weight(1f).verticalScroll(rememberScrollState()),
+            Modifier.weight(1f).fadingScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             list.chunked(2).forEach { pair ->

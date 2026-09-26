@@ -24,7 +24,8 @@ import ru.finney.pet.domain.model.TaskTheme
 /** Строка истории: откуда деньги или куда ушли — словами, и сколько. */
 data class HistoryRow(val label: String, val balanceDelta: Int, val savingsDelta: Int)
 
-data class HistoryPeriod(val number: Int, val rows: List<HistoryRow>)
+/** Операции одного игрового периода; ребёнку он подписан уровнем, который тогда играли. */
+data class HistoryPeriod(val number: Int, val level: Int, val rows: List<HistoryRow>)
 
 /** Задание, которое пробовали: лучший исход и сколько было попыток. */
 data class TaskRow(val title: String, val theme: String, val passed: Boolean, val attempts: Int)
@@ -33,13 +34,15 @@ sealed interface ProgressUiState {
     data object Loading : ProgressUiState
 
     data class Ready(
+        val petName: String,
         val level: Int,
         val stage: Int,
-        val points: Int,
         val goal: GoalProgress?,
         val goalsCompleted: Int,
         /** Последний закрытый период — для кнопки итогов. null — закрытых ещё нет. */
         val lastClosedPeriod: Int?,
+        /** Уровень, который играли в [lastClosedPeriod], — подпись кнопки итогов. */
+        val lastClosedLevel: Int?,
         val tasks: List<TaskRow>,
         /** Новые периоды сверху. */
         val history: List<HistoryPeriod>,
@@ -64,12 +67,13 @@ class ProgressViewModel(
     private fun toUiState(saved: SavedGame): ProgressUiState.Ready {
         val state = saved.state
         return ProgressUiState.Ready(
+            petName = saved.profile.petName,
             level = game.level(state),
             stage = game.stage(state),
-            points = state.points,
             goal = game.goalProgress(state),
             goalsCompleted = state.ledger.count { it.type == EntryType.GOAL_COMPLETE },
             lastClosedPeriod = state.periods.lastOrNull { it.result != null }?.number,
+            lastClosedLevel = state.periods.lastOrNull { it.result != null }?.let { game.levelAfter(state, it.number - 1) },
             tasks = state.attempts
                 .groupBy { it.taskId }
                 .mapNotNull { (taskId, attempts) ->
@@ -87,6 +91,7 @@ class ProgressViewModel(
                 .map { (number, entries) ->
                     HistoryPeriod(
                         number = number,
+                        level = game.levelAfter(state, number - 1),
                         // Лента в порядке записи; новые сверху. По времени не сортируем:
                         // у операций одной команды оно совпадает.
                         rows = entries.asReversed().map {
@@ -106,7 +111,7 @@ class ProgressViewModel(
 
 /** Подпись операции для ребёнка: источник денег или на что они ушли (ТЗ п. 2.5.4). */
 fun GameContent.entryLabel(entry: LedgerEntry): String = when (entry.type) {
-    EntryType.INCOME -> "Доход периода"
+    EntryType.INCOME -> "Деньги на уровень"
     EntryType.TASK_REWARD -> "Награда за мини-игру" +
         (entry.taskId?.let(::task)?.let { " «${it.title}»" } ?: "")
     EntryType.PARENT_BONUS -> "Бонус от взрослого"

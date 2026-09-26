@@ -146,10 +146,11 @@ private fun Decision(icon: FinneyIcons, color: Color, title: String, text: Strin
 @Composable
 private fun PeriodPage(isReplay: Boolean) {
     Title("Как идёт игра")
+    Body("Игра идёт уровнями. На каждом:")
     Body("1. Приходят монетки.")
     Body("2. Составь план.")
-    Body("3. Покупай, играй, копи.")
-    Body("4. Закончи период — Финни подрастёт.")
+    Body("3. Позаботься о питомце, играй в мини-игры, копи.")
+    Body("4. Заверши уровень. Выполнил 2 условия из 3 — питомец подрастёт.")
     Body("Ошибаться не страшно.")
     if (!isReplay) {
         Body("Для взрослых: в демо-режиме все игры открыты сразу.")

@@ -18,6 +18,7 @@ import ru.finney.pet.appContainer
 import ru.finney.pet.domain.game.Game
 import ru.finney.pet.domain.game.GameResult
 import ru.finney.pet.domain.game.GoalProgress
+import ru.finney.pet.domain.game.LevelCheck
 import ru.finney.pet.domain.game.PurchasePreview
 import ru.finney.pet.domain.game.Rejection
 import ru.finney.pet.domain.game.Session
@@ -28,11 +29,13 @@ import ru.finney.pet.domain.model.PetAppearance
 import ru.finney.pet.domain.model.PetStats
 import ru.finney.pet.domain.model.SavedGame
 import ru.finney.pet.domain.model.ShopItem
-import ru.finney.pet.domain.model.TaskDefinition
 import ru.finney.pet.domain.model.TaskOutcome
 import ru.finney.pet.domain.pet.Emotion
 import ru.finney.pet.ui.components.ActionFeedback
 import ru.finney.pet.ui.components.changesBetween
+
+/** Условий у уровня три: нужное, план, копилка. */
+const val LEVEL_CONDITIONS = 3
 
 sealed interface HomeUiState {
     data object Loading : HomeUiState
@@ -45,8 +48,8 @@ sealed interface HomeUiState {
         val stats: PetStats,
         val emotion: Emotion,
         val level: Int,
-        /** Доля до следующего уровня, 0..1 — дуга вокруг значка уровня. */
-        val levelProgress: Float,
+        /** Условия текущего уровня на эту минуту: чек-лист и дуга вокруг значка. */
+        val check: LevelCheck,
         val stage: Int,
         val balance: Int,
         val totalSavings: Int,
@@ -56,8 +59,8 @@ sealed interface HomeUiState {
         val phase: PeriodPhase,
         /** Сколько стоит закрыть нужное при текущих шкалах. */
         val needsHint: Int?,
-        /** Первое открытое и ещё не пройденное задание. null — всё пройдено. */
-        val nextTask: TaskDefinition?,
+        /** Сколько открытых мини-игр ещё не пройдено. */
+        val gamesLeft: Int,
         /** Чем покормить: всё из магазина, что поднимает сытость. */
         val food: List<PurchasePreview>,
         /** Чем помыть: всё, что поднимает чистоту. */
@@ -69,8 +72,11 @@ sealed interface HomeUiState {
         /** Питомец спит; null — не спит. */
         val sleep: SleepInfo? = null,
     ) : HomeUiState {
-        /** Период закрывается только после подтверждения плана. */
+        /** Уровень завершается только после подтверждения плана. */
         val canClosePeriod: Boolean get() = phase == PeriodPhase.ACTIVE
+
+        /** Дуга вокруг значка уровня: сколько условий уровня уже выполнено, 0..1. */
+        val levelProgress: Float get() = check.met / LEVEL_CONDITIONS.toFloat()
     }
 }
 
@@ -181,7 +187,7 @@ class HomeViewModel(
                         title = if (full) "Выспался!" else "Проснулся раньше",
                         lines = changesBetween(before, after),
                         why = if (full) "Сон — это нужное. И он бесплатный." else "Сон набирается постепенно: чем дольше спит, тем больше.",
-                        next = "За период сон снова убудет — следи за кольцом у кнопки зала.",
+                        next = "К следующему уровню сон снова убудет — следи за кольцом у кнопки зала.",
                     ),
                 ),
             )
@@ -212,7 +218,7 @@ class HomeViewModel(
             stats = state.pet,
             emotion = game.emotion(state),
             level = level,
-            levelProgress = levelProgress(state.points, level),
+            check = game.levelCheck(state),
             stage = game.stage(state),
             balance = state.balance,
             totalSavings = state.totalSavings,
@@ -220,7 +226,7 @@ class HomeViewModel(
             periodNumber = state.currentPeriod.number,
             phase = state.currentPeriod.phase,
             needsHint = game.needsHint(state),
-            nextTask = game.currentTasks(state).firstOrNull { it.id !in passed && game.isTaskAvailable(state, it) },
+            gamesLeft = game.currentTasks(state).count { it.id !in passed && game.isTaskAvailable(state, it) },
             // Что лежит на столе и что в ванной, решает не список имён, а эффект
             // предмета: добавят в контент новую еду — она появится на столе сама.
             food = previews(state) { it.effect.satiety > 0 },
@@ -231,18 +237,6 @@ class HomeViewModel(
                 SleepInfo(since = since, endsAt = game.sleepEndsAt(state)!!, energyFrom = state.pet.energy)
             },
         )
-    }
-
-    /**
-     * Сколько пройдено до следующего уровня.
-     *
-     * Формула уровня здесь не повторяется — берётся тот же шаг очков из
-     * economy.json, что и в домене. Сам уровень по-прежнему считает `Game`.
-     * Отдельного `Game.levelProgress()` в домене нет, а заводить его — правка
-     * в чужой зоне: понадобится ещё где-то, тогда и попросим.
-     */
-    private fun levelProgress(points: Int, level: Int): Float = with(content.economy) {
-        if (level >= maxLevel) 1f else (points % pointsPerLevel) / pointsPerLevel.toFloat()
     }
 
     private fun previews(state: GameState, fits: (ShopItem) -> Boolean): List<PurchasePreview> =

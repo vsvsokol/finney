@@ -32,7 +32,7 @@ class ProgressViewModelTest : ViewModelTest() {
         assertNull("закрытых периодов ещё нет", state.lastClosedPeriod)
         val rows = state.history.single { it.number == 1 }.rows
         assertEquals(
-            listOf("Покупка: Конфета (хочется)", "В копилку на «Велосипед»", "Доход периода"),
+            listOf("Покупка: Конфета (хочется)", "В копилку на «Велосипед»", "Деньги на уровень"),
             rows.map { it.label },
         )
         assertEquals(listOf(-5, -10, 50), rows.map { it.balanceDelta })

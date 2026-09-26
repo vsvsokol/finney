@@ -21,6 +21,8 @@ class TaskViewModelTest : ViewModelTest() {
 
     private suspend fun viewModel(taskId: String = "t1"): TaskViewModel {
         session.createProfile("Финни", PetAppearance(PetCharacter.LUCHIK, BodyColor.A, EyesVariant.ROUND))
+        // Мини-игры — только после плана.
+        session.execute { confirmPlan(it, needs = 0, wants = 0, savings = 0) }
         return TaskViewModel(taskId, session, game, Fixtures.content)
     }
 

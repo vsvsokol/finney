@@ -79,7 +79,6 @@ fun FinneyNavHost(
                 onOpenShop = { navController.navigate(ShopRoute) },
                 onOpenGoals = { navController.navigate(GoalsRoute) },
                 onOpenTasks = { navController.navigate(TasksRoute) },
-                onOpenTask = { taskId -> navController.navigate(TaskRoute(taskId)) },
                 onOpenProgress = { navController.navigate(ProgressRoute) },
                 onOpenAdult = { navController.navigate(AdultRoute) },
                 onOpenHelp = { navController.navigate(OnboardingRoute(isReplay = true)) },
@@ -111,6 +110,7 @@ fun FinneyNavHost(
         composable<TasksRoute> {
             TasksScreen(
                 onOpenTask = { taskId -> navController.navigate(TaskRoute(taskId)) },
+                onOpenBudget = { navController.navigate(BudgetRoute) },
                 onBack = { navController.popBackStack() },
             )
         }
@@ -118,7 +118,11 @@ fun FinneyNavHost(
         // Задание и мини-игра — один экран: какую игру показать, решает движок задания.
         composable<TaskRoute> { entry ->
             val route = entry.toRoute<TaskRoute>()
-            TaskScreen(taskId = route.taskId, onBack = { navController.popBackStack() })
+            TaskScreen(
+                taskId = route.taskId,
+                onBack = { navController.popBackStack() },
+                onOpenBudget = { navController.navigate(BudgetRoute) },
+            )
         }
 
         composable<PeriodResultRoute> { entry ->

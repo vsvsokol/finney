@@ -63,7 +63,7 @@ import ru.finney.pet.ui.components.ActionFeedbackCard
 import ru.finney.pet.ui.components.ActionFeedback
 import ru.finney.pet.domain.game.Rejection
 import kotlinx.coroutines.delay
-import ru.finney.pet.domain.model.TaskDefinition
+import ru.finney.pet.domain.game.LevelCheck
 import ru.finney.pet.ui.components.Coin
 import ru.finney.pet.ui.components.FinneyButton
 import ru.finney.pet.ui.components.FinneyIcon
@@ -136,7 +136,6 @@ fun HomeScreen(
     onOpenShop: () -> Unit,
     onOpenGoals: () -> Unit,
     onOpenTasks: () -> Unit,
-    onOpenTask: (taskId: String) -> Unit,
     onOpenProgress: () -> Unit,
     onOpenAdult: () -> Unit,
     onOpenHelp: () -> Unit,
@@ -180,7 +179,6 @@ fun HomeScreen(
             onOpenShop = onOpenShop,
             onOpenGoals = onOpenGoals,
             onOpenTasks = onOpenTasks,
-            onOpenTask = onOpenTask,
             onOpenProgress = onOpenProgress,
             onOpenAdult = onOpenAdult,
             onOpenHelp = onOpenHelp,
@@ -242,7 +240,6 @@ private fun HomeContent(
     onOpenShop: () -> Unit,
     onOpenGoals: () -> Unit,
     onOpenTasks: () -> Unit,
-    onOpenTask: (String) -> Unit,
     onOpenProgress: () -> Unit,
     onOpenAdult: () -> Unit,
     onOpenHelp: () -> Unit,
@@ -308,9 +305,9 @@ private fun HomeContent(
     // Панель отладки: долгое нажатие на уровень, только в отладочной сборке.
     var debugOpen by rememberSaveable { mutableStateOf(false) }
 
-    // Подтверждение перед закрытием периода: шаг необратимый, случайное
-    // нажатие не должно подводить итоги за ребёнка.
-    var confirmClose by rememberSaveable { mutableStateOf(false) }
+    // Панель уровня: чек-лист условий и «Завершить уровень». Она же — подтверждение:
+    // шаг необратимый, случайное нажатие не должно подводить итоги за ребёнка.
+    var levelOpen by rememberSaveable { mutableStateOf(false) }
 
     // Игра ухода: что выбрали в панели и теперь бросают в рот или трут о питомца.
     // Покупка — в конце игры, см. ui/room/CareGame.kt.
@@ -418,20 +415,17 @@ private fun HomeContent(
             // Уровень — главный показатель роста, поэтому в полтора раза крупнее кнопок по краям.
             // Центры всех трёх на одной линии: ряд выравнивается по вертикали.
             Box(contentAlignment = Alignment.Center) {
+                // Нажатие — что нужно для уровня. Дуга вокруг — сколько условий уже выполнено.
                 LevelBadge(
                     level = state.level,
                     size = LevelBadgeSize,
                     progress = state.levelProgress,
-                    modifier = if (isDebuggable) {
-                        Modifier.combinedClickable(
-                            onClickLabel = null,
-                            onLongClickLabel = "Отладка",
-                            onLongClick = { debugOpen = true },
-                            onClick = {},
-                        )
-                    } else {
-                        Modifier
-                    },
+                    modifier = Modifier.combinedClickable(
+                        onClickLabel = "Что нужно для уровня",
+                        onLongClickLabel = if (isDebuggable) "Отладка" else null,
+                        onLongClick = if (isDebuggable) ({ debugOpen = true }) else null,
+                        onClick = { if (!sleeping) levelOpen = true },
+                    ),
                 )
                 // Тестовый профиль видно сразу: эксперт знает, почему все игры открыты.
                 // Метка лежит на нижнем краю значка, а не под ним — ряд не вырастает.
@@ -459,8 +453,8 @@ private fun HomeContent(
                 // Отдельной кнопки «?» нет: подсказка — первый пункт меню («Как играть»).
                 // Она по-прежнему доступна в любой момент (ТЗ п. 2.5.1), а верхний ряд
                 // остаётся симметричным: монета — уровень — меню.
-                // «Бургер» — всё, что не про уход за питомцем: знакомство с игрой,
-                // активное задание, план, копилка, прогресс и раздел взрослого.
+                // «Бургер» — всё, что не про уход за питомцем и не на экране:
+                // игры, план, гардероб, подсказка и раздел взрослого.
                 // Низ экрана из-за этого остался про комнаты, а не про меню.
                 Box {
                     FinneyIconButton(
@@ -474,20 +468,17 @@ private fun HomeContent(
                     HomeMenu(
                         expanded = menuOpen,
                         onDismiss = { menuOpen = false },
-                        task = state.nextTask,
-                        onOpenTask = onOpenTask,
                         onOpenHelp = onOpenHelp,
                         onOpenBudget = onOpenBudget,
                         onOpenTasks = onOpenTasks,
                         onOpenWardrobe = { spot = RoomSpot.LIVING; wardrobeOpen = true },
-                        onOpenProgress = onOpenProgress,
                         onOpenAdult = onOpenAdult,
                     )
                 }
             }
         }
 
-        // Копилка и активное задание — то, чего макет на главном не предусмотрел,
+        // Копилка и мини-игры — то, чего макет на главном не предусмотрел,
         // а ТЗ п. 2.5.3 требует видеть сразу. Обе плашки умещаются в одну строку
         // и лежат в кремовой полосе над комнатой: строкой ниже начинается абажур
         // лампы, и второй ряд его бы срезал. Сытость, чистота и настроение сюда
@@ -506,17 +497,16 @@ private fun HomeContent(
                 modifier = Modifier.weight(1f),
             )
 
-            // Слово «задание» в плашку не влезает — его держит значок звезды
-            // и подпись для TalkBack.
-            state.nextTask?.let { task ->
-                InfoChip(
-                    icon = FinneyIcons.Star,
-                    text = task.title,
-                    action = "Задание: ${task.title}",
-                    onClick = { if (!sleeping) onOpenTask(task.id) },
-                    modifier = Modifier.weight(1f),
-                )
-            }
+            // Раньше здесь стояло название следующей игры — «Дорога к цели» читалась
+            // как ещё одна цель рядом с копилкой. Теперь плашка — вход во все игры
+            // и счёт, сколько осталось.
+            InfoChip(
+                icon = FinneyIcons.Star,
+                text = if (state.gamesLeft > 0) "Мини-игры: ${state.gamesLeft}" else "Мини-игры ✓",
+                action = "Мини-игры",
+                onClick = { if (!sleeping) onOpenTasks() },
+                modifier = Modifier.weight(1f),
+            )
         }
 
         emotionReason(state.petName, state.emotion)?.takeIf { !sleeping }?.let { reason ->
@@ -563,12 +553,14 @@ private fun HomeContent(
                 modifier = Modifier.offset(x = -HappinessEdgeShift),
             )
 
-            // Конец периода — главный шаг игрового цикла: без него не растёт
-            // уровень и не приходит новый доход. Кнопка стоит на полу под
+            // Конец уровня — главный шаг игрового цикла: без него не растёт
+            // уровень и не приходит новый доход. Кнопка, а не автозакрытие:
+            // ребёнок сам решает, когда хватит покупок и игр, и итог не
+            // обрывает его посреди кормления. Кнопка стоит на полу под
             // питомцем, над кнопками комнат; шкала настроения до низа не
             // доходит (0.55 высоты), так что места хватает.
             //
-            // До подтверждения плана период закрыть нельзя (Rejection.PlanNotConfirmed),
+            // До подтверждения плана уровень завершить нельзя (Rejection.PlanNotConfirmed),
             // и на месте кнопки — путь к плану: ребёнок видит следующий шаг, а не отказ.
             // Во время игры ухода кнопку убираем, а не гасим: погашенная ловила бы нажатия.
             if (sleep != null) {
@@ -581,8 +573,8 @@ private fun HomeContent(
                 )
             } else if (playing == null) {
                 FinneyButton(
-                    text = if (state.canClosePeriod) "Закончить период" else "Составить план",
-                    onClick = if (state.canClosePeriod) ({ confirmClose = true }) else onOpenBudget,
+                    text = if (state.canClosePeriod) "Завершить уровень" else "Составить план",
+                    onClick = if (state.canClosePeriod) ({ levelOpen = true }) else onOpenBudget,
                     fillWidth = false,
                     modifier = Modifier.align(Alignment.BottomCenter),
                 )
@@ -759,7 +751,7 @@ private fun HomeContent(
             }
         }
 
-        if (confirmClose) {
+        if (levelOpen) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -767,21 +759,23 @@ private fun HomeContent(
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
-                        onClickLabel = "Не заканчивать",
-                        onClick = { confirmClose = false },
+                        onClickLabel = "Закрыть",
+                        onClick = { levelOpen = false },
                     )
                     .systemBarsPadding()
                     .padding(16.dp),
                 contentAlignment = Alignment.BottomCenter,
             ) {
-                ClosePeriodPanel(
-                    petName = state.petName,
-                    periodNumber = state.periodNumber,
-                    onConfirm = {
-                        confirmClose = false
+                LevelPanel(
+                    level = state.level,
+                    check = state.check,
+                    onFinish = {
+                        levelOpen = false
                         onClosePeriod()
                     },
-                    onDismiss = { confirmClose = false },
+                    onOpenBudget = { levelOpen = false; onOpenBudget() },
+                    onOpenProgress = { levelOpen = false; onOpenProgress() },
+                    onDismiss = { levelOpen = false },
                     modifier = Modifier.pointerInput(Unit) { detectTapGestures { } },
                 )
             }
@@ -812,7 +806,7 @@ private fun HomeContent(
 
 
 /**
- * Ночь: сколько ещё спать и «Разбудить». Стоит на месте кнопки периода —
+ * Ночь: сколько ещё спать и «Разбудить». Стоит на месте кнопки уровня —
  * во сне это единственное, что можно сделать.
  */
 @Composable
@@ -843,50 +837,90 @@ private fun SleepPanel(
 }
 
 /**
- * «Точно закончить период?» Объясняет, что будет дальше, до нажатия:
- * итоги, очки и новый доход. Вернуть период нельзя — поэтому и спрашиваем.
+ * Панель уровня: что нужно, чтобы его пройти, и «Завершить уровень».
+ *
+ * Открывается нажатием на значок уровня и кнопкой «Завершить уровень» на полу —
+ * одна и та же, поэтому ребёнок всегда видит условия до того, как подвести итог.
+ * Вернуть уровень нельзя, и панель прямо говорит, что будет: пройден или
+ * начнётся заново с новыми деньгами. Прогресс при этом не падает никогда.
  */
 @Composable
-private fun ClosePeriodPanel(
-    petName: String,
-    periodNumber: Int,
-    onConfirm: () -> Unit,
+private fun LevelPanel(
+    level: Int,
+    check: LevelCheck,
+    onFinish: () -> Unit,
+    onOpenBudget: () -> Unit,
+    onOpenProgress: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    FinneyPanel(title = "Закончить период?", modifier = modifier) {
-        Text(
-            "$petName посмотрит, как прошёл период: план, копилка и очки.",
-            style = MaterialTheme.typography.bodyLarge,
-            color = FinneyInk,
-        )
-        Text(
-            "Потом придут новые деньги. Назад вернуться нельзя.",
-            style = MaterialTheme.typography.bodyLarge,
-            color = FinneyInk,
-        )
-        FinneyButton(text = "Закончить", onClick = onConfirm)
+    FinneyPanel(title = "Уровень $level", modifier = modifier) {
+        if (!check.planConfirmed) {
+            Text(
+                "Уровень начинается с плана: реши, сколько на нужное, сколько на «хочется» и сколько отложить.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = FinneyInk,
+            )
+            FinneyButton(text = "Составить план", onClick = onOpenBudget)
+        } else {
+            Text(
+                "Чтобы пройти уровень, выполни ${check.toPass} из $LEVEL_CONDITIONS:",
+                style = MaterialTheme.typography.bodyLarge,
+                color = FinneyInk,
+            )
+            CheckRow("Питомец сыт, чист и выспался", check.needsCovered)
+            CheckRow("Траты по плану", check.planMatched)
+            CheckRow("Отложено в копилку", check.savingsAdded)
+            Text(
+                if (check.willPass) {
+                    "Готово! Уровень будет пройден, и придут новые деньги."
+                } else {
+                    "Если завершить сейчас, уровень начнётся заново — с новыми деньгами."
+                },
+                style = MaterialTheme.typography.bodyLarge,
+                color = FinneyInk,
+            )
+            FinneyButton(text = "Завершить уровень", onClick = onFinish)
+        }
+        FinneyButton(text = "Итоги и история", onClick = onOpenProgress)
         FinneyButton(text = "Ещё поиграю", onClick = onDismiss)
     }
 }
 
+/** Условие уровня: галочка или прочерк словом — цвет тут ничего не решает (ТЗ п. 3.6). */
+@Composable
+private fun CheckRow(label: String, done: Boolean) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clearAndSetSemantics { contentDescription = "$label: ${if (done) "да" else "пока нет"}" },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = if (done) "✓" else "—",
+            style = MaterialTheme.typography.titleLarge,
+            color = FinneyInk,
+            modifier = Modifier.padding(end = 12.dp),
+        )
+        Text(text = label, style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
+    }
+}
+
 /**
- * Меню «бургера»: всё, что не про уход за питомцем.
+ * Меню «бургера»: всё, что не про уход за питомцем и чего нет на экране.
  *
- * Активное задание стоит первым пунктом и подписано своим названием — раньше
- * оно занимало на экране целую кнопку, а нужно оно не в каждый момент.
+ * Порядок — от игры к служебному: играть, планировать, наряжать, потом подсказка
+ * и раздел взрослого. Прогресс и итоги — в панели уровня (нажатие на значок),
+ * отдельное задание — в плашке «Мини-игры»: дублей в меню нет.
  */
 @Composable
 private fun HomeMenu(
     expanded: Boolean,
     onDismiss: () -> Unit,
-    task: TaskDefinition?,
-    onOpenTask: (String) -> Unit,
     onOpenHelp: () -> Unit,
     onOpenBudget: () -> Unit,
     onOpenTasks: () -> Unit,
     onOpenWardrobe: () -> Unit,
-    onOpenProgress: () -> Unit,
     onOpenAdult: () -> Unit,
 ) {
     DropdownMenu(
@@ -896,18 +930,11 @@ private fun HomeMenu(
     ) {
         // Каждый пункт сначала закрывает меню: иначе после возврата с экрана
         // оно осталось бы раскрытым поверх главного.
-        task?.let { active ->
-            HomeMenuItem("Задание: ${active.title}") {
-                onDismiss()
-                onOpenTask(active.id)
-            }
-        }
+        HomeMenuItem("Мини-игры") { onDismiss(); onOpenTasks() }
+        HomeMenuItem("План расходов") { onDismiss(); onOpenBudget() }
+        HomeMenuItem("Гардероб") { onDismiss(); onOpenWardrobe() }
         // Знакомство в режиме подсказки: в конце «Понятно» и назад, без «Создать питомца».
         HomeMenuItem("Как играть") { onDismiss(); onOpenHelp() }
-        HomeMenuItem("План расходов") { onDismiss(); onOpenBudget() }
-        HomeMenuItem("Мини-игры") { onDismiss(); onOpenTasks() }
-        HomeMenuItem("Гардероб") { onDismiss(); onOpenWardrobe() }
-        HomeMenuItem("Прогресс") { onDismiss(); onOpenProgress() }
         HomeMenuItem("Для взрослых") { onDismiss(); onOpenAdult() }
     }
 }
@@ -1095,7 +1122,13 @@ private fun HomeContentPreview() {
                 stats = PetStats(30, 40, 50, 20),
                 emotion = Emotion.CALM,
                 level = 1,
-                levelProgress = 0.4f,
+                check = LevelCheck(
+                    planConfirmed = true,
+                    needsCovered = true,
+                    planMatched = false,
+                    savingsAdded = false,
+                    toPass = 2,
+                ),
                 stage = 1,
                 balance = 50,
                 totalSavings = 0,
@@ -1103,11 +1136,11 @@ private fun HomeContentPreview() {
                 periodNumber = 1,
                 phase = PeriodPhase.PLANNING,
                 needsHint = 40,
-                nextTask = null,
+                gamesLeft = 3,
                 food = emptyList(),
                 care = emptyList(),
             ),
-            onOpenBudget = {}, onOpenShop = {}, onOpenGoals = {}, onOpenTasks = {}, onOpenTask = {},
+            onOpenBudget = {}, onOpenShop = {}, onOpenGoals = {}, onOpenTasks = {},
             onOpenProgress = {}, onOpenAdult = {}, onOpenHelp = {}, onOpenPetLab = {},
             onClosePeriod = {}, onBuy = {},
         )

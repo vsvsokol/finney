@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import ru.finney.pet.domain.game.Rejection
+import ru.finney.pet.domain.game.TaskResult
 import ru.finney.pet.domain.model.Category
 import ru.finney.pet.domain.model.EntryType
 import ru.finney.pet.domain.model.PeriodPhase
@@ -71,15 +72,14 @@ class BudgetAndPurchaseTest {
     }
 
     @Test
-    fun `задание до плана увеличивает бюджет и не считается незапланированным`() {
-        var s = game.submitTask(start, "t1", Fixtures.success).submitted().state
+    fun `мини-игры — после плана, их награда — незапланированный доход`() {
+        assertEquals(Rejection.PlanNotConfirmed, (game.submitTask(start, "t1", Fixtures.success) as TaskResult.Rejected).reason)
+
+        var s = game.confirmPlan(start, needs = 20, wants = 0, savings = 0).state()
+        assertEquals(50, s.currentPeriod.plan!!.budget)
+
+        s = game.submitTask(s, "t1", Fixtures.success).submitted().state
         assertEquals(65, s.balance)
-        assertTrue(s.ledger.none { it.unplanned })
-
-        s = game.confirmPlan(s, needs = 20, wants = 0, savings = 0).state()
-        assertEquals(65, s.currentPeriod.plan!!.budget)
-
-        s = game.submitTask(s, "t2", Fixtures.success).submitted().state
         assertTrue(s.ledger.last().unplanned)
     }
 

@@ -231,7 +231,7 @@ private fun RejectionNote(rejection: Rejection) {
             "Ты разделил ${rejection.planned}, а есть только ${rejection.budget}. Убавь что-нибудь."
         is Rejection.InsufficientFunds -> "Не хватает ${rejection.shortage} финок."
         Rejection.InvalidAmount -> "Так не получится: суммы не могут быть меньше нуля."
-        Rejection.PlanAlreadyConfirmed -> "План на этот период уже готов."
+        Rejection.PlanAlreadyConfirmed -> "План на этот уровень уже готов."
         Rejection.NoActiveGoal -> "Выбери цель — тогда будет куда откладывать."
         else -> "Так пока нельзя."
     }

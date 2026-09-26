@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -48,6 +47,7 @@ import ru.finney.pet.domain.model.PetCharacter
 import ru.finney.pet.ui.components.CoinAmount
 import ru.finney.pet.ui.components.FinneyIconButton
 import ru.finney.pet.ui.components.OutlinedText
+import ru.finney.pet.ui.components.fadingScroll
 import ru.finney.pet.ui.pet.PetMood
 import ru.finney.pet.ui.pet.PetPose
 import ru.finney.pet.ui.pet.PetView
@@ -137,7 +137,7 @@ internal fun SceneBody(
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
+                    .fadingScroll(rememberScrollState())
                     .heightIn(min = maxHeight),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 horizontalAlignment = horizontalAlignment,

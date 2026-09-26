@@ -61,6 +61,23 @@ data class PlanReport(
     val onTrack: Boolean,
 )
 
+/**
+ * Условия текущего уровня на эту минуту — то, что увидит ребёнок в чек-листе,
+ * и то, что засчитается, если завершить уровень сейчас.
+ */
+data class LevelCheck(
+    /** План составлен: без него уровень не завершить и в мини-игры не сыграть. */
+    val planConfirmed: Boolean,
+    val needsCovered: Boolean,
+    val planMatched: Boolean,
+    val savingsAdded: Boolean,
+    /** Сколько условий нужно для прохождения. */
+    val toPass: Int,
+) {
+    val met: Int get() = listOf(needsCovered, planMatched, savingsAdded).count { it }
+    val willPass: Boolean get() = met >= toPass
+}
+
 sealed interface TaskResult {
     /** Исход задания и числа для экрана объяснения. [reward] = 0, если награда уже выдавалась. */
     data class Submitted(
@@ -97,10 +114,35 @@ class Game(
 
     // ---------- Чтение ----------
 
-    fun level(state: GameState): Int = levelFor(state.points)
+    fun level(state: GameState): Int = levelAfter(state, state.periods.size)
 
-    /** Уровень по произвольной сумме очков: нужен, чтобы сравнить уровень до и после периода. */
-    fun levelFor(points: Int): Int = Progression.level(points, economy)
+    /**
+     * Уровень после периодов с номерами до [periodNumber] включительно: нужен, чтобы
+     * сравнить уровень до и после периода. Каждый пройденный период — плюс уровень.
+     */
+    fun levelAfter(state: GameState, periodNumber: Int): Int = Progression.level(
+        state.periods.count { period ->
+            period.number <= periodNumber && period.result?.let { Progression.passed(it, economy) } == true
+        },
+        economy,
+    )
+
+    /** Пройден ли уровень, сыгранный в этом периоде; null — период ещё идёт. */
+    fun isPassed(period: Period): Boolean? = period.result?.let { Progression.passed(it, economy) }
+
+    /** Чек-лист текущего уровня. Сон считается на сейчас: спящий досыпает. */
+    fun levelCheck(state: GameState): LevelCheck {
+        val period = state.currentPeriod
+        val plan = period.plan
+        val facts = PeriodRules.facts(state.ledger, period.number)
+        return LevelCheck(
+            planConfirmed = period.phase == PeriodPhase.ACTIVE && plan != null,
+            needsCovered = PetRules.needsCovered(state.pet.copy(energy = energyAt(state)), economy.pet),
+            planMatched = plan != null && PeriodRules.planMatched(plan, facts, economy.planTolerance),
+            savingsAdded = facts.savings > 0,
+            toPass = economy.conditionsToPass,
+        )
+    }
 
     fun stage(state: GameState): Int = Progression.stage(level(state), economy)
 
@@ -338,6 +380,9 @@ class Game(
         if (state.sleepingSince != null) return TaskResult.Rejected(Rejection.Asleep)
         val task = content.task(taskId) ?: return TaskResult.Rejected(Rejection.UnknownTask(taskId))
         if (!isTaskAvailable(state, task)) return TaskResult.Rejected(Rejection.TaskLocked)
+        // Мини-игры — часть уровня, а уровень начинается с плана: без него игры
+        // превращались в случайный перебор ради монет.
+        if (state.currentPeriod.phase != PeriodPhase.ACTIVE) return TaskResult.Rejected(Rejection.PlanNotConfirmed)
         val evaluation = when (val e = TaskEngines.evaluate(task, input)) {
             is TaskEvaluation.Invalid -> return TaskResult.Rejected(Rejection.InvalidTaskInput(e.error))
             is TaskEvaluation.Done -> e

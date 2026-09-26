@@ -52,9 +52,9 @@ fun PeriodResultScreen(
         }
 
         PeriodResultUiState.Unavailable -> FinneyScreen {
-            OutlinedText("Итоги периода", style = MaterialTheme.typography.headlineLarge)
+            OutlinedText("Итоги уровня", style = MaterialTheme.typography.headlineLarge)
             Text(
-                text = "Этот период ещё не закрыт.",
+                text = "Этот уровень ещё не завершён.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = FinneyInk,
             )
@@ -74,7 +74,24 @@ private fun PeriodResultContent(state: PeriodResultUiState.Ready, onBack: () -> 
         verticalArrangement = Arrangement.spacedBy(16.dp),
         bottom = { FinneyButton(text = "На главный", onClick = onBack) },
     ) {
-        OutlinedText("Итоги периода ${state.periodNumber}", style = MaterialTheme.typography.headlineLarge)
+        OutlinedText("Итоги уровня ${state.playedLevel}", style = MaterialTheme.typography.headlineLarge)
+
+        // Главное — сразу и словами, а не только цветом плашки (ТЗ п. 3.6).
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            LevelBadge(level = state.level)
+            Text(
+                text = when {
+                    state.leveledUp -> "Уровень пройден! Теперь уровень ${state.level}."
+                    state.passed -> "Уровень пройден!"
+                    else -> "Уровень пока не пройден. Попробуй ещё раз — деньги уже пришли."
+                },
+                style = MaterialTheme.typography.titleLarge,
+                color = FinneyInk,
+            )
+        }
 
         FinneyPanel(title = "Как вышло") {
             FactRow("Нужное", state.facts.needs, state.plan.needs)
@@ -85,25 +102,13 @@ private fun PeriodResultContent(state: PeriodResultUiState.Ready, onBack: () -> 
             }
         }
 
-        // Каждое условие очков отдельной строкой: ребёнку видно, за что дали и чего не хватило.
-        FinneyPanel(title = "За что очки") {
-            ScoreRow("Питомец накормлен и чист", state.needsCovered)
-            ScoreRow("План выполнен", state.planMatched)
-            ScoreRow("В копилку отложено", state.savingsAdded)
-            ScoreRow("Заданий пройдено: ${state.successfulTasks}", state.successfulTasks > 0)
+        // Каждое условие отдельной строкой: ребёнку видно, что получилось и чего не хватило.
+        FinneyPanel(title = "Условия уровня: нужно ${state.toPass} из 3") {
+            ScoreRow("Питомец сыт, чист и выспался", state.needsCovered)
+            ScoreRow("Траты по плану", state.planMatched)
+            ScoreRow("Отложено в копилку", state.savingsAdded)
         }
 
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            LevelBadge(level = state.level)
-            Text(
-                text = if (state.leveledUp) "Новый уровень!" else "Очков за период: ${state.pointsEarned}",
-                style = MaterialTheme.typography.titleLarge,
-                color = FinneyInk,
-            )
-        }
         if (state.harderGames.isNotEmpty()) {
             Text(
                 text = "Новые задания в мини-играх: ${state.harderGames.joinToString { "«$it»" }}",
@@ -120,7 +125,7 @@ private fun PeriodResultContent(state: PeriodResultUiState.Ready, onBack: () -> 
             CoinAmount(amount = state.balance)
         }
 
-        // Итог словами, а не только цветом плашки (ТЗ п. 3.6).
+        // План отдельно: это главный навык игры (ТЗ п. 2.5.5).
         Text(
             text = if (state.planMatched) "План выполнен!" else "В следующий раз получится точнее",
             style = MaterialTheme.typography.titleLarge,
@@ -132,12 +137,6 @@ private fun PeriodResultContent(state: PeriodResultUiState.Ready, onBack: () -> 
                 .border(3.dp, FinneyInk, RoundedCornerShape(20.dp))
                 .padding(14.dp),
             textAlign = TextAlign.Center,
-        )
-
-        Text(
-            text = "Дальше — период ${state.nextPeriodNumber}.",
-            style = MaterialTheme.typography.bodyLarge,
-            color = FinneyInk,
         )
     }
 }
@@ -156,7 +155,7 @@ private fun FactRow(label: String, fact: Int, planned: Int) {
     }
 }
 
-/** Условие очков: галочка или прочерк плюс подпись — цвет здесь ничего не решает. */
+/** Условие уровня: галочка или прочерк плюс подпись — цвет здесь ничего не решает. */
 @Composable
 private fun ScoreRow(label: String, earned: Boolean) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -177,19 +176,18 @@ private fun PeriodResultPreview() {
         PeriodResultContent(
             state = PeriodResultUiState.Ready(
                 periodNumber = 1,
+                playedLevel = 1,
                 plan = Plan(budget = 50, needs = 20, wants = 10, savings = 10),
                 facts = PeriodFacts(needs = 20, wants = 5, savings = 10, unplannedIncome = 0),
                 needsCovered = true,
                 planMatched = true,
                 savingsAdded = true,
-                successfulTasks = 1,
-                pointsEarned = 5,
-                totalPoints = 5,
+                toPass = 2,
+                passed = true,
                 level = 2,
                 leveledUp = true,
                 harderGames = listOf("Касса Финни"),
                 balance = 15,
-                nextPeriodNumber = 2,
             ),
             onBack = {},
         )

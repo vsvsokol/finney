@@ -50,7 +50,7 @@ ru.finney.pet
 │   ├── profile/     проверка имени питомца
 │   ├── economy/     темп накоплений и срок до цели
 │   ├── period/      план и факт периода
-│   ├── progress/    очки развития, уровни, стадии
+│   ├── progress/    уровни (пройденные периоды), стадии
 │   ├── pet/         шкалы, эмоция, подсказка по нужному
 │   ├── tasks/       движки заданий и мини-игр
 │   └── model/       состояние игры и модели контента (@Serializable)
@@ -273,9 +273,9 @@ content/
     "taskSuccess": 1,
     "taskSuccessMaxPerPeriod": 2
   },
-  "pointsPerLevel": 5,
+  "conditionsToPass": 2,
   "maxLevel": 9,
-  "stageStartLevels": [1, 4, 7],
+  "stageStartLevels": [1, 3, 5],
   "pet": {
     "start": { "satiety": 70, "hygiene": 70, "mood": 70 },
     "decayByStage": [

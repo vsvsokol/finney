@@ -46,12 +46,11 @@ fun ProgressScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
             bottom = { FinneyButton(text = "Назад", onClick = onBack) },
         ) {
-            OutlinedText("Прогресс", style = MaterialTheme.typography.headlineLarge)
+            OutlinedText("Итоги и история", style = MaterialTheme.typography.headlineLarge)
 
-            FinneyPanel(title = "Финни растёт") {
+            FinneyPanel(title = "${s.petName} растёт") {
                 Line("Уровень", "${s.level} из 9")
                 Line("Стадия", StageNames[s.stage] ?: s.stage.toString())
-                Line("Очки развития", s.points.toString())
                 Line("Целей достигнуто", s.goalsCompleted.toString())
             }
 
@@ -66,7 +65,7 @@ fun ProgressScreen(
             }
 
             s.lastClosedPeriod?.let { number ->
-                FinneyButton(text = "Итоги периода $number", onClick = { onOpenPeriodResult(number) })
+                FinneyButton(text = "Итоги уровня ${s.lastClosedLevel}", onClick = { onOpenPeriodResult(number) })
             }
 
             FinneyPanel(title = "Мини-игры") {
@@ -91,7 +90,7 @@ fun ProgressScreen(
 
             FinneyPanel(title = "История") {
                 s.history.forEach { period ->
-                    Text("Период ${period.number}", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
+                    Text("Уровень ${period.level}", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
                     period.rows.forEach { HistoryLine(it) }
                 }
             }

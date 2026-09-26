@@ -39,8 +39,12 @@ class PeriodResultViewModelTest : ViewModelTest() {
         assertEquals(10, state.facts.needs)
         assertEquals(0, state.facts.wants)
         assertFalse(state.savingsAdded)
-        // Закрытие периода сразу открывает следующий.
-        assertEquals(2, state.nextPeriodNumber)
+        // Нужное не закрыто (питомец грязный), копилки нет — выполнен только план: 1 из 3.
+        assertTrue(state.planMatched)
+        assertEquals(1, state.playedLevel)
+        assertFalse(state.passed)
+        assertEquals(1, state.level)
+        assertFalse(state.leveledUp)
     }
 
     @Test
