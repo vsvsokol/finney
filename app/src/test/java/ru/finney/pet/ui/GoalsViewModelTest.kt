@@ -70,7 +70,8 @@ class GoalsViewModelTest : ViewModelTest() {
         assertEquals(15, state.progress?.saved)
         assertEquals(35, state.balance)
         assertNull(state.pendingWithdraw)
-        assertTrue("после снятия видно, что изменилось", state.feedback?.lines?.any { it.label == "Копилка" } == true)
+        assertNull("снятие — не событие, окна нет", state.feedback)
+        assertEquals("Сняли 5. До цели осталось 85.", state.note)
     }
 
     @Test

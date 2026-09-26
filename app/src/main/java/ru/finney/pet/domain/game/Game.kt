@@ -229,6 +229,11 @@ class Game(
         val period = state.currentPeriod
         if (period.phase != PeriodPhase.PLANNING) return reject(Rejection.PlanAlreadyConfirmed)
         if (needs < 0 || wants < 0 || savings < 0) return reject(Rejection.InvalidAmount)
+        // ТЗ п. 2.5.5: сумма распределяется минимум по трём направлениям. Пустой план
+        // ничего не решает, а после него открываются и покупки, и игры.
+        if (listOf(needs, wants, savings).count { it > 0 } < economy.planDirections) {
+            return reject(Rejection.PlanMissingDirection)
+        }
         val plan = Plan(budget = state.balance, needs = needs, wants = wants, savings = savings)
         if (plan.remainder < 0) return reject(Rejection.PlanExceedsBudget(plan.budget, plan.planned))
         val confirmed = state.withCurrentPeriod(period.copy(phase = PeriodPhase.ACTIVE, plan = plan))
@@ -242,6 +247,7 @@ class Game(
         if (state.sleepingSince != null) return reject(Rejection.Asleep)
         val item = content.item(itemId) ?: return reject(Rejection.UnknownItem(itemId))
         if (state.currentPeriod.phase != PeriodPhase.ACTIVE) return reject(Rejection.PlanNotConfirmed)
+        content.goalFor(item.id)?.let { return reject(Rejection.NotForSale(item.id, it.label)) }
         if (item.kind == ItemKind.ACCESSORY && state.owns(item.id)) return reject(Rejection.AlreadyOwned)
         if (item.price > state.balance) return reject(Rejection.InsufficientFunds(item.price, state.balance))
         val entry = entry(state, EntryType.PURCHASE, balanceDelta = -item.price)
@@ -309,7 +315,7 @@ class Game(
     fun takeOff(state: GameState): GameResult =
         if (state.sleepingSince != null) reject(Rejection.Asleep) else ok(state.copy(wornItemId = null))
 
-    /** Купленные аксессуары в порядке магазина. */
+    /** Купленные и заработанные целями аксессуары в порядке магазина. */
     fun wardrobe(state: GameState): List<ShopItem> =
         content.shop.filter { it.kind == ItemKind.ACCESSORY && state.owns(it.id) }
 
@@ -352,12 +358,15 @@ class Game(
         val saved = state.goalSaved(goal.id)
         if (saved < goal.price) return reject(Rejection.GoalNotReached(goal.price, saved))
         val entry = entry(state, EntryType.GOAL_COMPLETE, balanceDelta = 0, savingsDelta = -goal.price)
-            .copy(goalId = goal.id)
+            .copy(goalId = goal.id, itemId = goal.reward)
+        // Награда сразу на питомце, как купленная шляпа: ребёнок видит, на что копил.
+        val reward = goal.reward?.let(content::item)?.takeIf { it.kind == ItemKind.ACCESSORY }
         return ok(
             state.copy(
                 pet = PetRules.apply(state.pet, StatEffect(mood = goal.moodBonus)),
                 activeGoalId = null,
                 ledger = state.ledger + entry,
+                wornItemId = reward?.id ?: state.wornItemId,
             ),
         )
     }

@@ -14,6 +14,9 @@ sealed interface Rejection {
     /** Покупки и копилка до подтверждения плана. */
     data object PlanNotConfirmed : Rejection
     data object PlanAlreadyConfirmed : Rejection
+
+    /** В плане пусто одно из трёх направлений: нужное, желаемое, копилка (ТЗ п. 2.5.5). */
+    data object PlanMissingDirection : Rejection
     data class PlanExceedsBudget(val budget: Int, val planned: Int) : Rejection
 
     /** Сумма ≤ 0 там, где нужна положительная, или отрицательная часть плана. */
@@ -24,6 +27,9 @@ sealed interface Rejection {
     }
 
     data object AlreadyOwned : Rejection
+
+    /** Вещь — награда за цель: её не покупают, на неё копят. */
+    data class NotForSale(val id: String, val goalLabel: String) : Rejection
 
     /** Шкала сна и так полная — спать не хочется. */
     data object NotSleepy : Rejection

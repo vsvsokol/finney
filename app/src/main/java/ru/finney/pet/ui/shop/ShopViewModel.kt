@@ -119,7 +119,7 @@ class ShopViewModel(
     private fun toUiState(saved: SavedGame, selection: ShopSelection): ShopUiState.Ready {
         val state = saved.state
         val report = game.planReport(state)
-        fun previews(category: Category) = content.shop
+        fun previews(category: Category) = content.forSale
             .filter { it.category == category && it.isOnSale(state) }
             .mapNotNull { game.previewPurchase(state, it.id) }
         return ShopUiState.Ready(

@@ -32,6 +32,9 @@ object Fixtures {
         taskReward = TaskReward(success = 15, fail = 5),
         parentBonus = ParentBonusRule(step = 5, maxPerPeriod = 20),
         planTolerance = 5,
+        // Тесты правил проверяют каждое направление отдельно, поэтому пустые части
+        // здесь разрешены. Требование ТЗ «во всех трёх» — отдельный тест с planDirections = 3.
+        planDirections = 0,
         points = PointsRule(needsCovered = 2, planMatched = 2, savingsAdded = 2, taskSuccess = 1, taskSuccessMaxPerPeriod = 2),
         conditionsToPass = 2,
         maxLevel = 9,
@@ -56,10 +59,12 @@ object Fixtures {
         ShopItem("ball", "Мячик", 15, Category.WANTS, effect = StatEffect(mood = 30)),
         ShopItem("lamp", "Лампа", 25, Category.WANTS, effect = StatEffect(mood = 50)),
         ShopItem("hat", "Шапка", 30, Category.WANTS, ItemKind.ACCESSORY, StatEffect(mood = 20)),
+        // Награда за цель «Корона»: в магазине не продаётся.
+        ShopItem("crown_hat", "Корона", 50, Category.WANTS, ItemKind.ACCESSORY, StatEffect(mood = 20)),
     )
 
     val goals = listOf(
-        Goal("crown", "Корона", 50, moodBonus = 20),
+        Goal("crown", "Корона", 50, moodBonus = 20, reward = "crown_hat"),
         Goal("bike", "Велосипед", 100, moodBonus = 30),
     )
 

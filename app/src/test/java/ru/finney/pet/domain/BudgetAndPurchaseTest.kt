@@ -3,6 +3,7 @@ package ru.finney.pet.domain
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import ru.finney.pet.domain.game.Game
 import ru.finney.pet.domain.game.Rejection
 import ru.finney.pet.domain.game.TaskResult
 import ru.finney.pet.domain.model.Category
@@ -61,6 +62,16 @@ class BudgetAndPurchaseTest {
         val plan = game.confirmPlan(start, needs = 20, wants = 10, savings = 5).state().currentPeriod.plan!!
         assertEquals(50, plan.budget)
         assertEquals(15, plan.remainder)
+    }
+
+    @Test
+    fun `ТЗ 2_5_5 — сумма разложена по всем трём направлениям`() {
+        val strict = Game(Fixtures.content.copy(economy = Fixtures.economy.copy(planDirections = 3))) { 0L }
+        val withGoal = strict.selectGoal(strict.newGame(), "bike").state()
+        assertEquals(Rejection.PlanMissingDirection, strict.confirmPlan(withGoal, 0, 0, 0).reason())
+        assertEquals(Rejection.PlanMissingDirection, strict.confirmPlan(withGoal, 20, 0, 10).reason())
+        assertEquals(Rejection.PlanMissingDirection, strict.confirmPlan(withGoal, 20, 10, 0).reason())
+        strict.confirmPlan(withGoal, 20, 10, 10).state()
     }
 
     @Test

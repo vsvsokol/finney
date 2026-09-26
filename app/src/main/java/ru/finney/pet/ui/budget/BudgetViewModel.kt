@@ -18,6 +18,8 @@ import ru.finney.pet.domain.game.GameResult
 import ru.finney.pet.domain.game.PlanReport
 import ru.finney.pet.domain.game.Rejection
 import ru.finney.pet.domain.game.Session
+import ru.finney.pet.domain.model.GameContent
+import ru.finney.pet.domain.model.Goal
 import ru.finney.pet.domain.model.SavedGame
 
 sealed interface BudgetUiState {
@@ -26,6 +28,8 @@ sealed interface BudgetUiState {
     /** План не подтверждён: ребёнок распределяет бюджет, суммы можно менять сколько угодно. */
     data class Planning(
         val periodNumber: Int,
+        /** Уровень, который начинается с этого плана. */
+        val level: Int,
         /** Всё, что есть на балансе сейчас: доход периода, остаток прошлых, награды до плана. */
         val budget: Int,
         val needs: Int,
@@ -35,17 +39,24 @@ sealed interface BudgetUiState {
         val needsHint: Int?,
         /** null — цель не выбрана, откладывать пока некуда. */
         val goalLabel: String?,
+        /** Цели на выбор прямо в плане, если своей ещё нет: без цели копилку не заполнить. */
+        val goals: List<Goal> = emptyList(),
+        /** Сколько направлений должно быть заполнено; из economy.json. */
+        val directions: Int = 3,
         val rejection: Rejection?,
         val isSaving: Boolean,
     ) : BudgetUiState {
         val planned: Int get() = needs + wants + savings
         val remainder: Int get() = budget - planned
-        val canConfirm: Boolean get() = remainder >= 0 && !isSaving
+        /** ТЗ п. 2.5.5: сумма разложена минимум по трём направлениям — в каждом хоть что-то. */
+        val allDirections: Boolean get() = listOf(needs, wants, savings).count { it > 0 } >= directions
+        val canConfirm: Boolean get() = remainder >= 0 && allDirections && !isSaving
     }
 
     /** План подтверждён: план против факта до закрытия периода. */
     data class Active(
         val periodNumber: Int,
+        val level: Int,
         val report: PlanReport,
         val balance: Int,
     ) : BudgetUiState
@@ -54,6 +65,7 @@ sealed interface BudgetUiState {
 class BudgetViewModel(
     private val session: Session,
     private val game: Game,
+    private val content: GameContent,
 ) : ViewModel() {
 
     private data class Draft(
@@ -74,6 +86,13 @@ class BudgetViewModel(
     fun setWants(amount: Int) = draft.update { it.copy(wants = amount.coerceAtLeast(0), rejection = null) }
 
     fun setSavings(amount: Int) = draft.update { it.copy(savings = amount.coerceAtLeast(0), rejection = null) }
+
+    fun selectGoal(goalId: String) {
+        viewModelScope.launch {
+            val result = session.execute { selectGoal(it, goalId) }
+            if (result is GameResult.Rejected) draft.update { it.copy(rejection = result.reason) }
+        }
+    }
 
     /** После успеха экран сам переключится на [BudgetUiState.Active]. */
     fun confirm() {
@@ -96,16 +115,23 @@ class BudgetViewModel(
         val state = saved.state
         val report = game.planReport(state)
         if (report != null) {
-            return BudgetUiState.Active(state.currentPeriod.number, report, state.balance)
+            return BudgetUiState.Active(state.currentPeriod.number, game.level(state), report, state.balance)
         }
         return BudgetUiState.Planning(
             periodNumber = state.currentPeriod.number,
+            level = game.level(state),
             budget = state.balance,
             needs = draft.needs,
             wants = draft.wants,
             savings = draft.savings,
             needsHint = game.needsHint(state),
             goalLabel = game.goalProgress(state)?.goal?.label,
+            goals = if (state.activeGoalId == null) {
+                content.goals.filterNot { state.isGoalCompleted(it.id) }
+            } else {
+                emptyList()
+            },
+            directions = content.economy.planDirections,
             rejection = draft.rejection,
             isSaving = draft.isSaving,
         )
@@ -113,7 +139,7 @@ class BudgetViewModel(
 
     companion object {
         val Factory = viewModelFactory {
-            initializer { appContainer().let { BudgetViewModel(it.session, it.game) } }
+            initializer { appContainer().let { BudgetViewModel(it.session, it.game, it.content) } }
         }
     }
 }

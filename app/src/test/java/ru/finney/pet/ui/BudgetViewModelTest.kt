@@ -5,6 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import ru.finney.pet.domain.Fixtures
 import ru.finney.pet.domain.game.Rejection
 import ru.finney.pet.domain.model.BodyColor
 import ru.finney.pet.domain.model.EyesVariant
@@ -17,7 +18,7 @@ class BudgetViewModelTest : ViewModelTest() {
 
     private suspend fun viewModel(): BudgetViewModel {
         session.createProfile("Финни", PetAppearance(PetCharacter.PUSHISTIK, BodyColor.A, EyesVariant.ROUND))
-        return BudgetViewModel(session, game)
+        return BudgetViewModel(session, game, Fixtures.content)
     }
 
     @Test

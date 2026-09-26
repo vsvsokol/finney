@@ -27,10 +27,11 @@ import ru.finney.pet.domain.game.PlanReport
 import ru.finney.pet.domain.game.Rejection
 import ru.finney.pet.domain.model.PeriodFacts
 import ru.finney.pet.domain.model.Plan
+import ru.finney.pet.ui.components.AMOUNT_STEP
+import ru.finney.pet.ui.components.AmountStepper
 import ru.finney.pet.ui.components.CoinAmount
 import ru.finney.pet.ui.components.FinneyButton
 import ru.finney.pet.ui.components.FinneyCard
-import ru.finney.pet.ui.components.FinneyIconButton
 import ru.finney.pet.ui.components.FinneyPanel
 import ru.finney.pet.ui.components.FinneyScreen
 import ru.finney.pet.ui.components.OutlinedText
@@ -43,12 +44,10 @@ import ru.finney.pet.ui.theme.RadiusCard
 import ru.finney.pet.ui.theme.StrokeRegular
 import ru.finney.pet.ui.theme.FinneyYellow
 
-// Экран плана (ТЗ п. 2.5.5). Суммы набираются кнопками «плюс» и «минус», а не
-// с клавиатуры: цифровое поле для 7-летнего — барьер, а шаг в 5 финок заодно
-// не даёт составить план из копеек.
+// Экран плана (ТЗ п. 2.5.5). Суммы набираются кнопками «плюс» и «минус» (AmountStepper),
+// и в каждое из трёх направлений нужно положить хоть что-то.
 
-/** Шаг изменения суммы. Совпадает с шагом родительского бонуса из economy.json. */
-private const val STEP = 5
+private const val STEP = AMOUNT_STEP
 
 @Composable
 fun BudgetScreen(
@@ -68,6 +67,7 @@ fun BudgetScreen(
             onNeedsChange = viewModel::setNeeds,
             onWantsChange = viewModel::setWants,
             onSavingsChange = viewModel::setSavings,
+            onSelectGoal = viewModel::selectGoal,
             onConfirm = viewModel::confirm,
             onBack = onBack,
         )
@@ -81,6 +81,7 @@ private fun PlanningContent(
     onNeedsChange: (Int) -> Unit,
     onWantsChange: (Int) -> Unit,
     onSavingsChange: (Int) -> Unit,
+    onSelectGoal: (String) -> Unit,
     onConfirm: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -91,7 +92,7 @@ private fun PlanningContent(
         OutlinedText("План", style = MaterialTheme.typography.headlineLarge)
 
         Text(
-            text = "Период ${state.periodNumber}. Реши, на что потратить деньги.",
+            text = "Уровень ${state.level}. Разложи деньги на три части — в каждую хоть немного.",
             style = MaterialTheme.typography.bodyLarge,
             color = FinneyInk,
             textAlign = TextAlign.Center,
@@ -123,19 +124,39 @@ private fun PlanningContent(
             onChange = onWantsChange,
             canAdd = canAdd,
         )
-        // Без выбранной цели откладывать некуда: план с копилкой домен не примет,
-        // поэтому «+» здесь недоступен, а подпись объясняет почему.
-        AmountRow(
-            label = state.goalLabel?.let { "Копилка: $it" } ?: "Копилка",
-            hint = if (state.goalLabel == null) "сначала выбери цель" else null,
-            value = state.savings,
-            onChange = onSavingsChange,
-            canAdd = canAdd && state.goalLabel != null,
-        )
+        // Без выбранной цели откладывать некуда: цель выбирается прямо здесь,
+        // а не на другом экране, — иначе план было бы не собрать.
+        if (state.goalLabel == null) {
+            FinneyCard {
+                Text("Копилка", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
+                Text("На что копим? Выбери цель:", style = MaterialTheme.typography.bodyMedium, color = FinneyInk)
+                state.goals.forEach { goal ->
+                    FinneyButton(text = "${goal.label} · ${goal.price}", onClick = { onSelectGoal(goal.id) })
+                }
+            }
+        } else {
+            AmountRow(
+                label = "Копилка: ${state.goalLabel}",
+                hint = null,
+                value = state.savings,
+                onChange = onSavingsChange,
+                canAdd = canAdd,
+            )
+        }
 
         Remainder(remainder = state.remainder)
 
         state.rejection?.let { RejectionNote(it) }
+
+        // Почему кнопка погашена — словами, а не догадкой.
+        if (!state.allDirections && state.remainder >= 0) {
+            Text(
+                text = "Положи хоть немного в каждую часть: нужное, желаемое и копилку.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = FinneyInk,
+                textAlign = TextAlign.Center,
+            )
+        }
 
         FinneyButton(
             text = "Подтвердить план",
@@ -166,36 +187,7 @@ private fun AmountRow(
         hint?.let {
             Text(it, style = MaterialTheme.typography.bodyMedium, color = FinneyInk)
         }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            FinneyIconButton(
-                onClick = { onChange((value - STEP).coerceAtLeast(0)) },
-                contentDescription = "$label: убавить",
-                size = 56.dp,
-                enabled = value > 0,
-            ) {
-                OutlinedText("−", style = MaterialTheme.typography.headlineMedium)
-            }
-
-            Box(
-                modifier = Modifier.weight(1f),
-                contentAlignment = Alignment.Center,
-            ) {
-                CoinAmount(amount = value)
-            }
-
-            FinneyIconButton(
-                onClick = { onChange(value + STEP) },
-                contentDescription = "$label: добавить",
-                size = 56.dp,
-                enabled = canAdd,
-            ) {
-                OutlinedText("+", style = MaterialTheme.typography.headlineMedium)
-            }
-        }
+        AmountStepper(label = label, value = value, onChange = onChange, canAdd = canAdd, step = STEP)
     }
 }
 
@@ -233,6 +225,7 @@ private fun RejectionNote(rejection: Rejection) {
         Rejection.InvalidAmount -> "Так не получится: суммы не могут быть меньше нуля."
         Rejection.PlanAlreadyConfirmed -> "План на этот уровень уже готов."
         Rejection.NoActiveGoal -> "Выбери цель — тогда будет куда откладывать."
+        Rejection.PlanMissingDirection -> "Положи хоть немного в каждую часть: нужное, желаемое и копилку."
         else -> "Так пока нельзя."
     }
     Text(
@@ -257,7 +250,7 @@ private fun ActiveContent(state: BudgetUiState.Active, onBack: () -> Unit) {
     ) {
         OutlinedText("План и факт", style = MaterialTheme.typography.headlineLarge)
 
-        FinneyPanel(title = "Период ${state.periodNumber}") {
+        FinneyPanel(title = "Уровень ${state.level}") {
             FactRow("Нужное", report.facts.needs, report.plan.needs)
             FactRow("Желаемое", report.facts.wants, report.plan.wants)
             FactRow("Копилка", report.facts.savings, report.plan.savings)
@@ -316,10 +309,10 @@ private fun PlanningContentPreview() {
     FinneyTheme {
         PlanningContent(
             state = BudgetUiState.Planning(
-                periodNumber = 1, budget = 50, needs = 30, wants = 10, savings = 10,
+                periodNumber = 1, level = 1, budget = 50, needs = 30, wants = 10, savings = 10,
                 needsHint = 30, goalLabel = "Велосипед", rejection = null, isSaving = false,
             ),
-            onNeedsChange = {}, onWantsChange = {}, onSavingsChange = {}, onConfirm = {}, onBack = {},
+            onNeedsChange = {}, onWantsChange = {}, onSavingsChange = {}, onSelectGoal = {}, onConfirm = {}, onBack = {},
         )
     }
 }
@@ -331,6 +324,7 @@ private fun ActiveContentPreview() {
         ActiveContent(
             state = BudgetUiState.Active(
                 periodNumber = 1,
+                level = 1,
                 report = PlanReport(
                     plan = Plan(budget = 50, needs = 30, wants = 10, savings = 10),
                     facts = PeriodFacts(needs = 25, wants = 10, savings = 10, unplannedIncome = 0),

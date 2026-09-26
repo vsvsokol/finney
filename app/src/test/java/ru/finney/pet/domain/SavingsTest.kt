@@ -95,4 +95,19 @@ class SavingsTest {
         assertNull(s.activeGoalId)
         assertEquals(Rejection.GoalAlreadyCompleted, game.selectGoal(s, "crown").reason())
     }
+
+    @Test
+    fun `достигнутая цель — это вещь, она у питомца, надета и в гардеробе`() {
+        var s = game.selectGoal(game.newGame(), "crown").state()
+        s = game.confirmPlan(s, 0, 0, 0).state()
+        assertEquals(Rejection.NotForSale("crown_hat", "Корона"), game.buy(s, "crown_hat").reason())
+
+        s = game.deposit(s, 50).state()
+        s = game.completeGoal(s).state()
+
+        assertTrue(s.owns("crown_hat"))
+        assertEquals("crown_hat", s.wornItemId)
+        assertEquals(listOf("crown_hat"), game.wardrobe(s).map { it.id })
+        assertEquals("снять и надеть снова", "crown_hat", game.wear(game.takeOff(s).state(), "crown_hat").state().wornItemId)
+    }
 }

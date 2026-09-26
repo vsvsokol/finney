@@ -122,5 +122,8 @@ data class GameState(
     fun isGoalCompleted(goalId: String): Boolean =
         ledger.any { it.type == EntryType.GOAL_COMPLETE && it.goalId == goalId }
 
-    fun owns(itemId: String): Boolean = ledger.any { it.type == EntryType.PURCHASE && it.itemId == itemId }
+    /** Вещь куплена или получена за достигнутую цель. */
+    fun owns(itemId: String): Boolean = ledger.any {
+        (it.type == EntryType.PURCHASE || it.type == EntryType.GOAL_COMPLETE) && it.itemId == itemId
+    }
 }

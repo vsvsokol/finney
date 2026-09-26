@@ -49,8 +49,10 @@ sealed interface GoalsUiState {
         /** Копилка цели набрана: можно подтвердить достижение. */
         val canComplete: Boolean,
         val rejection: Rejection?,
-        /** Итог последнего взноса или снятия: что изменилось и что дальше. */
+        /** Окно с итогом — только для достигнутой цели: это событие, а не рутина. */
         val feedback: ActionFeedback? = null,
+        /** Итог последнего взноса или снятия одной строкой под кнопками — без всплывающих окон. */
+        val note: String? = null,
         /** Снятие ждёт подтверждения: как изменятся копилка и срок (ТЗ п. 2.5.7). */
         val pendingWithdraw: PendingWithdraw? = null,
     ) : GoalsUiState
@@ -63,6 +65,7 @@ data class PendingWithdraw(val amount: Int, val preview: WithdrawPreview)
 private data class GoalsScreenState(
     val rejection: Rejection? = null,
     val feedback: ActionFeedback? = null,
+    val note: String? = null,
     val pendingWithdraw: PendingWithdraw? = null,
 )
 
@@ -85,15 +88,13 @@ class GoalsViewModel(
     fun selectGoal(goalId: String) = run { session.execute { selectGoal(it, goalId) } }
 
     fun deposit(amount: Int) = run(
-        feedback = { before, after ->
-            ActionFeedback(
-                title = "Отложили $amount",
-                lines = changesBetween(before, after),
-                why = "Копилка растёт — цель ближе.",
-                next = "Откладывай на каждом уровне.",
-            )
-        },
+        note = { _, after -> "Отложили $amount. ${leftLine(after)}" },
     ) { session.execute { deposit(it, amount) } }
+
+    private fun leftLine(state: GameState): String {
+        val left = game.goalProgress(state)?.remaining ?: return ""
+        return if (left > 0) "До цели осталось $left." else "Хватает — забирай!"
+    }
 
     /**
      * Первый шаг снятия: только показать, что будет. Сами деньги не двигаются,
@@ -117,24 +118,19 @@ class GoalsViewModel(
         val pending = screen.value.pendingWithdraw ?: return
         screen.update { it.copy(pendingWithdraw = null) }
         run(
-            feedback = { before, after ->
-                ActionFeedback(
-                    title = "Сняли ${pending.amount} из копилки",
-                    lines = changesBetween(before, after),
-                    why = "До цели стало дальше.",
-                    next = "Передумаешь — отложи снова.",
-                )
-            },
+            note = { _, after -> "Сняли ${pending.amount}. ${leftLine(after)}" },
         ) { session.execute { withdraw(it, pending.amount) } }
     }
 
+    /** Цель достигнута: вещь переходит питомцу и сразу надета. */
     fun completeGoal() = run(
         feedback = { before, after ->
+            val goal = before.activeGoalId?.let(content::goal)
             ActionFeedback(
-                title = "Цель достигнута!",
+                title = "${goal?.label ?: "Цель"} — твоя!",
                 lines = changesBetween(before, after),
-                why = "Ты копил — и получилось!",
-                next = "Выбери новую цель.",
+                why = "Ты копил — и получилось. Она уже на питомце.",
+                next = "Переодеть можно в гардеробе. Выбери новую цель.",
             )
         },
     ) { session.execute { completeGoal(it) } }
@@ -143,6 +139,7 @@ class GoalsViewModel(
 
     private fun run(
         feedback: ((before: GameState, after: GameState) -> ActionFeedback)? = null,
+        note: ((before: GameState, after: GameState) -> String)? = null,
         command: suspend () -> GameResult,
     ) {
         viewModelScope.launch {
@@ -150,6 +147,7 @@ class GoalsViewModel(
             screen.value = when (val result = command()) {
                 is GameResult.Ok -> GoalsScreenState(
                     feedback = if (feedback != null && before != null) feedback(before, result.state) else null,
+                    note = if (note != null && before != null) note(before, result.state) else null,
                 )
                 is GameResult.Rejected -> GoalsScreenState(rejection = result.reason)
             }
@@ -174,6 +172,7 @@ class GoalsViewModel(
             canComplete = progress != null && progress.remaining <= 0,
             rejection = screen.rejection,
             feedback = screen.feedback,
+            note = screen.note,
             pendingWithdraw = screen.pendingWithdraw,
         )
     }

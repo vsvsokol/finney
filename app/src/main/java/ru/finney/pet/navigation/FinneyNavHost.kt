@@ -24,6 +24,7 @@ import ru.finney.pet.ui.pet.PetLabScreen
 import ru.finney.pet.ui.progress.GlossaryScreen
 import ru.finney.pet.ui.progress.ProgressScreen
 import ru.finney.pet.ui.shop.ShopScreen
+import ru.finney.pet.ui.wardrobe.WardrobeScreen
 import ru.finney.pet.ui.tasks.TaskScreen
 import ru.finney.pet.ui.tasks.TasksScreen
 
@@ -79,6 +80,7 @@ fun FinneyNavHost(
                 onOpenShop = { navController.navigate(ShopRoute) },
                 onOpenGoals = { navController.navigate(GoalsRoute) },
                 onOpenTasks = { navController.navigate(TasksRoute) },
+                onOpenWardrobe = { navController.navigate(WardrobeRoute) },
                 onOpenProgress = { navController.navigate(ProgressRoute) },
                 onOpenAdult = { navController.navigate(AdultRoute) },
                 onOpenHelp = { navController.navigate(OnboardingRoute(isReplay = true)) },
@@ -100,6 +102,13 @@ fun FinneyNavHost(
                 onBack = { navController.popBackStack() },
                 onOpenBudget = { navController.navigate(BudgetRoute) },
                 onOpenHistory = { navController.navigate(ProgressRoute) },
+            )
+        }
+
+        composable<WardrobeRoute> {
+            WardrobeScreen(
+                onBack = { navController.popBackStack() },
+                onOpenGoals = { navController.navigate(GoalsRoute) },
             )
         }
 

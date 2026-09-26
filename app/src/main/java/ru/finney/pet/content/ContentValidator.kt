@@ -9,6 +9,7 @@ import ru.finney.pet.domain.model.DistributorTask
 import ru.finney.pet.domain.model.GameContent
 import ru.finney.pet.domain.model.GoalRaceTask
 import ru.finney.pet.domain.model.GoalSliderTask
+import ru.finney.pet.domain.model.ItemKind
 import ru.finney.pet.domain.model.ReserveTask
 import ru.finney.pet.domain.model.SorterTask
 import ru.finney.pet.domain.model.StandTask
@@ -28,6 +29,7 @@ object ContentValidator {
         if (e.stageStartLevels.firstOrNull() != 1) add("economy.json: stageStartLevels должен начинаться с 1")
         if (e.stageStartLevels.zipWithNext().any { (a, b) -> a >= b }) add("economy.json: stageStartLevels должен возрастать")
         if (e.stageStartLevels.any { it > e.maxLevel }) add("economy.json: стадия начинается после maxLevel")
+        if (e.planDirections !in 0..3) add("economy.json: planDirections должен быть от 0 до 3")
         if (e.conditionsToPass !in 1..3) add("economy.json: conditionsToPass должен быть от 1 до 3")
         if (e.parentBonus.step <= 0) add("economy.json: parentBonus.step должен быть > 0")
         if (e.incomeByStage.any { it <= 0 }) add("economy.json: доход должен быть > 0")
@@ -36,6 +38,12 @@ object ContentValidator {
         if (e.pet.sleepMinutes <= 0 || e.pet.demoSleepSeconds <= 0) add("economy.json: pet.sleepMinutes и demoSleepSeconds должны быть > 0")
 
         duplicates(content.shop.map { it.id }).forEach { add("shop.json: повторяется id $it") }
+        content.goals.forEach { goal ->
+            val reward = goal.reward ?: return@forEach
+            val item = content.item(reward)
+            if (item == null) add("goals.json: ${goal.id} — награда $reward не найдена в shop.json")
+            else if (item.kind != ItemKind.ACCESSORY) add("goals.json: ${goal.id} — награда $reward должна быть аксессуаром")
+        }
         content.shop.filter { it.price <= 0 }.forEach { add("shop.json: ${it.id} — цена должна быть > 0") }
         val needs = content.shop.filter { it.category == Category.NEEDS }
         if (needs.none { it.effect.satiety > 0 }) add("shop.json: нет обязательного товара, поднимающего сытость")

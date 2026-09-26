@@ -67,8 +67,6 @@ sealed interface HomeUiState {
         val care: List<PurchasePreview>,
         /** Что надето сейчас — id аксессуара из магазина. */
         val worn: String? = null,
-        /** Купленные аксессуары: их можно надеть в гардеробе. */
-        val wardrobe: List<ShopItem> = emptyList(),
         /** Питомец спит; null — не спит. */
         val sleep: SleepInfo? = null,
     ) : HomeUiState {
@@ -195,18 +193,6 @@ class HomeViewModel(
     }
 
     /** Надеть купленную вещь. Бесплатно: деньги ушли при покупке. */
-    fun wear(itemId: String) {
-        viewModelScope.launch {
-            (session.execute { wear(it, itemId) } as? GameResult.Rejected)?.let {
-                _events.send(HomeEvent.Rejected(it.reason))
-            }
-        }
-    }
-
-    fun takeOff() {
-        viewModelScope.launch { session.execute { takeOff(it) } }
-    }
-
     private fun toUiState(saved: SavedGame): HomeUiState.Ready {
         val state = saved.state
         val passed = state.attempts.filter { it.outcome == TaskOutcome.SUCCESS }.map { it.taskId }.toSet()
@@ -232,7 +218,6 @@ class HomeViewModel(
             food = previews(state) { it.effect.satiety > 0 },
             care = previews(state) { it.effect.hygiene > 0 },
             worn = state.wornItemId,
-            wardrobe = game.wardrobe(state),
             sleep = state.sleepingSince?.let { since ->
                 SleepInfo(since = since, endsAt = game.sleepEndsAt(state)!!, energyFrom = state.pet.energy)
             },

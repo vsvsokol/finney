@@ -1,41 +1,33 @@
-"""Собирает значок приложения из слоя Пушистика — как в кадре айдентики 1:2.
+"""Собирает значок приложения из design/icon.svg — утверждённого значка «Финни».
 
-Зачем не вырезать значок из экспорта айдентики: там он ~260 px, а передний слой
-адаптивного значка на xxxhdpi — 432 px. Растянутый вырез мылится, а у питомца
-есть исходник в 2048 px.
-
-Кадр найден совмещением значка из design/exports/ui/identity-1-2.png со слоем
-pushistik_happy.png: квадрат со стороной ICON_SIDE вокруг ICON_CENTER. Рисунок
-значка в айдентике чуть старше нынешнего питомца (цветы на капюшоне стоят иначе),
-поэтому совпадение — по лицу, а не пиксель в пиксель.
+В icon.svg лежит PNG 1000 × 1000 и матрица, которая вырезает из него кадр
+258 × 261: лицо питомца крупно. Кадр считается из той же матрицы, а не
+промеряется вручную, — поменяют значок в Figma, скрипт возьмёт новый кадр.
 
 Адаптивный значок — слой 108 dp, из которого лаунчер показывает середину 72 dp,
-а остальное оставляет на параллакс. Поэтому видимый квадрат айдентики — это
-средние 2/3 слоя, и вырез берётся в полтора раза шире.
+а остальное оставляет на параллакс. Поэтому кадр значка — это средние 2/3 слоя,
+и вырез берётся в полтора раза шире: вокруг лица остаётся рисунок из того же PNG.
 
 Выход (WebP без потерь, PNG в ресурсы не кладём):
     mipmap-*dpi/ic_launcher_foreground.webp  — питомец на прозрачном
     mipmap-*dpi/ic_launcher_monochrome.webp  — тёмные линии для тематических значков
-Фон — цвет капюшона, values/ic_launcher.xml: там, где кончается капюшон,
-в параллаксе не видно шва.
+Фон — кремовый, как у значка в icon.svg: values/ic_launcher.xml.
 
-Запуск из корня репозитория (нужен Pillow):
+Запуск из корня репозитория (нужны Pillow и numpy):
     python tools/make_app_icon.py
 """
 
+import base64
+import io
+import re
 from pathlib import Path
 
 import numpy as np
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
-SOURCE = ROOT / "design/exports/pet/pushistik/pushistik_happy.png"
+SOURCE = ROOT / "design/icon.svg"
 RES = ROOT / "app/src/main/res"
-
-# Промер по identity-1-2.png, в пикселях холста Пушистика (2048 × 2048).
-ICON_CENTER = (1028, 896)
-ICON_SIDE = 1040
-LAYER_SIDE = ICON_SIDE * 108 // 72
 
 DENSITIES = {"mdpi": 108, "hdpi": 162, "xhdpi": 216, "xxhdpi": 324, "xxxhdpi": 432}
 
@@ -44,10 +36,22 @@ DENSITIES = {"mdpi": 108, "hdpi": 162, "xhdpi": 216, "xxhdpi": 324, "xxxhdpi": 4
 INK_LUMA = 70
 
 
-def crop_layer(pet: Image.Image) -> Image.Image:
-    cx, cy = ICON_CENTER
-    half = LAYER_SIDE // 2
-    return pet.crop((cx - half, cy - half, cx + half, cy + half))
+def load_icon() -> tuple[Image.Image, tuple[float, float, float, float]]:
+    """PNG из icon.svg и видимый в значке кадр в его пикселях: (лево, верх, право, низ)."""
+    svg = SOURCE.read_text(encoding="utf-8")
+    png = base64.b64decode(re.search(r'base64,([^"]+)"', svg).group(1))
+    # <use transform="matrix(sx 0 0 sy tx ty)"> в единицах objectBoundingBox:
+    # кадр 0..1 значка — это пиксели (-tx / sx) .. ((1 - tx) / sx) картинки.
+    sx, _, _, sy, tx, ty = map(float, re.search(r'matrix\(([^)]+)\)', svg).group(1).split())
+    frame = (-tx / sx, -ty / sy, (1 - tx) / sx, (1 - ty) / sy)
+    return Image.open(io.BytesIO(png)).convert("RGBA"), frame
+
+
+def crop_layer(icon: Image.Image, frame: tuple[float, float, float, float]) -> Image.Image:
+    left, top, right, bottom = frame
+    cx, cy = (left + right) / 2, (top + bottom) / 2
+    half = max(right - left, bottom - top) * 108 / 72 / 2
+    return icon.crop(tuple(round(v) for v in (cx - half, cy - half, cx + half, cy + half)))
 
 
 def monochrome(layer: Image.Image) -> Image.Image:
@@ -61,8 +65,8 @@ def monochrome(layer: Image.Image) -> Image.Image:
 
 
 def main() -> None:
-    pet = Image.open(SOURCE).convert("RGBA")
-    layers = {"foreground": crop_layer(pet)}
+    icon, frame = load_icon()
+    layers = {"foreground": crop_layer(icon, frame)}
     layers["monochrome"] = monochrome(layers["foreground"])
     for density, side in DENSITIES.items():
         folder = RES / f"mipmap-{density}"

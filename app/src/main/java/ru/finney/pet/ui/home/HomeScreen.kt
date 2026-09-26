@@ -99,7 +99,6 @@ import ru.finney.pet.ui.room.CareOption
 import ru.finney.pet.ui.room.CarePanel
 import ru.finney.pet.ui.room.DOOR_MS
 import ru.finney.pet.ui.room.WALK_MS
-import ru.finney.pet.ui.room.WardrobePanel
 import ru.finney.pet.ui.room.RoomScene
 import ru.finney.pet.ui.room.RoomSpot
 import ru.finney.pet.ui.theme.FinneyInk
@@ -136,6 +135,7 @@ fun HomeScreen(
     onOpenShop: () -> Unit,
     onOpenGoals: () -> Unit,
     onOpenTasks: () -> Unit,
+    onOpenWardrobe: () -> Unit,
     onOpenProgress: () -> Unit,
     onOpenAdult: () -> Unit,
     onOpenHelp: () -> Unit,
@@ -179,14 +179,13 @@ fun HomeScreen(
             onOpenShop = onOpenShop,
             onOpenGoals = onOpenGoals,
             onOpenTasks = onOpenTasks,
+            onOpenWardrobe = onOpenWardrobe,
             onOpenProgress = onOpenProgress,
             onOpenAdult = onOpenAdult,
             onOpenHelp = onOpenHelp,
             onOpenPetLab = onOpenPetLab,
             onClosePeriod = viewModel::closePeriod,
             onBuy = viewModel::buy,
-            onWear = viewModel::wear,
-            onTakeOff = viewModel::takeOff,
             onSleep = viewModel::sleep,
             onWake = viewModel::wake,
         )
@@ -240,14 +239,13 @@ private fun HomeContent(
     onOpenShop: () -> Unit,
     onOpenGoals: () -> Unit,
     onOpenTasks: () -> Unit,
+    onOpenWardrobe: () -> Unit,
     onOpenProgress: () -> Unit,
     onOpenAdult: () -> Unit,
     onOpenHelp: () -> Unit,
     onOpenPetLab: () -> Unit,
     onClosePeriod: () -> Unit,
     onBuy: (itemId: String) -> Unit,
-    onWear: (itemId: String) -> Unit = {},
-    onTakeOff: () -> Unit = {},
     onSleep: () -> Unit = {},
     onWake: () -> Unit = {},
 ) {
@@ -298,8 +296,6 @@ private fun HomeContent(
     // а не в игре: пока не нажали «Купить», ничего не произошло.
     var care by rememberSaveable { mutableStateOf<CareTarget?>(null) }
 
-    // Гардероб — по пункту меню: второе нажатие на «Зал» укладывает спать.
-    var wardrobeOpen by rememberSaveable { mutableStateOf(false) }
     var picked by rememberSaveable { mutableStateOf<String?>(null) }
 
     // Панель отладки: долгое нажатие на уровень, только в отладочной сборке.
@@ -471,7 +467,7 @@ private fun HomeContent(
                         onOpenHelp = onOpenHelp,
                         onOpenBudget = onOpenBudget,
                         onOpenTasks = onOpenTasks,
-                        onOpenWardrobe = { spot = RoomSpot.LIVING; wardrobeOpen = true },
+                        onOpenWardrobe = onOpenWardrobe,
                         onOpenAdult = onOpenAdult,
                     )
                 }
@@ -630,33 +626,6 @@ private fun HomeContent(
         // чтобы заголовок панели не наезжал на плашки, и ловит нажатия: без неё
         // сквозь панель нажимались кнопки комнат, а нажатие мимо панели ничего
         // не делало. Теперь мимо — это «закрыть».
-        if (wardrobeOpen) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(FinneyInk.copy(alpha = 0.45f))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClickLabel = "Закрыть",
-                        onClick = { wardrobeOpen = false },
-                    )
-                    .systemBarsPadding()
-                    .padding(16.dp),
-                contentAlignment = Alignment.BottomCenter,
-            ) {
-                WardrobePanel(
-                    modifier = Modifier.pointerInput(Unit) { detectTapGestures { } },
-                    items = state.wardrobe,
-                    worn = state.worn,
-                    onWear = onWear,
-                    onTakeOff = onTakeOff,
-                    onOpenShop = { wardrobeOpen = false; onOpenShop() },
-                    onDismiss = { wardrobeOpen = false },
-                )
-            }
-        }
-
         care?.let { target ->
             val previews = when (target) {
                 CareTarget.FOOD -> state.food
@@ -1140,7 +1109,7 @@ private fun HomeContentPreview() {
                 food = emptyList(),
                 care = emptyList(),
             ),
-            onOpenBudget = {}, onOpenShop = {}, onOpenGoals = {}, onOpenTasks = {},
+            onOpenBudget = {}, onOpenShop = {}, onOpenGoals = {}, onOpenTasks = {}, onOpenWardrobe = {},
             onOpenProgress = {}, onOpenAdult = {}, onOpenHelp = {}, onOpenPetLab = {},
             onClosePeriod = {}, onBuy = {},
         )

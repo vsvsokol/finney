@@ -43,6 +43,12 @@ data class Goal(
     val label: String,
     val price: Int,
     val moodBonus: Int = 0,
+    /**
+     * Вещь из shop.json, которую ребёнок получает, когда цель достигнута. Копят не на
+     * абстрактную «цель», а на то, что потом видно на питомце. В магазине такая вещь
+     * не продаётся: её можно только накопить.
+     */
+    val reward: String? = null,
 )
 
 /** glossary.json — справочник терминов, ТЗ п. 2.5.11. */
@@ -65,6 +71,12 @@ data class GameContent(
 ) {
     fun item(id: String): ShopItem? = shop.firstOrNull { it.id == id }
     fun goal(id: String): Goal? = goals.firstOrNull { it.id == id }
+
+    /** Цель, наградой за которую служит вещь [itemId]; null — вещь продаётся в магазине. */
+    fun goalFor(itemId: String): Goal? = goals.firstOrNull { it.reward == itemId }
+
+    /** То, что продаётся в магазине: всё, кроме наград за цели. */
+    val forSale: List<ShopItem> get() = shop.filter { goalFor(it.id) == null }
     fun task(id: String): TaskDefinition? = tasks.firstOrNull { it.id == id }
 
     /**

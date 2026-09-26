@@ -38,6 +38,10 @@ data object ShopRoute
 @Serializable
 data object GoalsRoute
 
+/** Гардероб: питомец крупно и его вещи — надеть, снять, как получить. */
+@Serializable
+data object WardrobeRoute
+
 /** Все задания и мини-игры по темам. */
 @Serializable
 data object TasksRoute

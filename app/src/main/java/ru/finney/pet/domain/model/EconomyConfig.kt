@@ -9,6 +9,8 @@ data class EconomyConfig(
     val taskReward: TaskReward,
     val parentBonus: ParentBonusRule,
     val planTolerance: Int,
+    /** В скольких направлениях плана (нужное, желаемое, копилка) должна быть сумма > 0. ТЗ п. 2.5.5 — во всех трёх. */
+    val planDirections: Int = 3,
     val points: PointsRule,
     /** Сколько из трёх условий уровня (нужное, план, копилка) нужно выполнить, чтобы его пройти. */
     val conditionsToPass: Int,

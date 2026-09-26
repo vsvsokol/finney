@@ -48,6 +48,14 @@ fun rejectionMessage(rejection: Rejection): RejectionMessage = when (rejection) 
         "План уровня ещё не готов.",
         "Сначала составь план.",
     )
+    Rejection.PlanMissingDirection -> RejectionMessage(
+        "В плане пусто.",
+        "Положи хоть немного в каждое: нужное, желаемое и копилку.",
+    )
+    is Rejection.NotForSale -> RejectionMessage(
+        "Это не продаётся.",
+        "На «${rejection.goalLabel}» копят в копилке.",
+    )
     Rejection.PlanAlreadyConfirmed -> RejectionMessage(
         "План этого уровня уже подтверждён.",
         "Новый план — на следующем уровне.",

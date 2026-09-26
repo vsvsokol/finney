@@ -102,9 +102,11 @@ class RoomGameStorageTest {
         val store = store(db)
         val look = PetAppearance(PetCharacter.ROGATIK, BodyColor.A, EyesVariant.ROUND)
         val id = (store.createProfile("Финни", look) as ProfileResult.Saved).profileId
+        // Шляпа — награда за цель: копим 50 и забираем.
+        store.ok(id) { selectGoal(it, "goal_crown") }
         store.ok(id) { addParentBonus(it, 20) }
-        store.ok(id) { confirmPlan(it, needs = 0, wants = 40, savings = 0) }
-        store.ok(id) { buy(it, "hat_cowboy") }
+        store.ok(id) { confirmPlan(it, needs = 5, wants = 5, savings = 50) }
+        store.ok(id) { completeGoal(it) }
 
         db.close()
         db = open()
@@ -184,7 +186,8 @@ class RoomGameStorageTest {
         assertEquals(fresh, reset.state.copy(ledger = reset.state.ledger.map { it.copy(createdAt = fresh.ledger.first().createdAt) }))
 
         // После сброса игра продолжается обычными командами: хвосты операций считаются с нуля.
-        store.ok(id) { confirmPlan(it, needs = 0, wants = 0, savings = 0) }
+        store.ok(id) { selectGoal(it, "goal_bike") }
+        store.ok(id) { confirmPlan(it, needs = 5, wants = 5, savings = 5) }
         store.ok(id) { closePeriod(it) }
         assertEquals(2, RoomGameStorage(db.gameDao()).load(id)!!.state.periods.size)
     }
