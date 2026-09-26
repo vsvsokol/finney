@@ -45,6 +45,17 @@ class ContentTest {
         }
     }
 
+    /** Опечатка в `art` игру не ломает, но вместо рисунка молча показывается буква — ловим здесь. */
+    @Test
+    fun `у каждого art в мини-играх есть рисунок`() {
+        val art = Regex("\"art\"\\s*:\\s*\"([^\"]+)\"")
+        val missing = art.findAll(File("src/main/assets/content/tasks.json").readText())
+            .map { it.groupValues[1] }
+            .filterNot { File("src/main/res/drawable-nodpi/$it.webp").exists() }
+            .toSet()
+        assertEquals("нет рисунка в drawable-nodpi", emptySet<String>(), missing)
+    }
+
     @Test
     fun `минимальный объём контента по ТЗ п 2_6`() {
         assertTrue("покупок ≥ 8", content.shop.size >= 8)
