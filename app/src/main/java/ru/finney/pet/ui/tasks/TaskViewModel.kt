@@ -43,6 +43,8 @@ sealed interface TaskUiState {
         val character: PetCharacter,
         /** Цвет тела питомца игрока — чтобы в сцене игры он был тем же, что на главном. */
         val bodyColor: BodyColor = BodyColor.A,
+        /** Надетый аксессуар — и в сцене игры питомец в своей шляпе. */
+        val worn: String? = null,
         val balance: Int,
         /** false — задание откроется позже: на уровне [lockedUntilLevel] или в следующих периодах. */
         val available: Boolean,
@@ -115,6 +117,7 @@ class TaskViewModel(
             task = task,
             character = saved.profile.appearance.character,
             bodyColor = saved.profile.appearance.bodyColor,
+            worn = state.wornItemId,
             balance = state.balance,
             available = game.isTaskAvailable(state, task),
             lockedUntilLevel = task.unlockLevel.takeIf { !state.isDemo && it > game.level(state) },

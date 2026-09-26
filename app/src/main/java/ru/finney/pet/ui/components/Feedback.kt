@@ -72,6 +72,10 @@ fun rejectionMessage(rejection: Rejection): RejectionMessage = when (rejection) 
         "Это у тебя уже есть.",
         "Выбери что-нибудь другое.",
     )
+    is Rejection.NotOwned -> RejectionMessage(
+        "Этой вещи у тебя пока нет.",
+        "Её можно купить в магазине.",
+    )
     is Rejection.BonusLimitExceeded -> RejectionMessage(
         "В этом периоде можно добавить ещё ${rejection.left}.",
         "Остальное — в следующем периоде.",
@@ -87,6 +91,7 @@ fun rejectionMessage(rejection: Rejection): RejectionMessage = when (rejection) 
     Rejection.InvalidAmount,
     is Rejection.UnknownGoal,
     is Rejection.UnknownItem,
+    is Rejection.NotWearable,
     is Rejection.UnknownTask,
     is Rejection.InvalidTaskInput,
     -> RejectionMessage("Так не получится.", "Попробуй по-другому.")

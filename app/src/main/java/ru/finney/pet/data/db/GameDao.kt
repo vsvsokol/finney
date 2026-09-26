@@ -42,6 +42,9 @@ abstract class GameDao {
     @Query("UPDATE profiles SET activeGoalId = :goalId WHERE id = :profileId")
     abstract suspend fun setActiveGoal(profileId: Long, goalId: String?)
 
+    @Query("UPDATE profiles SET wornItemId = :itemId WHERE id = :profileId")
+    abstract suspend fun setWornItem(profileId: Long, itemId: String?)
+
     @Upsert
     abstract suspend fun upsertPet(pet: PetStateEntity)
 
@@ -89,6 +92,7 @@ abstract class GameDao {
     @Transaction
     open suspend fun writeGame(profileId: Long, game: GameRows) {
         setActiveGoal(profileId, game.activeGoalId)
+        setWornItem(profileId, game.wornItemId)
         upsertPet(game.pet)
         upsertPeriods(game.periods)
 
@@ -114,6 +118,7 @@ abstract class GameDao {
 /** Игровое состояние, разложенное по таблицам. */
 data class GameRows(
     val activeGoalId: String?,
+    val wornItemId: String?,
     val pet: PetStateEntity,
     val periods: List<PeriodEntity>,
     val ledger: List<LedgerEntryEntity>,

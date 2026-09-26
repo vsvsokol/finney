@@ -96,6 +96,7 @@ import ru.finney.pet.ui.room.WashingGame
 import ru.finney.pet.ui.room.CareBlock
 import ru.finney.pet.ui.room.CareOption
 import ru.finney.pet.ui.room.CarePanel
+import ru.finney.pet.ui.room.WardrobePanel
 import ru.finney.pet.ui.room.RoomScene
 import ru.finney.pet.ui.room.RoomSpot
 import ru.finney.pet.ui.theme.FinneyInk
@@ -180,6 +181,8 @@ fun HomeScreen(
             onOpenPetLab = onOpenPetLab,
             onClosePeriod = viewModel::closePeriod,
             onBuy = viewModel::buy,
+            onWear = viewModel::wear,
+            onTakeOff = viewModel::takeOff,
         )
     }
 
@@ -234,6 +237,8 @@ private fun HomeContent(
     onOpenPetLab: () -> Unit,
     onClosePeriod: () -> Unit,
     onBuy: (itemId: String) -> Unit,
+    onWear: (itemId: String) -> Unit = {},
+    onTakeOff: () -> Unit = {},
 ) {
     var menuOpen by rememberSaveable { mutableStateOf(false) }
 
@@ -252,6 +257,9 @@ private fun HomeContent(
     // Какая панель ухода открыта и что в ней выбрано. Выбор живёт на экране,
     // а не в игре: пока не нажали «Купить», ничего не произошло.
     var care by rememberSaveable { mutableStateOf<CareTarget?>(null) }
+
+    // Гардероб — панель зала: вторым нажатием на «Зал» или по пункту меню.
+    var wardrobeOpen by rememberSaveable { mutableStateOf(false) }
     var picked by rememberSaveable { mutableStateOf<String?>(null) }
 
     // Панель отладки: долгое нажатие на уровень, только в отладочной сборке.
@@ -302,8 +310,7 @@ private fun HomeContent(
                 when (spot) {
                     RoomSpot.KITCHEN -> openCare(CareTarget.FOOD)
                     RoomSpot.BATH -> openCare(CareTarget.BATH)
-                    // Зал пока пустой: свет и сон — отдельная работа после сдачи.
-                    RoomSpot.LIVING -> Unit
+                    RoomSpot.LIVING -> wardrobeOpen = true
                 }
             },
         ) {
@@ -317,6 +324,7 @@ private fun HomeContent(
             PetView(
                 character = state.appearance.character,
                 bodyColor = state.appearance.bodyColor,
+                accessory = state.worn,
                 mood = state.emotion.toMood(),
                 pose = rememberPoseProvider(animation),
                 modifier = Modifier
@@ -422,6 +430,7 @@ private fun HomeContent(
                         onOpenHelp = onOpenHelp,
                         onOpenBudget = onOpenBudget,
                         onOpenTasks = onOpenTasks,
+                        onOpenWardrobe = { spot = RoomSpot.LIVING; wardrobeOpen = true },
                         onOpenProgress = onOpenProgress,
                         onOpenAdult = onOpenAdult,
                     )
@@ -537,7 +546,8 @@ private fun HomeContent(
             FinneyNeedButton(
                 icon = FinneyIcons.Lamp,
                 label = "Зал и сон",
-                onClick = { spot = RoomSpot.LIVING },
+                // Как у кухни и ванной: первое нажатие — комната, второе — её панель.
+                onClick = { if (spot == RoomSpot.LIVING) wardrobeOpen = true else spot = RoomSpot.LIVING },
                 selected = spot == RoomSpot.LIVING,
             )
             FinneyNeedButton(
@@ -565,6 +575,33 @@ private fun HomeContent(
         // чтобы заголовок панели не наезжал на плашки, и ловит нажатия: без неё
         // сквозь панель нажимались кнопки комнат, а нажатие мимо панели ничего
         // не делало. Теперь мимо — это «закрыть».
+        if (wardrobeOpen) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(FinneyInk.copy(alpha = 0.45f))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClickLabel = "Закрыть",
+                        onClick = { wardrobeOpen = false },
+                    )
+                    .systemBarsPadding()
+                    .padding(16.dp),
+                contentAlignment = Alignment.BottomCenter,
+            ) {
+                WardrobePanel(
+                    modifier = Modifier.pointerInput(Unit) { detectTapGestures { } },
+                    items = state.wardrobe,
+                    worn = state.worn,
+                    onWear = onWear,
+                    onTakeOff = onTakeOff,
+                    onOpenShop = { wardrobeOpen = false; onOpenShop() },
+                    onDismiss = { wardrobeOpen = false },
+                )
+            }
+        }
+
         care?.let { target ->
             val previews = when (target) {
                 CareTarget.FOOD -> state.food
@@ -753,6 +790,7 @@ private fun HomeMenu(
     onOpenHelp: () -> Unit,
     onOpenBudget: () -> Unit,
     onOpenTasks: () -> Unit,
+    onOpenWardrobe: () -> Unit,
     onOpenProgress: () -> Unit,
     onOpenAdult: () -> Unit,
 ) {
@@ -773,6 +811,7 @@ private fun HomeMenu(
         HomeMenuItem("Как играть") { onDismiss(); onOpenHelp() }
         HomeMenuItem("План расходов") { onDismiss(); onOpenBudget() }
         HomeMenuItem("Мини-игры") { onDismiss(); onOpenTasks() }
+        HomeMenuItem("Гардероб") { onDismiss(); onOpenWardrobe() }
         HomeMenuItem("Прогресс") { onDismiss(); onOpenProgress() }
         HomeMenuItem("Для взрослых") { onDismiss(); onOpenAdult() }
     }

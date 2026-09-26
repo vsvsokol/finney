@@ -103,6 +103,7 @@ class ShopViewModel(
             Category.WANTS -> "Это «хочется»: радует, но можно и без него."
         } + if (overPlan) " Это уже сверх плана." else ""
         val next = when {
+            item.kind == ItemKind.ACCESSORY -> "Уже надето! Переодеть — в гардеробе в зале."
             overPlan -> "В следующий раз заложи больше или купи меньше."
             item.category == Category.WANTS -> "Хватит ли на нужное?"
             else -> "Что ещё нужно питомцу?"

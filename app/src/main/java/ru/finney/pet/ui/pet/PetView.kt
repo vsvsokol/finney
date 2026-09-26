@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -79,6 +80,8 @@ fun PetView(
     pose: () -> PetPose,
     modifier: Modifier = Modifier,
     bodyColor: BodyColor = BodyColor.A,
+    /** Надетый аксессуар — id из магазина. Двигается вместе с питомцем: лежит внутри позы. */
+    accessory: String? = null,
 ) {
     val skin = character.skin
     val tint = bodyColor.colorFilter
@@ -140,6 +143,15 @@ fun PetView(
                         scaleX = 1f + open * MOUTH_STRETCH_X
                         scaleY = 1f + open * MOUTH_STRETCH_Y
                     },
+            )
+        }
+
+        accessory?.let(::accessoryArt)?.let { art ->
+            Image(
+                painter = painterResource(art),
+                contentDescription = null,
+                contentScale = ContentScale.FillWidth,
+                modifier = Modifier.hatPlacement(skin.hat),
             )
         }
     }

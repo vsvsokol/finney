@@ -62,6 +62,10 @@ sealed interface HomeUiState {
         val food: List<PurchasePreview>,
         /** Чем помыть: всё, что поднимает чистоту. */
         val care: List<PurchasePreview>,
+        /** Что надето сейчас — id аксессуара из магазина. */
+        val worn: String? = null,
+        /** Купленные аксессуары: их можно надеть в гардеробе. */
+        val wardrobe: List<ShopItem> = emptyList(),
     ) : HomeUiState {
         /** Период закрывается только после подтверждения плана. */
         val canClosePeriod: Boolean get() = phase == PeriodPhase.ACTIVE
@@ -133,6 +137,19 @@ class HomeViewModel(
         }
     }
 
+    /** Надеть купленную вещь. Бесплатно: деньги ушли при покупке. */
+    fun wear(itemId: String) {
+        viewModelScope.launch {
+            (session.execute { wear(it, itemId) } as? GameResult.Rejected)?.let {
+                _events.send(HomeEvent.Rejected(it.reason))
+            }
+        }
+    }
+
+    fun takeOff() {
+        viewModelScope.launch { session.execute { takeOff(it) } }
+    }
+
     private fun toUiState(saved: SavedGame): HomeUiState.Ready {
         val state = saved.state
         val passed = state.attempts.filter { it.outcome == TaskOutcome.SUCCESS }.map { it.taskId }.toSet()
@@ -157,6 +174,8 @@ class HomeViewModel(
             // предмета: добавят в контент новую еду — она появится на столе сама.
             food = previews(state) { it.effect.satiety > 0 },
             care = previews(state) { it.effect.hygiene > 0 },
+            worn = state.wornItemId,
+            wardrobe = game.wardrobe(state),
         )
     }
 

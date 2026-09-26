@@ -201,8 +201,28 @@ class Game(
         if (item.price > state.balance) return reject(Rejection.InsufficientFunds(item.price, state.balance))
         val entry = entry(state, EntryType.PURCHASE, balanceDelta = -item.price)
             .copy(category = item.category, itemId = item.id)
-        return ok(state.copy(pet = PetRules.apply(state.pet, item.effect), ledger = state.ledger + entry))
+        // Купленный аксессуар сразу надевается: ребёнок видит покупку на питомце.
+        val worn = if (item.kind == ItemKind.ACCESSORY) item.id else state.wornItemId
+        return ok(
+            state.copy(pet = PetRules.apply(state.pet, item.effect), ledger = state.ledger + entry, wornItemId = worn),
+        )
     }
+
+    // ---------- Гардероб ----------
+
+    /** Надеть купленный аксессуар вместо текущего. Бесплатно и в любой фазе периода. */
+    fun wear(state: GameState, itemId: String): GameResult {
+        val item = content.item(itemId) ?: return reject(Rejection.UnknownItem(itemId))
+        if (item.kind != ItemKind.ACCESSORY) return reject(Rejection.NotWearable(itemId))
+        if (!state.owns(itemId)) return reject(Rejection.NotOwned(itemId))
+        return ok(state.copy(wornItemId = itemId))
+    }
+
+    fun takeOff(state: GameState): GameResult = ok(state.copy(wornItemId = null))
+
+    /** Купленные аксессуары в порядке магазина. */
+    fun wardrobe(state: GameState): List<ShopItem> =
+        content.shop.filter { it.kind == ItemKind.ACCESSORY && state.owns(it.id) }
 
     // ---------- Накопления ----------
 

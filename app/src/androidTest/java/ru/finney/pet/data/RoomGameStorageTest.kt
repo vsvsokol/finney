@@ -98,6 +98,24 @@ class RoomGameStorageTest {
     }
 
     @Test
+    fun wornAccessorySurvivesReopen() = runBlocking {
+        val store = store(db)
+        val look = PetAppearance(PetCharacter.ROGATIK, BodyColor.A, EyesVariant.ROUND)
+        val id = (store.createProfile("Финни", look) as ProfileResult.Saved).profileId
+        store.ok(id) { addParentBonus(it, 20) }
+        store.ok(id) { confirmPlan(it, needs = 0, wants = 40, savings = 0) }
+        store.ok(id) { buy(it, "hat_cowboy") }
+
+        db.close()
+        db = open()
+        assertEquals("hat_cowboy", RoomGameStorage(db.gameDao()).load(id)!!.state.wornItemId)
+
+        val reopened = store(db)
+        reopened.ok(id) { takeOff(it) }
+        assertNull(RoomGameStorage(db.gameDao()).load(id)!!.state.wornItemId)
+    }
+
+    @Test
     fun savedStateEqualsInMemoryGame() = runBlocking {
         val store = store(db)
         val id = (store.createProfile("Финни", PetAppearance(PetCharacter.PUSHISTIK, BodyColor.A, EyesVariant.ROUND)) as ProfileResult.Saved).profileId

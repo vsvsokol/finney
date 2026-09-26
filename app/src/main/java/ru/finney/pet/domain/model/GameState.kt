@@ -102,6 +102,8 @@ data class GameState(
     val periods: List<Period>,
     val ledger: List<LedgerEntry>,
     val attempts: List<TaskAttempt>,
+    /** Аксессуар, который сейчас на питомце. Только из купленных; null — ничего не надето. */
+    val wornItemId: String? = null,
 ) {
     val currentPeriod: Period get() = periods.last()
 

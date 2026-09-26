@@ -26,6 +26,7 @@ import ru.finney.pet.ui.components.FinneyButton
 import ru.finney.pet.ui.components.FinneyScreen
 import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.tasks.games.GameScene
+import ru.finney.pet.ui.tasks.games.LocalPlayerAccessory
 import ru.finney.pet.ui.tasks.games.LocalPlayerBodyColor
 import ru.finney.pet.ui.tasks.games.PetSays
 import ru.finney.pet.ui.tasks.games.ResultBody
@@ -60,7 +61,10 @@ fun TaskScreen(
             FinneyButton(text = "Назад", onClick = onBack)
         }
 
-        is TaskUiState.Ready -> CompositionLocalProvider(LocalPlayerBodyColor provides s.bodyColor) {
+        is TaskUiState.Ready -> CompositionLocalProvider(
+            LocalPlayerBodyColor provides s.bodyColor,
+            LocalPlayerAccessory provides s.worn,
+        ) {
             when (s.phase) {
             TaskPhase.INTRO -> TaskIntro(s, onStart = viewModel::start, onBack = onBack)
             // Крестик и системное «назад» посреди игры закрывают её: до итога ничего не засчитано.
