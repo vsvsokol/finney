@@ -21,18 +21,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ru.finney.pet.domain.game.GoalProgress
-import ru.finney.pet.domain.game.Rejection
 import ru.finney.pet.domain.model.Goal
 import ru.finney.pet.ui.components.CoinAmount
+import ru.finney.pet.ui.components.FeedbackDialog
 import ru.finney.pet.ui.components.FinneyButton
 import ru.finney.pet.ui.components.FinneyPanel
 import ru.finney.pet.ui.components.FinneyScreen
 import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.theme.FinneyInk
-import ru.finney.pet.ui.theme.FinneyPink
 import ru.finney.pet.ui.theme.FinneySand
 import ru.finney.pet.ui.theme.FinneyTheme
 import ru.finney.pet.ui.theme.FinneyYellow
@@ -56,10 +56,59 @@ fun GoalsScreen(
             state = s,
             onSelect = viewModel::selectGoal,
             onDeposit = { viewModel.deposit(STEP) },
-            onWithdraw = { viewModel.withdraw(STEP) },
+            onWithdraw = { viewModel.askWithdraw(STEP) },
             onComplete = viewModel::completeGoal,
             onBack = onBack,
         )
+    }
+
+    (state as? GoalsUiState.Ready)?.let { ready ->
+        ready.pendingWithdraw?.let {
+            WithdrawConfirmDialog(
+                pending = it,
+                goalLabel = ready.progress?.goal?.label.orEmpty(),
+                onConfirm = viewModel::confirmWithdraw,
+                onCancel = viewModel::cancelWithdraw,
+            )
+        }
+        FeedbackDialog(
+            feedback = ready.feedback,
+            rejection = ready.rejection,
+            onDismiss = viewModel::dismissFeedback,
+        )
+    }
+}
+
+/**
+ * Снятие с копилки — только после отдельного подтверждения, и до него видно,
+ * сколько останется и как сдвинется срок (ТЗ п. 2.5.7).
+ */
+@Composable
+private fun WithdrawConfirmDialog(
+    pending: PendingWithdraw,
+    goalLabel: String,
+    onConfirm: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    val p = pending.preview
+    Dialog(onDismissRequest = onCancel) {
+        FinneyPanel(title = "Снять ${pending.amount}?") {
+            Text(
+                text = "Это деньги на «$goalLabel». Если снять, до цели дальше.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = FinneyInk,
+            )
+            InfoRow("В копилке", "${p.savedBefore} → ${p.savedAfter}")
+            // В первом периоде темпа пополнений ещё нет — срок не показываем вовсе.
+            if (p.periodsBefore != null || p.periodsAfter != null) {
+                InfoRow(
+                    "Периодов до цели",
+                    "${p.periodsBefore?.toString() ?: "—"} → ${p.periodsAfter?.toString() ?: "—"}",
+                )
+            }
+            FinneyButton(text = "Оставить в копилке", onClick = onCancel)
+            FinneyButton(text = "Снять ${pending.amount}", onClick = onConfirm)
+        }
     }
 }
 
@@ -128,7 +177,6 @@ private fun GoalsContent(
             )
         }
 
-        state.rejection?.let { RejectionNote(it) }
     }
 }
 
@@ -173,30 +221,6 @@ private fun InfoRow(label: String, value: String) {
         )
         Text(text = value, style = MaterialTheme.typography.titleMedium, color = FinneyInk)
     }
-}
-
-/** Тексты временные, до `feedback.json` @vsvsokol — как на экране плана. */
-@Composable
-private fun RejectionNote(rejection: Rejection) {
-    val text = when (rejection) {
-        is Rejection.InsufficientFunds -> "Не хватает ${rejection.shortage} финок."
-        is Rejection.InsufficientSavings -> "В копилке пока только ${rejection.saved}."
-        Rejection.NoActiveGoal -> "Сначала выбери цель."
-        Rejection.PlanNotConfirmed -> "Сначала подтверди план периода."
-        Rejection.InvalidAmount -> "Так не получится."
-        else -> "Так пока нельзя."
-    }
-    Text(
-        text = text,
-        style = MaterialTheme.typography.bodyLarge,
-        color = FinneyInk,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(FinneyPink)
-            .border(2.dp, FinneyInk, RoundedCornerShape(16.dp))
-            .padding(12.dp),
-    )
 }
 
 @Preview(showBackground = true, backgroundColor = 0xFFFDF0D5)

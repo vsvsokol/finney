@@ -27,6 +27,8 @@ data class ProfileEntity(
     val activeGoalId: String?,
     val isDemo: Boolean,
     val createdAt: Long,
+    /** Надетый аксессуар. Колонка добавлена в версии 4 базы, см. [FinneyDatabase.MIGRATION_3_4]. */
+    val wornItemId: String? = null,
 )
 
 @Entity(

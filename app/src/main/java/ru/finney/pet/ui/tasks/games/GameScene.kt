@@ -24,6 +24,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,6 +43,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import ru.finney.pet.domain.model.BodyColor
 import ru.finney.pet.domain.model.PetCharacter
 import ru.finney.pet.ui.components.CoinAmount
 import ru.finney.pet.ui.components.FinneyIconButton
@@ -239,12 +241,23 @@ private fun Rain() {
     }
 }
 
+/**
+ * Цвет тела питомца игрока. Задаёт экран задания, читает [ScenePet]: так цвет не нужно
+ * протаскивать параметром через все шесть игр. Гостей в сценах он не касается.
+ */
+internal val LocalPlayerBodyColor = staticCompositionLocalOf { BodyColor.A }
+
+/** Надетый аксессуар питомца игрока — тем же способом, что и цвет тела. */
+internal val LocalPlayerAccessory = staticCompositionLocalOf<String?> { null }
+
 /** Питомец игрока в сцене: живой, дышит. */
 @Composable
 internal fun ScenePet(character: PetCharacter, size: Dp, modifier: Modifier = Modifier, mood: PetMood = PetMood.HAPPY) {
     val animation = rememberPetAnimation()
     PetView(
         character = character,
+        bodyColor = LocalPlayerBodyColor.current,
+        accessory = LocalPlayerAccessory.current,
         mood = mood,
         pose = rememberPoseProvider(animation),
         modifier = modifier.widthIn(max = size).fillMaxWidth(),

@@ -4,6 +4,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import android.content.pm.ApplicationInfo
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.offset
@@ -11,11 +15,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.material3.Surface
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.foundation.layout.Arrangement
@@ -32,14 +36,12 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import ru.finney.pet.ui.theme.FinneyCream
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -55,15 +57,18 @@ import ru.finney.pet.domain.model.PetAppearance
 import ru.finney.pet.domain.model.PetCharacter
 import ru.finney.pet.domain.model.PetStats
 import ru.finney.pet.domain.pet.Emotion
+import ru.finney.pet.ui.components.FeedbackDialog
+import ru.finney.pet.ui.components.ActionFeedbackCard
+import ru.finney.pet.ui.components.ActionFeedback
+import ru.finney.pet.domain.game.Rejection
+import kotlinx.coroutines.delay
 import ru.finney.pet.domain.model.TaskDefinition
 import ru.finney.pet.ui.components.Coin
-import ru.finney.pet.ui.components.buttonFill
 import ru.finney.pet.ui.components.FinneyButton
 import ru.finney.pet.ui.components.FinneyIcon
 import ru.finney.pet.ui.components.FinneyIconButton
 import ru.finney.pet.ui.components.FinneyIcons
 import ru.finney.pet.ui.components.LevelBadge
-import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.components.FinneyNeedButton
 import ru.finney.pet.ui.components.FinneyPanel
 import ru.finney.pet.ui.components.HappinessBar
@@ -73,6 +78,13 @@ import ru.finney.pet.ui.pet.rememberPoseProvider
 import ru.finney.pet.ui.pet.rememberPetAnimation
 import ru.finney.pet.ui.debug.DebugPanel
 import androidx.compose.animation.core.animateFloatAsState
+import ru.finney.pet.ui.components.OutlinedText
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.Animatable
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Rect
@@ -84,6 +96,7 @@ import ru.finney.pet.ui.room.WashingGame
 import ru.finney.pet.ui.room.CareBlock
 import ru.finney.pet.ui.room.CareOption
 import ru.finney.pet.ui.room.CarePanel
+import ru.finney.pet.ui.room.WardrobePanel
 import ru.finney.pet.ui.room.RoomScene
 import ru.finney.pet.ui.room.RoomSpot
 import ru.finney.pet.ui.theme.FinneyInk
@@ -126,16 +139,27 @@ fun HomeScreen(
     onOpenHelp: () -> Unit,
     onPeriodClosed: (periodNumber: Int) -> Unit,
     onOpenPetLab: () -> Unit,
-    onOpenOnboarding: () -> Unit,
     viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    // Итог покупки ухода висит несколько секунд и сам уходит: игра не прерывается окном,
+    // а ребёнок успевает увидеть, что стало с деньгами и шкалой (ТЗ п. 2.5.9).
+    var purchased by remember { mutableStateOf<ActionFeedback?>(null) }
+    var rejected by remember { mutableStateOf<Rejection?>(null) }
+    LaunchedEffect(purchased) {
+        if (purchased != null) {
+            delay(PurchaseFeedbackMillis)
+            purchased = null
+        }
+    }
 
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
             when (event) {
                 is HomeEvent.PeriodClosed -> onPeriodClosed(event.periodNumber)
-                is HomeEvent.Rejected -> Unit // кнопка и так неактивна до подтверждения плана
+                is HomeEvent.Rejected -> rejected = event.reason
+                is HomeEvent.Purchased -> purchased = event.feedback
             }
         }
     }
@@ -155,11 +179,48 @@ fun HomeScreen(
             onOpenAdult = onOpenAdult,
             onOpenHelp = onOpenHelp,
             onOpenPetLab = onOpenPetLab,
-            onOpenOnboarding = onOpenOnboarding,
             onClosePeriod = viewModel::closePeriod,
             onBuy = viewModel::buy,
+            onWear = viewModel::wear,
+            onTakeOff = viewModel::takeOff,
         )
     }
+
+    purchased?.let { feedback ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .systemBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 96.dp),
+            contentAlignment = Alignment.TopCenter,
+        ) {
+            ActionFeedbackCard(
+                feedback = feedback,
+                modifier = Modifier.clickable(onClickLabel = "Скрыть") { purchased = null },
+            )
+        }
+    }
+    FeedbackDialog(
+        feedback = null,
+        rejection = rejected,
+        onDismiss = { rejected = null },
+        actionLabel = if (rejected is Rejection.PlanNotConfirmed) "К плану расходов" else null,
+        onAction = onOpenBudget,
+    )
+}
+
+private const val PurchaseFeedbackMillis = 5_000L
+
+/**
+ * Почему питомцу так — ТЗ п. 2.5.10: краткое объяснение причины эмоции и что сделать.
+ * Спокойное состояние не комментируем: всё в порядке, лишний текст ни к чему.
+ */
+private fun emotionReason(name: String, emotion: Emotion): String? = when (emotion) {
+    Emotion.HUNGRY -> "$name голоден: сытость низкая. Покорми на кухне"
+    Emotion.DIRTY -> "$name испачкался. Помой в ванной"
+    Emotion.SAD -> "$name грустит: мало радости. Загляни в магазин за «хочется»"
+    Emotion.HAPPY -> "$name доволен: о нём хорошо заботятся"
+    Emotion.CALM -> null
 }
 
 @Composable
@@ -174,9 +235,10 @@ private fun HomeContent(
     onOpenAdult: () -> Unit,
     onOpenHelp: () -> Unit,
     onOpenPetLab: () -> Unit,
-    onOpenOnboarding: () -> Unit,
     onClosePeriod: () -> Unit,
     onBuy: (itemId: String) -> Unit,
+    onWear: (itemId: String) -> Unit = {},
+    onTakeOff: () -> Unit = {},
 ) {
     var menuOpen by rememberSaveable { mutableStateOf(false) }
 
@@ -195,6 +257,9 @@ private fun HomeContent(
     // Какая панель ухода открыта и что в ней выбрано. Выбор живёт на экране,
     // а не в игре: пока не нажали «Купить», ничего не произошло.
     var care by rememberSaveable { mutableStateOf<CareTarget?>(null) }
+
+    // Гардероб — панель зала: вторым нажатием на «Зал» или по пункту меню.
+    var wardrobeOpen by rememberSaveable { mutableStateOf(false) }
     var picked by rememberSaveable { mutableStateOf<String?>(null) }
 
     // Панель отладки: долгое нажатие на уровень, только в отладочной сборке.
@@ -245,8 +310,7 @@ private fun HomeContent(
                 when (spot) {
                     RoomSpot.KITCHEN -> openCare(CareTarget.FOOD)
                     RoomSpot.BATH -> openCare(CareTarget.BATH)
-                    // Зал пока пустой: свет и сон — отдельная работа после сдачи.
-                    RoomSpot.LIVING -> Unit
+                    RoomSpot.LIVING -> wardrobeOpen = true
                 }
             },
         ) {
@@ -259,6 +323,8 @@ private fun HomeContent(
             // лёг бы квадратом вокруг.
             PetView(
                 character = state.appearance.character,
+                bodyColor = state.appearance.bodyColor,
+                accessory = state.worn,
                 mood = state.emotion.toMood(),
                 pose = rememberPoseProvider(animation),
                 modifier = Modifier
@@ -300,34 +366,50 @@ private fun HomeContent(
                 MoneyButton(balance = state.balance, onClick = onOpenShop)
             }
 
-            LevelBadge(
-                level = state.level,
-                size = 56.dp,
-                progress = state.levelProgress,
-                modifier = if (isDebuggable) {
-                    Modifier.combinedClickable(
-                        onClickLabel = null,
-                        onLongClickLabel = "Отладка",
-                        onLongClick = { debugOpen = true },
-                        onClick = {},
+            // Уровень — главный показатель роста, поэтому в полтора раза крупнее кнопок по краям.
+            // Центры всех трёх на одной линии: ряд выравнивается по вертикали.
+            Box(contentAlignment = Alignment.Center) {
+                LevelBadge(
+                    level = state.level,
+                    size = LevelBadgeSize,
+                    progress = state.levelProgress,
+                    modifier = if (isDebuggable) {
+                        Modifier.combinedClickable(
+                            onClickLabel = null,
+                            onLongClickLabel = "Отладка",
+                            onLongClick = { debugOpen = true },
+                            onClick = {},
+                        )
+                    } else {
+                        Modifier
+                    },
+                )
+                // Тестовый профиль видно сразу: эксперт знает, почему все игры открыты.
+                // Метка лежит на нижнем краю значка, а не под ним — ряд не вырастает.
+                if (state.isDemo) {
+                    Text(
+                        text = "демо",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = FinneyInk,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .offset(y = 6.dp)
+                            .clip(RoundedCornerShape(percent = 50))
+                            .background(FinneySand)
+                            .border(StrokeThin, FinneyInk, RoundedCornerShape(percent = 50))
+                            .padding(horizontal = 8.dp),
                     )
-                } else {
-                    Modifier
-                },
-            )
+                }
+            }
 
             Row(
                 modifier = Modifier.weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                FinneyIconButton(
-                    onClick = onOpenHelp,
-                    contentDescription = "Подсказка",
-                    size = 56.dp,
-                ) {
-                    FinneyIcon(FinneyIcons.Help, size = 26.dp)
-                }
+                // Отдельной кнопки «?» нет: подсказка — первый пункт меню («Как играть»).
+                // Она по-прежнему доступна в любой момент (ТЗ п. 2.5.1), а верхний ряд
+                // остаётся симметричным: монета — уровень — меню.
                 // «Бургер» — всё, что не про уход за питомцем: знакомство с игрой,
                 // активное задание, план, копилка, прогресс и раздел взрослого.
                 // Низ экрана из-за этого остался про комнаты, а не про меню.
@@ -345,9 +427,10 @@ private fun HomeContent(
                         onDismiss = { menuOpen = false },
                         task = state.nextTask,
                         onOpenTask = onOpenTask,
-                        onOpenOnboarding = onOpenOnboarding,
+                        onOpenHelp = onOpenHelp,
                         onOpenBudget = onOpenBudget,
                         onOpenTasks = onOpenTasks,
+                        onOpenWardrobe = { spot = RoomSpot.LIVING; wardrobeOpen = true },
                         onOpenProgress = onOpenProgress,
                         onOpenAdult = onOpenAdult,
                     )
@@ -385,6 +468,21 @@ private fun HomeContent(
                     modifier = Modifier.weight(1f),
                 )
             }
+        }
+
+        emotionReason(state.petName, state.emotion)?.let { reason ->
+            Text(
+                text = reason,
+                style = MaterialTheme.typography.bodyMedium,
+                color = FinneyInk,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer { alpha = hudAlpha }
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(FinneyCream.copy(alpha = 0.9f))
+                    .border(2.dp, FinneyInk, RoundedCornerShape(16.dp))
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+            )
         }
 
         // ---------- Середина: сама комната ----------
@@ -448,7 +546,8 @@ private fun HomeContent(
             FinneyNeedButton(
                 icon = FinneyIcons.Lamp,
                 label = "Зал и сон",
-                onClick = { spot = RoomSpot.LIVING },
+                // Как у кухни и ванной: первое нажатие — комната, второе — её панель.
+                onClick = { if (spot == RoomSpot.LIVING) wardrobeOpen = true else spot = RoomSpot.LIVING },
                 selected = spot == RoomSpot.LIVING,
             )
             FinneyNeedButton(
@@ -476,6 +575,33 @@ private fun HomeContent(
         // чтобы заголовок панели не наезжал на плашки, и ловит нажатия: без неё
         // сквозь панель нажимались кнопки комнат, а нажатие мимо панели ничего
         // не делало. Теперь мимо — это «закрыть».
+        if (wardrobeOpen) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(FinneyInk.copy(alpha = 0.45f))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClickLabel = "Закрыть",
+                        onClick = { wardrobeOpen = false },
+                    )
+                    .systemBarsPadding()
+                    .padding(16.dp),
+                contentAlignment = Alignment.BottomCenter,
+            ) {
+                WardrobePanel(
+                    modifier = Modifier.pointerInput(Unit) { detectTapGestures { } },
+                    items = state.wardrobe,
+                    worn = state.worn,
+                    onWear = onWear,
+                    onTakeOff = onTakeOff,
+                    onOpenShop = { wardrobeOpen = false; onOpenShop() },
+                    onDismiss = { wardrobeOpen = false },
+                )
+            }
+        }
+
         care?.let { target ->
             val previews = when (target) {
                 CareTarget.FOOD -> state.food
@@ -513,8 +639,7 @@ private fun HomeContent(
                         null
                     } else {
                         CareBlock(
-                            reason = "Сначала распредели деньги в плане расходов — " +
-                                "после этого можно покупать",
+                            reason = "Сначала составь план — потом покупки",
                             actionLabel = "К плану расходов",
                             onAction = onOpenBudget,
                         )
@@ -636,14 +761,12 @@ private fun ClosePeriodPanel(
 ) {
     FinneyPanel(title = "Закончить период?", modifier = modifier) {
         Text(
-            "$petName подведёт итоги периода $periodNumber: что получилось по плану, " +
-                "сколько отложено в копилку и сколько очков заработано.",
+            "$petName посмотрит, как прошёл период: план, копилка и очки.",
             style = MaterialTheme.typography.bodyLarge,
             color = FinneyInk,
         )
         Text(
-            "Потом начнётся период ${periodNumber + 1} и придут новые деньги. " +
-                "Вернуться в этот период уже не получится.",
+            "Потом придут новые деньги. Назад вернуться нельзя.",
             style = MaterialTheme.typography.bodyLarge,
             color = FinneyInk,
         )
@@ -664,9 +787,10 @@ private fun HomeMenu(
     onDismiss: () -> Unit,
     task: TaskDefinition?,
     onOpenTask: (String) -> Unit,
-    onOpenOnboarding: () -> Unit,
+    onOpenHelp: () -> Unit,
     onOpenBudget: () -> Unit,
     onOpenTasks: () -> Unit,
+    onOpenWardrobe: () -> Unit,
     onOpenProgress: () -> Unit,
     onOpenAdult: () -> Unit,
 ) {
@@ -683,9 +807,11 @@ private fun HomeMenu(
                 onOpenTask(active.id)
             }
         }
-        HomeMenuItem("Знакомство с игрой") { onDismiss(); onOpenOnboarding() }
+        // Знакомство в режиме подсказки: в конце «Понятно» и назад, без «Создать питомца».
+        HomeMenuItem("Как играть") { onDismiss(); onOpenHelp() }
         HomeMenuItem("План расходов") { onDismiss(); onOpenBudget() }
         HomeMenuItem("Мини-игры") { onDismiss(); onOpenTasks() }
+        HomeMenuItem("Гардероб") { onDismiss(); onOpenWardrobe() }
         HomeMenuItem("Прогресс") { onDismiss(); onOpenProgress() }
         HomeMenuItem("Для взрослых") { onDismiss(); onOpenAdult() }
     }
@@ -707,44 +833,108 @@ private fun HomeMenuItem(text: String, onClick: () -> Unit) {
  * тогда, когда собирается что-то купить, и отдельный кружок «Магазин» внизу
  * после этого лишний. Сумма берётся из состояния и на экране не пересчитывается.
  *
- * Форма — «стадион» с обводкой и нижней полосой, как у остальных кнопок кита,
- * но по содержимому: внутри сумма и монета, а не надпись.
+ * Сама кнопка — монета-финка, круглая и того же размера, что «бургер» справа:
+ * верхний ряд читается как три круга вокруг уровня. Сумма — плашкой в правом
+ * нижнем углу монеты, как счётчик на значке: бежевая подложка, синяя обводка
+ * и синий текст, как у плашек копилки и задания.
  */
 @Composable
 private fun MoneyButton(balance: Int, onClick: () -> Unit) {
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
-    val shape = RoundedCornerShape(percent = 50)
+    val pressScale by animateFloatAsState(if (pressed) 0.92f else 1f, label = "coinPress")
 
-    Surface(
-        onClick = onClick,
+    // «Поп», когда монет стало больше: монета вздувается и пружинит обратно,
+    // над ней всплывает «+N». Какая сумма уже показана, помнит rememberSaveable:
+    // он переживает уход на другой экран, и вернувшись с мини-игры или итогов
+    // периода, ребёнок видит прибавку. При первом открытии и при тратах — без попа.
+    var shown by rememberSaveable { mutableStateOf<Int?>(null) }
+    val pop = remember { Animatable(1f) }
+    val rise = remember { Animatable(0f) }
+    var gain by remember { mutableIntStateOf(0) }
+    LaunchedEffect(balance) {
+        val before = shown
+        shown = balance
+        if (before == null || balance <= before) return@LaunchedEffect
+        gain = balance - before
+        launch {
+            pop.animateTo(1.35f, tween(durationMillis = 110))
+            pop.animateTo(1f, spring(dampingRatio = 0.35f, stiffness = Spring.StiffnessMedium))
+        }
+        rise.snapTo(0f)
+        rise.animateTo(1f, tween(durationMillis = 1100))
+        gain = 0
+    }
+    val scale = pressScale * pop.value
+
+    // Один контейнер размером с монету: плашка привязана к его правому нижнему
+    // углу и выходит за край смещением, поэтому ряд не раздвигается от длины суммы.
+    Box(
         modifier = Modifier
-            .defaultMinSize(minWidth = 112.dp, minHeight = 56.dp)
-            .clearAndSetSemantics { contentDescription = "$balance финок, открыть магазин" },
-        shape = shape,
-        color = Color.Transparent,
-        interactionSource = interactionSource,
+            .size(MoneyCoinSize)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clearAndSetSemantics {
+                contentDescription = "$balance финок, открыть магазин"
+                role = Role.Button
+            },
     ) {
         Box(
             modifier = Modifier
-                .clip(shape)
-                .buttonFill(pressed, round = false, glare = false)
-                .padding(horizontal = 14.dp, vertical = 8.dp),
-            contentAlignment = Alignment.Center,
+                .matchParentSize()
+                .clip(CircleShape)
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = onClick,
+                ),
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                OutlinedText(
-                    balance.toString(),
-                    style = MaterialTheme.typography.titleLarge,
-                )
-                Coin(size = 26.dp)
-            }
+            Coin(size = MoneyCoinSize)
+        }
+        Text(
+            text = balance.toString(),
+            style = MaterialTheme.typography.titleMedium,
+            color = FinneyInk,
+            maxLines = 1,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .offset(x = 14.dp, y = 8.dp)
+                .clip(RoundedCornerShape(percent = 50))
+                .background(FinneySand)
+                .border(StrokeThin, FinneyInk, RoundedCornerShape(percent = 50))
+                .clickable(onClick = onClick)
+                .padding(horizontal = 7.dp),
+        )
+        if (gain > 0) {
+            OutlinedText(
+                text = "+$gain",
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = 24.dp, y = (-4).dp)
+                    .graphicsLayer {
+                        translationY = -rise.value * 28.dp.toPx()
+                        // Первую половину пути видна целиком, потом тает.
+                        alpha = (2f - rise.value * 2f).coerceIn(0f, 1f)
+                    }
+                    .clearAndSetSemantics { contentDescription = "Получено $gain финок" },
+            )
         }
     }
 }
+
+/** Монета того же размера, что «бургер» справа. */
+private val MoneyCoinSize = 56.dp
+
+/**
+ * Уровень в полтора раза крупнее кнопок по краям верхнего ряда — вместе с кольцом
+ * прогресса. Кольцо рисуется снаружи круга и добавляет 26 % диаметра (дорожка и обводка
+ * с двух сторон), поэтому круг 66 dp даёт значок 84 dp = 1,5 × 56. Вдвое крупнее
+ * (112 dp) уровень перетягивал на себя весь ряд.
+ */
+private val LevelBadgeSize = 66.dp
 
 /**
  * Плашка-кнопка с фактом: копилка, активное задание.
@@ -822,7 +1012,7 @@ private fun HomeContentPreview() {
                 care = emptyList(),
             ),
             onOpenBudget = {}, onOpenShop = {}, onOpenGoals = {}, onOpenTasks = {}, onOpenTask = {},
-            onOpenProgress = {}, onOpenAdult = {}, onOpenHelp = {}, onOpenPetLab = {}, onOpenOnboarding = {},
+            onOpenProgress = {}, onOpenAdult = {}, onOpenHelp = {}, onOpenPetLab = {},
             onClosePeriod = {}, onBuy = {},
         )
     }

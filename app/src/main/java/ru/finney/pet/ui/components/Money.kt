@@ -122,9 +122,14 @@ fun LevelBadge(
                 .clearAndSetSemantics { contentDescription = "Уровень $level" },
             contentAlignment = Alignment.Center,
         ) {
+            // Цифра растёт вместе с кругом: на 56 dp это прежние 28 sp, на 112 dp — вдвое больше.
+            // Привязка к размеру круга, а не к шрифту системы: это значок, цифра обязана влезать.
             OutlinedText(
                 text = level.toString(),
-                style = MaterialTheme.typography.headlineMedium,
+                style = MaterialTheme.typography.headlineMedium.copy(
+                    fontSize = (size.value * 0.5f).sp,
+                    lineHeight = (size.value * 0.68f).sp,
+                ),
                 textAlign = TextAlign.Center,
             )
         }

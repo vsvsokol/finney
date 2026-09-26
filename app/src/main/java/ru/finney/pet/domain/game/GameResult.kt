@@ -26,6 +26,10 @@ sealed interface Rejection {
     data object AlreadyOwned : Rejection
     data class UnknownItem(val id: String) : Rejection
 
+    /** Надеть можно только купленный аксессуар. */
+    data class NotOwned(val id: String) : Rejection
+    data class NotWearable(val id: String) : Rejection
+
     data class UnknownGoal(val id: String) : Rejection
     data object NoActiveGoal : Rejection
     data object GoalAlreadyCompleted : Rejection

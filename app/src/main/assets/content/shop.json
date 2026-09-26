@@ -6,5 +6,8 @@
   { "id": "treat_candy", "label": "Конфета",     "price": 5,  "category": "wants", "effect": { "mood": 10 } },
   { "id": "toy_book",    "label": "Книжка",      "price": 10, "category": "wants", "effect": { "mood": 20 } },
   { "id": "toy_ball",    "label": "Мячик",       "price": 15, "category": "wants", "effect": { "mood": 30 } },
-  { "id": "decor_lamp",  "label": "Лампа",       "price": 25, "category": "wants", "effect": { "mood": 50 } }
+  { "id": "decor_lamp",  "label": "Лампа",       "price": 25, "category": "wants", "effect": { "mood": 50 } },
+  { "id": "hat_cowboy",  "label": "Ковбойская шляпа", "price": 30, "category": "wants", "kind": "accessory", "effect": { "mood": 25 } },
+  { "id": "hat_pirate",  "label": "Пиратская шляпа",  "price": 35, "category": "wants", "kind": "accessory", "effect": { "mood": 30 } },
+  { "id": "hat_wizard",  "label": "Шляпа волшебника", "price": 40, "category": "wants", "kind": "accessory", "effect": { "mood": 35 } }
 ]
