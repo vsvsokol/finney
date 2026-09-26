@@ -58,12 +58,13 @@ data class PetSkin(
 }
 
 /**
- * Посадка шляпы на голову — доли стороны холста питомца, как и остальные точки:
- * [centerX] — середина шляпы, [bottom] — где лежат её поля, [width] — ширина шляпы.
- * Все шляпы нарисованы на общем холсте одного масштаба, поэтому посадка одна на все.
+ * Посадка шляпы на макушку — доли стороны холста питомца, как и остальные точки:
+ * [centerX] — середина шляпы, [brim] — высота, на которой лежат поля, [width] — ширина шляпы.
+ * К голове прикладывается линия полей, а не низ рисунка: у шляпы волшебника поля свисают,
+ * и по низу рисунка она садилась криво. Где у каждой шляпы поля — [accessoryArt].
  */
 @Immutable
-data class HatFit(val centerX: Float, val bottom: Float, val width: Float)
+data class HatFit(val centerX: Float, val brim: Float, val width: Float)
 
 /** Базовый слой настроения и его моргание: меняются только вместе. */
 @Immutable
@@ -105,7 +106,7 @@ private val ZalinaSkin = PetSkin(
     eyesTop = 234f / BLINK_LAYER,
     eyesBottom = 342f / BLINK_LAYER,
     mouthCenter = TransformOrigin(0.5022f, 0.6619f),
-    hat = HatFit(centerX = 0.50f, bottom = 0.30f, width = 0.62f),
+    hat = HatFit(centerX = 0.50f, brim = 0.23f, width = 0.72f),
 )
 
 private val VanyaSkin = PetSkin(
@@ -129,7 +130,7 @@ private val VanyaSkin = PetSkin(
     eyesTop = 223f / BLINK_LAYER,
     eyesBottom = 337f / BLINK_LAYER,
     mouthCenter = TransformOrigin(0.502f, 0.6395f),
-    hat = HatFit(centerX = 0.50f, bottom = 0.35f, width = 0.58f),
+    hat = HatFit(centerX = 0.50f, brim = 0.24f, width = 0.70f),
 )
 
 private val IraSkin = PetSkin(
@@ -153,7 +154,7 @@ private val IraSkin = PetSkin(
     eyesTop = 201f / BLINK_LAYER,
     eyesBottom = 325f / BLINK_LAYER,
     mouthCenter = TransformOrigin(0.5043f, 0.6307f),
-    hat = HatFit(centerX = 0.50f, bottom = 0.34f, width = 0.62f),
+    hat = HatFit(centerX = 0.50f, brim = 0.23f, width = 0.70f),
 )
 
 private val SevaSkin = PetSkin(
@@ -177,7 +178,7 @@ private val SevaSkin = PetSkin(
     eyesTop = 227f / BLINK_LAYER,
     eyesBottom = 335f / BLINK_LAYER,
     mouthCenter = TransformOrigin(0.5043f, 0.6516f),
-    hat = HatFit(centerX = 0.50f, bottom = 0.36f, width = 0.60f),
+    hat = HatFit(centerX = 0.50f, brim = 0.25f, width = 0.68f),
 )
 
 private val YarikSkin = PetSkin(
@@ -201,7 +202,7 @@ private val YarikSkin = PetSkin(
     eyesTop = 215f / BLINK_LAYER,
     eyesBottom = 330f / BLINK_LAYER,
     mouthCenter = TransformOrigin(0.5036f, 0.638f),
-    hat = HatFit(centerX = 0.50f, bottom = 0.38f, width = 0.60f),
+    hat = HatFit(centerX = 0.50f, brim = 0.27f, width = 0.68f),
 )
 
 val PetCharacter.skin: PetSkin

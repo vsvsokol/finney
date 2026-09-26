@@ -7,32 +7,35 @@ import androidx.compose.ui.unit.Constraints
 import ru.finney.pet.R
 import kotlin.math.roundToInt
 
+/** Рисунок аксессуара и где на нём линия полей — доля высоты рисунка. */
+data class AccessoryArt(@DrawableRes val res: Int, val brim: Float)
+
 /**
  * Рисунок аксессуара по id из магазина. Файлы кладёт tools/pack_items.py
  * (`design/exports/items/acc_<id>.png` → `drawable-nodpi/acc_<id>.webp`).
+ * Линия полей — самая широкая строка рисунка, замерена по файлам в ресурсах.
  * null — аксессуар без рисунка: на питомце его не видно.
  */
-@DrawableRes
-fun accessoryArt(itemId: String): Int? = when (itemId) {
-    "hat_cowboy" -> R.drawable.acc_hat_cowboy
-    "hat_pirate" -> R.drawable.acc_hat_pirate
-    "hat_wizard" -> R.drawable.acc_hat_wizard
+fun accessoryArt(itemId: String): AccessoryArt? = when (itemId) {
+    "hat_cowboy" -> AccessoryArt(R.drawable.acc_hat_cowboy, brim = 0.53f)
+    "hat_pirate" -> AccessoryArt(R.drawable.acc_hat_pirate, brim = 0.62f)
+    "hat_wizard" -> AccessoryArt(R.drawable.acc_hat_wizard, brim = 0.71f)
     else -> null
 }
 
 /**
- * Поставить слой по [HatFit]: ширина — доля стороны питомца, середина и низ — доли
- * его холста. Высота — по пропорциям рисунка. Слой занимает место всего холста,
- * поэтому соседние слои питомца не сдвигаются.
+ * Поставить шляпу по [HatFit]: ширина — доля стороны питомца, линия полей [artBrim]
+ * (доля высоты рисунка) ложится на [HatFit.brim]. Слой занимает место всего холста,
+ * поэтому соседние слои питомца не сдвигаются. За верх холста шляпа может выходить.
  */
-internal fun Modifier.hatPlacement(fit: HatFit): Modifier = layout { measurable, constraints ->
+internal fun Modifier.hatPlacement(fit: HatFit, artBrim: Float): Modifier = layout { measurable, constraints ->
     val side = constraints.maxWidth
     val width = (side * fit.width).roundToInt()
     val placeable = measurable.measure(Constraints.fixedWidth(width))
     layout(side, constraints.maxHeight) {
         placeable.place(
             x = (side * fit.centerX - width / 2f).roundToInt(),
-            y = (constraints.maxHeight * fit.bottom - placeable.height).roundToInt(),
+            y = (constraints.maxHeight * fit.brim - placeable.height * artBrim).roundToInt(),
         )
     }
 }

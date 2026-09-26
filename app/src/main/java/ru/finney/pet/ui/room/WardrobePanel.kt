@@ -57,7 +57,7 @@ fun WardrobePanel(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     accessoryArt(item.id)?.let {
-                        Image(painter = painterResource(it), contentDescription = null, modifier = Modifier.size(56.dp))
+                        Image(painter = painterResource(it.res), contentDescription = null, modifier = Modifier.size(56.dp))
                     }
                     Column(modifier = Modifier.weight(1f)) {
                         Text(item.label, style = MaterialTheme.typography.titleMedium, color = FinneyInk)

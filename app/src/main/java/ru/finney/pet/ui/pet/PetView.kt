@@ -148,10 +148,10 @@ fun PetView(
 
         accessory?.let(::accessoryArt)?.let { art ->
             Image(
-                painter = painterResource(art),
+                painter = painterResource(art.res),
                 contentDescription = null,
                 contentScale = ContentScale.FillWidth,
-                modifier = Modifier.hatPlacement(skin.hat),
+                modifier = Modifier.hatPlacement(skin.hat, art.brim),
             )
         }
     }
