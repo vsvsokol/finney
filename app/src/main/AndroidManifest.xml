@@ -2,6 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Напоминания о питомце и «проснулся» (пакет notifications). Android 13+ спрашивает
+         разрешение после создания питомца; отказ игру не ломает. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:name=".FinneyApplication"
         android:allowBackup="false"

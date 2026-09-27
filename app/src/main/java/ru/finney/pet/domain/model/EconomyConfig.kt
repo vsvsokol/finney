@@ -75,9 +75,16 @@ data class PlayRule(
 /**
  * Напоминания о питомце (пакет notifications). Обычно — раз в [everyHours] часов,
  * в демо-режиме — раз в [demoReminderMinutes] минут, чтобы эксперт их увидел.
+ * Ночью, с [quietFromHour] до [quietToHour], не пишем — напоминание переносится на утро.
+ * Приложение открывали меньше [skipIfOpenedHours] часов назад (в демо — [demoSkipIfOpenedMinutes]
+ * минут) — не пишем: ребёнок и так недавно заглядывал.
  */
 @Serializable
 data class ReminderRule(
     val everyHours: Int = 24,
     val demoReminderMinutes: Int = 2,
+    val quietFromHour: Int = 21,
+    val quietToHour: Int = 9,
+    val skipIfOpenedHours: Int = 6,
+    val demoSkipIfOpenedMinutes: Int = 1,
 )
