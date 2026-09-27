@@ -344,6 +344,8 @@ class MiniGamesTest {
     @Test
     fun `receipt — любая строка из дубля засчитывается`() {
         assertEquals(TaskOutcome.SUCCESS, checkOf(check, "l1", "l3", change = true).outcome())
+        // И подсветка экрана согласна с оценкой: отмеченная первая строка — ошибка, вторая — нет.
+        assertEquals(setOf("l1", "l3"), TaskEngines.receiptErrors(check, flagged = setOf("l1")).lines)
     }
 
     @Test

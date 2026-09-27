@@ -72,8 +72,8 @@ fun TaskGame(
         // Учебные движки без своей сцены: в контенте их сейчас нет, экран — запасной.
         is DistributorTask -> EnvelopesGame(task, inputError, onInputSeen, onSubmit)
         is GoalSliderTask -> DepositGame(task, onSubmit)
-        // Сцены чека и подработки ждут стиля «меньше слов» из fix/ui-common; в tasks.json их пока нет.
-        is ReceiptTask, is ChoresTask -> Unit
+        is ReceiptTask -> ReceiptGame(task, character, onClose, onSubmit)
+        is ChoresTask -> ChoresGame(task, character, onClose, onSubmit)
     }
 }
 
@@ -205,7 +205,7 @@ fun ColumnScope.ResultBody(task: TaskDefinition, details: TaskDetails, input: Ta
                         Meter(details.earned.toFloat() / it.goal.price, Modifier.height(14.dp))
                     }
                 }
-                ResultRow(null, "Дней отдыха: ${details.restDays} из ${it.minRestDays}", ok = details.restDays >= it.minRestDays)
+                ResultRow(null, "Дней отдыха: ${details.restDays}, нужно ${it.minRestDays}", ok = details.restDays >= it.minRestDays)
             }
             if (details.shortfall > 0) Summary("Не хватило ${details.shortfall}")
         }

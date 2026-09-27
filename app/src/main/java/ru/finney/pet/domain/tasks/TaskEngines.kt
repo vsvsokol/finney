@@ -257,12 +257,15 @@ object TaskEngines {
 
     /**
      * Что должно быть отмечено. Одинаковые строки одного товара взаимозаменяемы: из дубля
-     * здесь названы последние, а оценка засчитывает любую из них.
+     * ошибкой названы сначала уже отмеченные в [flagged], потом последние — так экран
+     * подсвечивает то же, что засчитывает оценка.
      */
-    fun receiptErrors(task: ReceiptTask): ReceiptErrors = ReceiptErrors(
+    fun receiptErrors(task: ReceiptTask, flagged: Set<String> = emptySet()): ReceiptErrors = ReceiptErrors(
         lines = task.cart.flatMap { item ->
             val check = checkItem(task, item)
-            check.wrongPrice.map { it.id } + check.samePrice.takeLast(check.duplicates).map { it.id }
+            val (marked, rest) = check.samePrice.partition { it.id in flagged }
+            val duplicates = (marked + rest.reversed()).take(check.duplicates)
+            check.wrongPrice.map { it.id } + duplicates.map { it.id }
         }.toSet(),
         changeShort = changeShort(task),
     )

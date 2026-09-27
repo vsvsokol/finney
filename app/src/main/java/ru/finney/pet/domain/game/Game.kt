@@ -578,13 +578,19 @@ class Game(
     }
 
     /**
-     * Игра уровня: случайная из открытых, в варианте по уровню питомца. Та же игра
-     * два уровня подряд не выпадает — разве что открыта всего одна.
+     * Игра уровня: случайная из открытых, в варианте по уровню питомца. Сначала —
+     * из тех, что ещё не выпадали ни на одном уровне: игр больше, чем уровней, и
+     * иначе часть из них могла бы не выпасть за всю игру. Когда выпали все, та же
+     * игра два уровня подряд не выпадает — разве что открыта всего одна.
      */
     private fun pickLevelGame(state: GameState): String? {
-        val previous = state.periods.dropLast(1).lastOrNull()?.levelTaskId?.let(content::task)?.seriesId
+        val earlier = state.periods.dropLast(1).map { it.levelTaskId?.let(content::task)?.seriesId }
+        val previous = earlier.lastOrNull()
         val open = currentTasks(state).filter { isTaskAvailable(state, it) }
-        return open.filter { it.seriesId != previous }.ifEmpty { open }.randomOrNull(random)?.id
+        val candidates = open.filter { it.seriesId !in earlier }
+            .ifEmpty { open.filter { it.seriesId != previous } }
+            .ifEmpty { open }
+        return candidates.randomOrNull(random)?.id
     }
 
     // ---------- Служебное ----------
