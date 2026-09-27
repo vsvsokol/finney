@@ -28,6 +28,9 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -41,6 +44,7 @@ import ru.finney.pet.ui.pet.PetView
 import ru.finney.pet.ui.pet.accessoryArt
 import ru.finney.pet.ui.pet.rememberPetAnimation
 import ru.finney.pet.ui.pet.rememberPoseProvider
+import ru.finney.pet.ui.theme.FinneyCream
 import ru.finney.pet.ui.theme.FinneyGreen
 import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneySand
@@ -119,7 +123,7 @@ private fun WardrobeContent(
         // «Без шляпы» — первой плиткой: снять так же просто, как надеть.
         Tile(
             label = "Без шляпы",
-            status = if (state.worn == null) "надето" else "снять шляпу",
+            status = null,
             selected = state.worn == null,
             enabled = true,
             onClick = onTakeOff,
@@ -130,11 +134,8 @@ private fun WardrobeContent(
                     val worn = entry.item.id == state.worn
                     Tile(
                         label = entry.item.label,
-                        status = when {
-                            worn -> "надето"
-                            entry.owned -> "надеть"
-                            else -> entry.howToGet.orEmpty()
-                        },
+                        // Слова остались только у ещё не полученной шляпы — как её получить.
+                        status = entry.howToGet.takeUnless { entry.owned },
                         art = accessoryArt(entry.item.id)?.res,
                         selected = worn,
                         enabled = entry.owned,
@@ -165,7 +166,7 @@ private fun WardrobeContent(
 @Composable
 private fun Tile(
     label: String,
-    status: String,
+    status: String?,
     selected: Boolean,
     enabled: Boolean,
     onClick: () -> Unit,
@@ -179,6 +180,11 @@ private fun Tile(
             .clip(shape)
             .background(if (selected) FinneyGreen else if (enabled) FinneyYellow else FinneySand)
             .border(if (selected) 3.dp else 2.dp, FinneyInk, shape)
+            // Название и «надето» — для TalkBack; на плитке — картинка и «✓».
+            .semantics(mergeDescendants = true) {
+                contentDescription = label
+                stateDescription = if (selected) "надето" else if (enabled) "не надето" else "ещё нет"
+            }
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
             .padding(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -193,7 +199,14 @@ private fun Tile(
                     .alpha(if (enabled) 1f else 0.45f),
             )
         }
-        Text(label, style = MaterialTheme.typography.titleMedium, color = FinneyInk, textAlign = TextAlign.Center)
-        Text(status, style = MaterialTheme.typography.bodyMedium, color = FinneyInk, textAlign = TextAlign.Center)
+        // Без рисунка («Без шляпы») без подписи не понять — она остаётся.
+        if (art == null) Text(label, style = MaterialTheme.typography.titleMedium, color = FinneyInk, textAlign = TextAlign.Center)
+        if (selected) {
+            Box(
+                Modifier.size(28.dp).clip(CircleShape).background(FinneyCream).border(2.dp, FinneyInk, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) { Text("✓", style = MaterialTheme.typography.titleMedium, color = FinneyInk) }
+        }
+        status?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = FinneyInk, textAlign = TextAlign.Center) }
     }
 }
