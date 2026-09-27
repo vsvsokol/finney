@@ -103,10 +103,13 @@ data class BasketTask(
     val shelf: List<ShelfItem>,
     val preloaded: List<String> = emptyList(),
     val rules: List<BasketRule> = emptyList(),
+    /** Цель одной фразой — видна с первого экрана: «Купи всё из списка и уложись в 40». */
+    val goalText: String? = null,
 ) : TaskDefinition()
 
 /**
  * Товар на полке задания. [qty] — сколько штук в упаковке: «5 яблок за 20» выгоднее «2 за 10».
+ * [promo] — надпись акции на ценнике («Акция!»); цена в [price] уже со скидкой.
  * [art] и [emoji] — только для рисунка, см. [ItemArt].
  */
 @Serializable
@@ -116,6 +119,7 @@ data class ShelfItem(
     val price: Int,
     val category: Category,
     val qty: Int = 1,
+    val promo: String? = null,
     override val art: String? = null,
     override val emoji: String? = null,
 ) : ItemArt
@@ -260,7 +264,11 @@ data class RaceEvent(
     override val emoji: String? = null,
 ) : ItemArt
 
-/** «Дождливый день»: спланировать траты с запасом, потом случается непредвиденное. */
+/**
+ * «Дождливый день»: спланировать траты с запасом, потом случается непредвиденное.
+ * [surprises] — что случилось на этой неделе: в tasks.json у каждого сюрприза
+ * `chance`, и какие выпали, решает зерно попытки. Бывает и ни одного.
+ */
 @Serializable
 @SerialName("reserve")
 data class ReserveTask(
@@ -276,10 +284,13 @@ data class ReserveTask(
     override val series: String? = null,
     val amount: Int,
     val spendings: List<Spending>,
-    val surprise: Surprise,
+    val surprises: List<Surprise>,
 ) : TaskDefinition()
 
-/** Трата недели. Нужное нельзя ни убрать из плана, ни перенести. */
+/**
+ * Трата недели. Нужное нельзя убрать из плана. Перенести его можно, если на сюрприз не
+ * хватило запаса, но тогда игра не пройдена.
+ */
 @Serializable
 data class Spending(
     val id: String,
@@ -299,7 +310,16 @@ data class Surprise(
     override val emoji: String? = null,
 ) : ItemArt
 
-/** «Лимонадная лавка»: закупить сырьё под число гостей. */
+/**
+ * «Лимонадная лавка»: закупить сырьё под число гостей.
+ *
+ * С [days] — лавка на несколько дней: каждое утро ребёнок решает, сколько купить и почём
+ * продавать стакан. Гостей приходит по настоящей погоде дня ([StandDay.weather]), а видит
+ * он прогноз ([StandDay.forecast]) — «прогноз — подсказка, а не обещание». Лимоны переходят
+ * на завтра и портятся через [freshDays] дней. Дороже стакан — меньше гостей
+ * ([guestsPerCoin]). Победа — прибыль за все дни не меньше [goalProfit]. Без [days] — один
+ * день с [guests] гостями, как раньше.
+ */
 @Serializable
 @SerialName("stand")
 data class StandTask(
@@ -318,10 +338,34 @@ data class StandTask(
     val ingredient: StandIngredient,
     /** Цена одного стакана для гостя. */
     val cupPrice: Int,
-    val guests: Int,
+    val guests: Int = 0,
     /** Подсказка о погоде и числе гостей: «Жарко — придут около 8 гостей». */
-    val forecast: String,
-) : TaskDefinition()
+    val forecast: String = "",
+    val days: List<StandDay> = emptyList(),
+    /** Сколько гостей приходит в такую погоду, если стакан по [cupPrice]. */
+    val demand: Map<Weather, Int> = emptyMap(),
+    /** Цены стакана на выбор; пусто — только [cupPrice]. */
+    val prices: List<Int> = emptyList(),
+    /** На столько гостей меньше за каждую монету цены выше [cupPrice] (и больше — за каждую ниже). */
+    val guestsPerCoin: Int = 0,
+    /** Лимон, купленный утром, годен в этот день и ещё [freshDays] − 1, потом портится. */
+    val freshDays: Int = 2,
+    val goalProfit: Int = 0,
+) : TaskDefinition() {
+    /** Цены стакана, из которых выбирает ребёнок. */
+    val cupPrices: List<Int> get() = prices.ifEmpty { listOf(cupPrice) }
+}
+
+@Serializable
+enum class Weather {
+    @SerialName("sun") SUN,
+    @SerialName("clouds") CLOUDS,
+    @SerialName("rain") RAIN,
+}
+
+/** День лавки: что обещал прогноз и какая погода была на самом деле. */
+@Serializable
+data class StandDay(val forecast: Weather, val weather: Weather)
 
 /** Из одной штуки выходит [yields] стаканов. */
 @Serializable
@@ -420,6 +464,9 @@ data class ReceiptLine(val id: String, val item: String, val price: Int)
 /**
  * «Подработка»: разложить дела по неделе, набрать на цель и оставить дни отдыха.
  * В каждом из [days] дней — [hoursPerDay] часиков; пустых дней нужно не меньше [minRestDays].
+ * Усталость: дело, которое было и вчера, приносит на [tiredCut] меньше (не ниже нуля).
+ * За [varietyCount] разных дел за неделю — [varietyBonus] сверху. Так «самое выгодное
+ * дело каждый день» перестаёт быть лучшим планом.
  */
 @Serializable
 @SerialName("chores")
@@ -439,9 +486,16 @@ data class ChoresTask(
     val hoursPerDay: Int,
     val minRestDays: Int = 1,
     val chores: List<Chore>,
+    val tiredCut: Int = 0,
+    val varietyBonus: Int = 0,
+    val varietyCount: Int = 3,
 ) : TaskDefinition()
 
-/** Дело: занимает [hours] часиков, приносит [reward]. [maxTimes] — сколько раз за неделю его дают. */
+/**
+ * Дело: занимает [hours] часиков, приносит [reward]. [maxTimes] — сколько раз за неделю его дают.
+ * [pay] — оплата по дням недели, по числу на день: в выходной собака платит больше; нет —
+ * каждый день [reward]. [onDays] — в какие дни (с 1) дело дают; нет — в любой.
+ */
 @Serializable
 data class Chore(
     val id: String,
@@ -449,6 +503,8 @@ data class Chore(
     val hours: Int,
     val reward: Int,
     val maxTimes: Int? = null,
+    val pay: List<Int>? = null,
+    val onDays: List<Int>? = null,
     override val art: String? = null,
     override val emoji: String? = null,
 ) : ItemArt

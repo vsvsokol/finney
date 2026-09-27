@@ -65,8 +65,9 @@ import ru.finney.pet.ui.theme.StrokeRegular
 // «Дождливый день» — спланированный случай непредвиденной траты, который ТЗ
 // разрешает прямо (раздел 2). Сначала «Моя неделя»: траты конвертами, нужное
 // всегда в плане, остаток падает в банку «Запас». Потом за окном дождь и
-// ломается зонт. Запаса хватило — успех. Нет — ребёнок сам переносит желаемое;
-// нужное перенести нельзя. Питомец не болеет и не пугается.
+// случается непредвиденное — от нуля до нескольких трат, заранее неизвестно. Запаса
+// не хватило — ребёнок сам переносит траты; перенёс нужное — игра не пройдена, сохранил
+// желаемое — бонус. Питомец не болеет и не пугается.
 
 @Composable
 internal fun ReserveGame(
@@ -125,8 +126,9 @@ internal fun ReserveGame(
         return
     }
 
-    val surprise = task.surprise
-    val shortage = maxOf(0, surprise.price - reserve)
+    val surprises = task.surprises
+    val total = TaskEngines.surprisesTotal(task)
+    val shortage = maxOf(0, total - reserve)
     val freed = task.spendings.filter { it.id in dropped }.sumOf { it.price }
 
     GameScene(backdrop = Backdrop.ROOM_RAIN, onClose = onClose, money = reserve) {
@@ -141,20 +143,31 @@ internal fun ReserveGame(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 if (shortage == 0) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Box(
-                            Modifier.size(64.dp).clip(RoundedCornerShape(14.dp)).background(FinneyBlue)
-                                .border(3.dp, FinneyInk, RoundedCornerShape(14.dp)),
-                            contentAlignment = Alignment.Center,
-                        ) { ItemPicture(surprise, surprise.label, 44.dp) }
-                        Column {
-                            OutlinedText(surprise.label, style = MaterialTheme.typography.titleLarge, fill = FinneyInk, outline = Color.White)
-                            Text(surprise.text, style = MaterialTheme.typography.bodyMedium, color = FinneyInk)
+                    if (surprises.isEmpty()) {
+                        OutlinedText("Неделя прошла спокойно", style = MaterialTheme.typography.titleLarge, fill = FinneyInk, outline = Color.White)
+                    }
+                    surprises.forEach { surprise ->
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Box(
+                                Modifier.size(64.dp).clip(RoundedCornerShape(14.dp)).background(FinneyBlue)
+                                    .border(3.dp, FinneyInk, RoundedCornerShape(14.dp)),
+                                contentAlignment = Alignment.Center,
+                            ) { ItemPicture(surprise, surprise.label, 44.dp) }
+                            Column {
+                                OutlinedText(surprise.label, style = MaterialTheme.typography.titleLarge, fill = FinneyInk, outline = Color.White)
+                                Text(surprise.text, style = MaterialTheme.typography.bodyMedium, color = FinneyInk)
+                            }
                         }
                     }
-                    FinneyButton(text = "Взять из запаса · ${surprise.price}", onClick = { onSubmit(TaskInput.Reserve(planned, dropped)) })
+                    FinneyButton(
+                        text = if (total > 0) "Взять из запаса · $total" else "Дальше",
+                        onClick = { onSubmit(TaskInput.Reserve(planned, dropped)) },
+                    )
                 } else {
-                    OutlinedText("Нужно ${surprise.price}: ${surprise.label.lowercase().trimEnd('!')}", style = MaterialTheme.typography.titleLarge)
+                    OutlinedText(
+                        "Нужно $total: " + surprises.joinToString { it.label.lowercase().trimEnd('!') },
+                        style = MaterialTheme.typography.titleLarge,
+                    )
                     // Сколько не хватает — числом, вопрос — коротко: что делать, без слов не понять.
                     Text("Не хватает $shortage. Что перенесём?", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
                     task.spendings.filter { it.id in planned }.forEach { s ->
@@ -290,7 +303,7 @@ private fun PostponeRow(spending: Spending, checked: Boolean, onChange: (Boolean
                     Modifier.border(3.dp, FinneyInk, RoundedCornerShape(12.dp))
                 },
             )
-            .toggleable(value = checked, enabled = !locked, role = Role.Checkbox, onValueChange = onChange)
+            .toggleable(value = checked, role = Role.Checkbox, onValueChange = onChange)
             .padding(horizontal = 10.dp, vertical = 6.dp),
     ) {
         // Отметка «переносим» — тем же кружком, что у конвертов: пустой — на месте, «✓» — перенесли.

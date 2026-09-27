@@ -75,27 +75,54 @@ class TaskGeneratorTest {
         val t = template(
             """
             {
-              "id": "r", "theme": "planning", "engine": "reserve", "title": "Р", "intro": "{surprise.label}",
+              "id": "r", "theme": "planning", "engine": "reserve", "title": "Р", "intro": "{surprises.0.label}",
               "explainOk": "ок", "explainFail": "нет", "amount": 100,
               "spendings": { "pick": 2, "from": [
                 { "id": "a", "label": "А", "price": 10, "category": "needs" },
                 { "id": "b", "label": "Б", "price": 10, "category": "wants" },
                 { "id": "c", "label": "В", "price": 10, "category": "wants" }
               ] },
-              "surprise": { "oneOf": [
-                { "label": "Зонт", "text": "стоит {surprise.price}", "price": 10 },
-                { "label": "Рюкзак", "text": "стоит {surprise.price}", "price": 20 }
-              ] }
+              "surprises": [{ "oneOf": [
+                { "label": "Зонт", "text": "стоит {surprises.0.price}", "price": 10 },
+                { "label": "Рюкзак", "text": "стоит {surprises.0.price}", "price": 20 }
+              ] }]
             }
             """,
         )
         val tasks = (1L..200L).map { TaskGenerator.generate(t, it) as ReserveTask }
         assertEquals(setOf("Зонт", "Рюкзак"), tasks.map { it.intro }.toSet())
-        assertTrue(tasks.all { it.surprise.text == "стоит ${it.surprise.price}" })
+        assertTrue(tasks.all { it.surprises.single().text == "стоит ${it.surprises.single().price}" })
         assertTrue(tasks.all { it.spendings.size == 2 })
         assertEquals(3, tasks.map { r -> r.spendings.map { it.id } }.toSet().size)
         // Порядок — как в списке: «a» никогда не после «b».
         assertTrue(tasks.all { r -> r.spendings.map { it.id }.let { it == it.sorted() } })
+    }
+
+    @Test
+    fun `chance — элемент списка есть с заданной вероятностью`() {
+        val t = template(
+            """
+            {
+              "id": "r", "theme": "planning", "engine": "reserve", "title": "Р", "intro": "", "explainOk": "", "explainFail": "",
+              "amount": 100,
+              "spendings": [
+                { "id": "a", "label": "А", "price": 10, "category": "needs" },
+                { "id": "b", "label": "Б", "price": 10, "category": "wants" }
+              ],
+              "surprises": [
+                { "chance": 100, "value": { "label": "Всегда", "text": "", "price": 5 } },
+                { "chance": 30, "value": { "label": "Иногда", "text": "", "price": 5 } },
+                { "chance": 0, "value": { "label": "Никогда", "text": "", "price": 5 } }
+              ]
+            }
+            """,
+        )
+        val labels = (1L..1000L).map { seed -> (TaskGenerator.generate(t, seed) as ReserveTask).surprises.map { it.label } }
+        assertTrue(labels.all { "Всегда" in it && "Никогда" !in it })
+        val sometimes = labels.count { "Иногда" in it }
+        assertTrue("выпало $sometimes из 1000", sometimes in 220..380)
+        // Без случайности элемент есть.
+        assertEquals(3, (TaskGenerator.base(t) as ReserveTask).surprises.size)
     }
 
     @Test
@@ -173,6 +200,25 @@ class TaskGeneratorTest {
 
         val wrong = game.submitTask(start, task.id, TaskInput.Stock(TaskEngines.bestStock(task)), other).submitted()
         assertEquals(TaskOutcome.FAIL, wrong.outcome)
+    }
+
+    @Test
+    fun `бонус движка добавляется к награде один раз`() {
+        val game = Game(content, Random(1))
+        val fresh = game.selectGoal(game.newGame(isDemo = true), content.goals.first().id).state()
+        val start = game.confirmPlan(fresh, 20, 10, 10).state()
+        // Без зерна — вариант без случайности: случились оба сюрприза, 10 + 15.
+        val keepIcecream = TaskInput.Reserve(setOf("food", "soap", "icecream"), emptySet())
+        val first = game.submitTask(start, "game_rainy", keepIcecream).submitted()
+        val rates = content.economy.taskReward
+        assertEquals(TaskOutcome.SUCCESS, first.outcome)
+        assertEquals(rates.bonus, first.bonus)
+        assertEquals(rates.success + rates.bonus, first.reward)
+        assertTrue(first.state.attempts.last().bonus)
+
+        val again = game.submitTask(first.state, "game_rainy", keepIcecream).submitted()
+        assertEquals(0, again.reward)
+        assertEquals(0, again.bonus)
     }
 
     @Test

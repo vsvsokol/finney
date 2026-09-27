@@ -39,7 +39,7 @@ fun GameState.toRows(profileId: Long) = GameRows(
     pet = PetStateEntity(profileId, pet.satiety, pet.hygiene, pet.mood, pet.energy, sleepingSince, playMood, playSince),
     periods = periods.map { it.toEntity(profileId) },
     ledger = ledger.map { it.toEntity(profileId) },
-    attempts = attempts.map { TaskAttemptEntity(0, profileId, it.periodNumber, it.taskId, it.outcome, it.reward, it.createdAt, it.seed) },
+    attempts = attempts.map { TaskAttemptEntity(0, profileId, it.periodNumber, it.taskId, it.outcome, it.reward, it.createdAt, it.seed, it.bonus) },
 )
 
 fun ProfileWithGame.toDomain(): SavedGame {
@@ -53,7 +53,7 @@ fun ProfileWithGame.toDomain(): SavedGame {
             periods = periods.sortedBy { it.number }.map { it.toDomain() },
             ledger = ledger.sortedBy { it.id }.map { it.toDomain() },
             attempts = attempts.sortedBy { it.id }.map {
-                TaskAttempt(it.periodNumber, it.taskId, it.outcome, it.reward, it.createdAt, it.seed)
+                TaskAttempt(it.periodNumber, it.taskId, it.outcome, it.reward, it.createdAt, it.seed, it.bonus)
             },
             wornItemId = profile.wornItemId,
             sleepingSince = pet.sleepingSince,

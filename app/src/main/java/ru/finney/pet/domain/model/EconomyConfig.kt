@@ -29,7 +29,11 @@ data class EconomyConfig(
 }
 
 @Serializable
-data class TaskReward(val success: Int, val fail: Int)
+/**
+ * Награда за задание. [bonus] — сверху к успеху, если движок засчитал бонус (например,
+ * в «Дождливом дне» нужное закрыто и желаемое не отменено); выдаётся тоже один раз.
+ */
+data class TaskReward(val success: Int, val fail: Int, val bonus: Int = 0)
 
 @Serializable
 data class ParentBonusRule(val step: Int, val maxPerPeriod: Int)

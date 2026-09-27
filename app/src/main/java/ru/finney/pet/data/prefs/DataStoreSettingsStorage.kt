@@ -15,6 +15,7 @@ class DataStoreSettingsStorage(private val dataStore: DataStore<Preferences>) : 
         SoundSettings(
             sound = prefs[SOUND] ?: true,
             music = prefs[MUSIC] ?: true,
+            haptics = prefs[HAPTICS] ?: true,
         )
     }
 
@@ -26,8 +27,13 @@ class DataStoreSettingsStorage(private val dataStore: DataStore<Preferences>) : 
         dataStore.edit { it[MUSIC] = enabled }
     }
 
+    override suspend fun setHaptics(enabled: Boolean) {
+        dataStore.edit { it[HAPTICS] = enabled }
+    }
+
     private companion object {
         val SOUND = booleanPreferencesKey("sound")
         val MUSIC = booleanPreferencesKey("music")
+        val HAPTICS = booleanPreferencesKey("haptics")
     }
 }

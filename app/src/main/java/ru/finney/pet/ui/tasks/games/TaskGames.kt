@@ -110,7 +110,7 @@ fun taskIconCandidates(task: TaskDefinition): List<ItemArt> = when (task) {
     is SorterTask -> task.items
     is BasketTask -> task.shelf
     is GoalRaceTask -> listOf(task.goal) + task.events
-    is ReserveTask -> listOf(task.surprise) + task.spendings
+    is ReserveTask -> task.surprises + task.spendings
     is StandTask -> listOf(task.ingredient)
     is ChangeTask -> task.rounds
     is ReceiptTask -> task.cart
@@ -201,17 +201,19 @@ fun ColumnScope.ResultBody(task: TaskDefinition, details: TaskDetails, input: Ta
             reserve?.let {
                 // Хватило ли запаса на непредвиденное — полосой: запас против того, что понадобилось.
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ItemPicture(it.surprise, it.surprise.label, 36.dp)
+                    it.surprises.firstOrNull()?.let { s -> ItemPicture(s, s.label, 36.dp) }
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         SumRow("Запас", details.reserve.toString(), strong = true)
-                        SumRow("Понадобилось", it.surprise.price.toString())
-                        FillBar(details.reserve, it.surprise.price, Modifier.fillMaxWidth(), description = "Запас ${details.reserve}, понадобилось ${it.surprise.price}")
+                        SumRow("Понадобилось", details.surprises.toString())
+                        FillBar(details.reserve, details.surprises, Modifier.fillMaxWidth(), description = "Запас ${details.reserve}, понадобилось ${details.surprises}")
                     }
                 }
             }
             val dropped = (input as? TaskInput.Reserve)?.dropped.orEmpty()
             reserve?.spendings?.filter { it.id in dropped }?.forEach { ResultRow(it, "${it.label} — перенесли", ok = false) }
             ResultRow(null, if (details.shortage == 0) "Запаса хватило" else "Не хватило ${details.shortage}", ok = details.shortage == 0)
+            if (details.droppedNeeds > 0) ResultRow(null, "Пришлось перенести нужное", ok = false)
+            if (details.left > 0) SumRow("Осталось на потом", details.left.toString())
         }
 
         is TaskDetails.Stand -> {
@@ -234,6 +236,15 @@ fun ColumnScope.ResultBody(task: TaskDefinition, details: TaskDetails, input: Ta
                     note = "На всех хватило бы: ${stand?.ingredient?.label?.lowercase().orEmpty()} × ${details.best}",
                 )
             }
+        }
+
+        // Лавка на несколько дней: по строке на день, итог — прибыль против цели.
+        // Экран дней ещё не сделан, см. docs/minigames.md, «Лавка на несколько дней».
+        is TaskDetails.StandWeek -> {
+            details.days.forEachIndexed { d, day ->
+                SumRow("День ${d + 1}: продал ${day.sold}, испортилось ${day.spoiled}", "${day.earned - day.spent}")
+            }
+            ResultRow(null, "Прибыль ${details.profit}, нужно ${details.goal}", ok = details.profit >= details.goal)
         }
 
         is TaskDetails.Change -> {
@@ -265,6 +276,8 @@ fun ColumnScope.ResultBody(task: TaskDefinition, details: TaskDetails, input: Ta
                     }
                 }
                 ResultRow(null, "Дней отдыха: ${details.restDays}, нужно ${it.minRestDays}", ok = details.restDays >= it.minRestDays)
+                if (details.tiredLoss > 0) SumRow("Устал — заплатили меньше", "−${details.tiredLoss}")
+                if (details.bonus > 0) SumRow("Бонус за разные дела", "+${details.bonus}")
             }
             if (details.shortfall > 0) ResultRow(null, "Не хватило ${details.shortfall}", ok = false)
         }

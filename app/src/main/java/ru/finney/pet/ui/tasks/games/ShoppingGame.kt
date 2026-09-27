@@ -166,6 +166,7 @@ private fun ShoppingList(task: BasketTask, rules: List<BasketRule>, cart: Set<St
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         OutlinedText("Список", style = MaterialTheme.typography.titleLarge)
+        task.goalText?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = FinneyInk) }
         rules.forEach { rule ->
             val done = TaskEngines.ruleMet(task, rule, cart)
             Row(
@@ -213,6 +214,7 @@ private fun Goods(item: ShelfItem, inCart: Boolean, modifier: Modifier, onToggle
             }
         }
         Text(item.label, style = MaterialTheme.typography.labelMedium, color = FinneyInk, textAlign = TextAlign.Center)
+        item.promo?.let { OutlinedText(it, style = MaterialTheme.typography.labelLarge, fill = FinneyPink) }
         PriceTag(if (item.qty > 1) "${item.qty} шт · ${item.price}" else item.price.toString())
     }
 }

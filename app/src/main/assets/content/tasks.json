@@ -82,8 +82,9 @@
     "title": "Список покупок",
     "series": "shopping",
     "unlockLevel": 1,
-    "intro": "Финни дал список и 50 монет. Собери всё по списку и не забудь сравнить упаковки.",
-    "limit": 50,
+    "intro": "Финни дал список и {limit} монет. Собери всё по списку и не забудь сравнить упаковки.",
+    "limit": { "min": 40, "max": 50, "step": 5 },
+    "goalText": "Купи всё из списка и уложись в {limit}",
     "shelf": [
       { "id": "apple2", "label": "2 яблока", "price": 10, "qty": 2, "category": "needs", "art": "item_food_apple" },
       { "id": "apple5", "label": "5 яблок", "price": 20, "qty": 5, "category": "needs", "art": "item_food_apple" },
@@ -106,23 +107,36 @@
     "title": "Список покупок",
     "series": "shopping",
     "unlockLevel": 4,
-    "intro": "У Финни 45 монет и список: сок на 3 дня, молоко и мыло. Сок продают по-разному — сравни упаковки.",
-    "limit": 45,
-    "shelf": [
-      { "id": "juice1", "label": "1 сок", "price": 10, "category": "needs", "art": "item_food_juice" },
-      { "id": "juice2", "label": "2 сока", "price": 15, "qty": 2, "category": "needs", "art": "item_food_juice" },
-      { "id": "juice3", "label": "3 сока", "price": 20, "qty": 3, "category": "needs", "art": "item_food_juice" },
-      { "id": "milk", "label": "Молоко", "price": 15, "category": "needs", "art": "item_food_milk" },
-      { "id": "soap", "label": "Мыло", "price": 10, "category": "needs", "art": "item_care_soap" },
-      { "id": "donut", "label": "Пончик у кассы", "price": 5, "category": "wants", "art": "item_treat_donut" }
-    ],
+    "intro": "У Финни {limit} монет и список: сок на 3 дня, молоко и мыло. На одну упаковку сока сегодня акция — посчитай, где сок дешевле.",
+    "limit": 40,
+    "goalText": "Купи всё из списка и уложись в {limit}",
+    "shelf": {
+      "oneOf": [
+        [
+        { "id": "juice1", "label": "1 сок", "price": 10, "category": "needs", "art": "item_food_juice" },
+        { "id": "juice2", "label": "2 сока", "price": 15, "qty": 2, "category": "needs", "art": "item_food_juice" },
+        { "id": "juice3", "label": "3 сока", "price": 15, "qty": 3, "category": "needs", "promo": "Акция!", "art": "item_food_juice" },
+        { "id": "milk", "label": "Молоко", "price": 15, "category": "needs", "art": "item_food_milk" },
+        { "id": "soap", "label": "Мыло", "price": 10, "category": "needs", "art": "item_care_soap" },
+        { "id": "donut", "label": "Пончик у кассы", "price": 5, "category": "wants", "art": "item_treat_donut" }
+        ],
+        [
+        { "id": "juice1", "label": "1 сок", "price": 10, "category": "needs", "art": "item_food_juice" },
+        { "id": "juice2", "label": "2 сока", "price": 5, "qty": 2, "category": "needs", "promo": "Акция!", "art": "item_food_juice" },
+        { "id": "juice3", "label": "3 сока", "price": 20, "qty": 3, "category": "needs", "art": "item_food_juice" },
+        { "id": "milk", "label": "Молоко", "price": 15, "category": "needs", "art": "item_food_milk" },
+        { "id": "soap", "label": "Мыло", "price": 10, "category": "needs", "art": "item_care_soap" },
+        { "id": "donut", "label": "Пончик у кассы", "price": 5, "category": "wants", "art": "item_treat_donut" }
+        ]
+      ]
+    },
     "rules": [
       { "type": "minQty", "items": ["juice1", "juice2", "juice3"], "qty": 3, "label": "3 сока — по одному на день" },
       { "type": "anyOf", "items": ["milk"], "label": "Молоко" },
       { "type": "anyOf", "items": ["soap"], "label": "Мыло" }
     ],
-    "explainOk": "Всё по списку! 3 сока одной упаковкой стоят 20, а если брать 1 и 2 — 25. Большая упаковка выгоднее, когда всё правда пригодится.",
-    "explainFail": "В корзине не всё из списка. Посмотри, где нет галочки. Подсказка: одна большая упаковка сока дешевле, чем несколько маленьких."
+    "explainOk": "Всё по списку, и денег хватило! Ты сравнил упаковки с акцией: иногда выгоднее большая, а иногда маленькая по акции.",
+    "explainFail": "В корзине не всё из списка или не хватило денег. Посчитай, сколько стоят 3 сока в разных упаковках, — и не пропусти акцию."
   },
   {
     "id": "game_shopping_3",
@@ -133,6 +147,7 @@
     "unlockLevel": 5,
     "intro": "Финни собирается в поход на 3 дня. У него 60 монет, а список длинный. Уложись и ничего не забудь!",
     "limit": 60,
+    "goalText": "Купи всё из списка и уложись в {limit}",
     "shelf": [
       { "id": "apple1", "label": "1 яблоко", "price": 5, "category": "needs", "art": "item_food_apple" },
       { "id": "apple2", "label": "2 яблока", "price": 10, "qty": 2, "category": "needs", "art": "item_food_apple" },
@@ -236,15 +251,12 @@
       { "id": "stickers", "label": "Наклейки", "price": 10, "category": "wants", "art": "item_toy_stickers" },
       { "id": "icecream", "label": "Мороженое", "price": 5, "category": "wants", "art": "item_treat_icecream" }
     ],
-    "surprise": {
-      "oneOf": [
-          { "label": "Сломался зонт!", "text": "Новый стоит {surprise.price}. Без него Финни промокнет по дороге.", "price": 10, "art": "item_wear_umbrella" },
-          { "label": "Порвался рюкзак!", "text": "Новый стоит {surprise.price}. Без рюкзака не в чем носить тетради.", "price": 15, "art": "item_school_backpack" },
-          { "label": "Порвались кроссовки!", "text": "Новые стоят {surprise.price}. В рваных по лужам не походишь.", "price": 20, "art": "item_wear_sneakers" }
-      ]
-    },
-    "explainOk": "Хорошо, что был запас! Неожиданная трата не испортила неделю. Запас — это деньги на всякий случай.",
-    "explainFail": "Запаса не хватило, и что-то пришлось перенести. Ничего страшного — в следующий раз оставь немного монет на всякий случай."
+    "surprises": [
+      { "chance": 70, "value": { "label": "Сломался зонт!", "text": "Новый стоит 10. Без него Финни промокнет по дороге.", "price": 10, "art": "item_wear_umbrella" } },
+      { "chance": 30, "value": { "label": "Порвался рюкзак!", "text": "Новый стоит 15. Без рюкзака не в чем носить тетради.", "price": 15, "art": "item_school_backpack" } }
+    ],
+    "explainOk": "Хорошо, что был запас! Непредвиденное не испортило неделю: нужное оплачено. Запас — это деньги на всякий случай.",
+    "explainFail": "Запаса не хватило, и пришлось перенести нужное. Ничего страшного — в следующий раз оставь побольше монет на всякий случай."
   },
   {
     "id": "game_rainy_2",
@@ -264,15 +276,12 @@
       { "id": "stickers", "label": "Наклейки", "price": 10, "category": "wants", "art": "item_toy_stickers" },
       { "id": "icecream", "label": "Мороженое", "price": 5, "category": "wants", "art": "item_treat_icecream" }
     ],
-    "surprise": {
-      "oneOf": [
-          { "label": "Сломался зонт!", "text": "Новый стоит {surprise.price}. Без него Финни промокнет по дороге.", "price": 15, "art": "item_wear_umbrella" },
-          { "label": "Порвался рюкзак!", "text": "Новый стоит {surprise.price}. Без рюкзака не в чем носить тетради.", "price": 20, "art": "item_school_backpack" },
-          { "label": "Порвались кроссовки!", "text": "Новые стоят {surprise.price}. В рваных по лужам не походишь.", "price": 25, "art": "item_wear_sneakers" }
-      ]
-    },
-    "explainOk": "Запаса хватило на неожиданную трату! Когда нужное оплачено, часть монет лучше не тратить сразу.",
-    "explainFail": "Запаса не хватило, и кое-что пришлось отменить. В следующий раз оставь на всякий случай побольше монет."
+    "surprises": [
+      { "chance": 60, "value": { "label": "Сломался зонт!", "text": "Новый стоит 10. Без него Финни промокнет по дороге.", "price": 10, "art": "item_wear_umbrella" } },
+      { "chance": 40, "value": { "label": "Порвались кроссовки!", "text": "Новые стоят 15. В рваных по лужам не походишь.", "price": 15, "art": "item_wear_sneakers" } }
+    ],
+    "explainOk": "Запаса хватило! Когда нужное оплачено, часть монет лучше не тратить сразу — а если сюрпризов не было, запас пригодится потом.",
+    "explainFail": "Запаса не хватило, и пришлось отменить нужное. В следующий раз оставь на всякий случай побольше монет."
   },
   {
     "id": "game_rainy_3",
@@ -293,15 +302,13 @@
       { "id": "stickers", "label": "Наклейки", "price": 10, "category": "wants", "art": "item_toy_stickers" },
       { "id": "icecream", "label": "Мороженое", "price": 5, "category": "wants", "art": "item_treat_icecream" }
     ],
-    "surprise": {
-      "oneOf": [
-          { "label": "Сломался зонт!", "text": "Новый стоит {surprise.price}. Без него Финни промокнет по дороге.", "price": 20, "art": "item_wear_umbrella" },
-          { "label": "Порвался рюкзак!", "text": "Новый стоит {surprise.price}. Без рюкзака не в чем носить тетради.", "price": 25, "art": "item_school_backpack" },
-          { "label": "Порвались кроссовки!", "text": "Новые стоят {surprise.price}. В рваных по лужам не походишь.", "price": 30, "art": "item_wear_sneakers" }
-      ]
-    },
-    "explainOk": "Запас спас неделю: неожиданную трату оплатили и ничего не отменили. Чем больше трат, тем важнее запас.",
-    "explainFail": "Запаса не хватило. Когда трат много, откладывай на всякий случай больше — хотя бы треть денег."
+    "surprises": [
+      { "chance": 50, "value": { "label": "Сломался зонт!", "text": "Новый стоит 10. Без него Финни промокнет по дороге.", "price": 10, "art": "item_wear_umbrella" } },
+      { "chance": 50, "value": { "label": "Порвался рюкзак!", "text": "Новый стоит 10. Без рюкзака не в чем носить тетради.", "price": 10, "art": "item_school_backpack" } },
+      { "chance": 50, "value": { "label": "Порвались кроссовки!", "text": "Новые стоят 15. В рваных по лужам не походишь.", "price": 15, "art": "item_wear_sneakers" } }
+    ],
+    "explainOk": "Запас спас неделю: непредвиденное оплатили, нужное не отменили. Чем больше трат, тем важнее запас.",
+    "explainFail": "Запаса не хватило, и нужное пришлось отменить. Когда трат много, откладывай на всякий случай больше — хотя бы треть денег."
   },
   {
     "id": "game_lemonade",
@@ -494,18 +501,19 @@
     "title": "Подработка",
     "series": "chores",
     "unlockLevel": 1,
-    "intro": "Финни копит на мяч. Выбери день и нажми дела — они встанут в часики дня. Один день оставь на отдых.",
-    "goal": { "label": "Мяч", "price": { "min": 40, "max": 60, "step": 10 }, "art": "item_toy_ball" },
+    "intro": "Финни копит на мяч. Выбери день и нажми дела — они встанут в часики дня. Одно дело два дня подряд — Финни устаёт, и платят меньше. Один день оставь на отдых.",
+    "goal": { "label": "Мяч", "price": { "min": 60, "max": 70, "step": 10 }, "art": "item_toy_ball" },
     "days": 5,
     "hoursPerDay": 2,
     "minRestDays": 1,
+    "tiredCut": 10,
     "chores": [
       { "id": "flowers", "label": "Полить цветы", "hours": 1, "reward": 5, "emoji": "🌱" },
       { "id": "dishes", "label": "Помыть посуду", "hours": 1, "reward": 10, "emoji": "🍽️" },
       { "id": "dog", "label": "Выгулять собаку", "hours": 2, "reward": 20, "emoji": "🐕" }
     ],
-    "explainOk": "Ты заработал на мяч и оставил день отдыха. Деньги приходят за работу, а отдых тоже нужен.",
-    "explainFail": "Не хватило монет или не осталось дня отдыха. Поставь больше дел в рабочие дни, а один день оставь пустым."
+    "explainOk": "Ты заработал на мяч и оставил день отдыха. Менять дела и отдыхать выгоднее, чем делать одно и то же каждый день.",
+    "explainFail": "Не хватило монет или не осталось дня отдыха. Одно дело два дня подряд — Финни устаёт, и платят на {tiredCut} меньше. Чередуй дела и оставь один день пустым."
   },
   {
     "id": "game_chores_2",
@@ -514,18 +522,21 @@
     "title": "Подработка",
     "series": "chores",
     "unlockLevel": 4,
-    "intro": "Собаку соседа выгулять просят только два раза, а посуду — три. Набери на конструктор и отдохни два дня.",
-    "goal": { "label": "Конструктор", "price": { "min": 70, "max": 80, "step": 10 }, "art": "item_toy_blocks" },
+    "intro": "Соседке помогают только во второй и четвёртый день, а в последние два дня собака платит больше. Три разных дела за неделю — бонус {varietyBonus}. Набери на конструктор и отдохни два дня.",
+    "goal": { "label": "Конструктор", "price": { "min": 90, "max": 100, "step": 10 }, "art": "item_toy_blocks" },
     "days": 6,
     "hoursPerDay": 2,
     "minRestDays": 2,
+    "tiredCut": 10,
+    "varietyBonus": 10,
     "chores": [
       { "id": "flowers", "label": "Полить цветы", "hours": 1, "reward": 5, "emoji": "🌱" },
       { "id": "dishes", "label": "Помыть посуду", "hours": 1, "reward": 10, "maxTimes": 3, "emoji": "🍽️" },
-      { "id": "dog", "label": "Собака соседа", "hours": 2, "reward": 25, "maxTimes": 2, "emoji": "🐕" }
+      { "id": "dog", "label": "Собака соседа", "hours": 2, "reward": 20, "pay": [20, 20, 20, 20, 30, 30], "emoji": "🐕" },
+      { "id": "neighbor", "label": "Помочь соседке", "hours": 1, "reward": 15, "maxTimes": 2, "onDays": [2, 4], "emoji": "👵" }
     ],
-    "explainOk": "Выгодные дела дают редко, и ты их не упустил. Так и планируют: сначала самое выгодное, потом остальное.",
-    "explainFail": "Собака соседа — самое выгодное дело, но его дают дважды. Начни с него, потом добавь посуду и оставь два дня отдыха."
+    "explainOk": "Ты поймал выгодные дни и не устал. Так и планируют: смотрят, когда за дело платят больше.",
+    "explainFail": "Посмотри, в какие дни собака платит больше и когда нужна помощь соседке. Не ставь одно дело два дня подряд и оставь два дня отдыха."
   },
   {
     "id": "game_chores_3",
@@ -534,18 +545,22 @@
     "title": "Подработка",
     "series": "chores",
     "unlockLevel": 6,
-    "intro": "Большая уборка занимает весь день. Набери на самокат за три рабочих дня и отдохни два.",
-    "goal": { "label": "Самокат", "price": { "min": 90, "max": 100, "step": 10 }, "art": "item_toy_scooter" },
+    "intro": "Большая уборка занимает весь день, зато в конце недели за неё платят больше. Четыре разных дела за неделю — бонус {varietyBonus}. Набери на самокат и отдохни два дня.",
+    "goal": { "label": "Самокат", "price": { "min": 100, "max": 110, "step": 10 }, "art": "item_toy_scooter" },
     "days": 5,
     "hoursPerDay": 3,
     "minRestDays": 2,
+    "tiredCut": 10,
+    "varietyBonus": 10,
+    "varietyCount": 4,
     "chores": [
       { "id": "flowers", "label": "Полить цветы", "hours": 1, "reward": 5, "emoji": "🌱" },
       { "id": "dishes", "label": "Помыть посуду", "hours": 1, "reward": 10, "maxTimes": 4, "emoji": "🍽️" },
       { "id": "dog", "label": "Собака соседа", "hours": 2, "reward": 25, "maxTimes": 2, "emoji": "🐕" },
-      { "id": "cleaning", "label": "Большая уборка", "hours": 3, "reward": 30, "emoji": "🧹" }
+      { "id": "cleaning", "label": "Большая уборка", "hours": 3, "reward": 30, "pay": [30, 30, 30, 40, 40], "emoji": "🧹" },
+      { "id": "neighbor", "label": "Помочь соседке", "hours": 1, "reward": 15, "maxTimes": 2, "onDays": [2, 4], "emoji": "👵" }
     ],
-    "explainOk": "Ты сравнил, что даёт один день: уборка — 30, собака и посуда вместе — 35. Так и решают, на что тратить время.",
-    "explainFail": "Посчитай, что даёт один день: уборка — 30, собака и посуда вместе — 35. Поставь самые выгодные дни и оставь два дня отдыха."
+    "explainOk": "Ты сравнил дни и дела: где дороже, где устанешь, где бонус. Так и решают, на что тратить время.",
+    "explainFail": "Сравни, что даёт каждый день: уборка в конце недели дороже, соседке нужна помощь во второй и четвёртый день, а четыре разных дела дают бонус. Оставь два дня отдыха."
   }
 ]
