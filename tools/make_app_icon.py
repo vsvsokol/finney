@@ -12,7 +12,7 @@ Pixel Launcher в круглой маске показывает больше �
 
 Выход (WebP без потерь, PNG в ресурсы не кладём):
     mipmap-*dpi/ic_launcher_foreground.webp  — питомец на прозрачном
-    mipmap-*dpi/ic_launcher_monochrome.webp  — тёмные линии для тематических значков
+    mipmap-*dpi/ic_launcher_monochrome.webp  — залитый силуэт для тематических значков
 Фон — кремовый, как у значка в icon.svg: values/ic_launcher.xml.
 
 Запуск из корня репозитория (нужны Pillow и numpy):
@@ -36,9 +36,19 @@ VISIBLE_SHARE = 0.72
 
 DENSITIES = {"mdpi": 108, "hdpi": 162, "xhdpi": 216, "xxhdpi": 324, "xxxhdpi": 432}
 
-# Тёмнее этого — линия обводки или тёмные пряди: из них и складывается
-# одноцветный силуэт для тематических значков Android 13.
-INK_LUMA = 70
+# Тематический значок Android 13+ — один цвет, лаунчер красит его в цвет системы.
+# Лаунчер кладёт слой тёмным цветом на светлый фон, поэтому непрозрачное в слое —
+# тёмное на значке. Слой повторяет светлоту цветного значка: обводка и зрачки плотные,
+# волосы, щёки и радужки — полупрозрачные, лицо и блики — пустые (там светлый фон).
+# Из одних линий, как раньше, оставались только контур и глаза; залитый силуэт
+# (следующая попытка) выглядел негативом.
+#
+# Яркость ниже INK_LUMA — линия, выше неё за INK_RAMP — уже заливка.
+INK_LUMA = 60
+INK_RAMP = 40
+# Светлота заливки: самые тёмные — наполовину, с TONE_FULL и светлее — полностью.
+TONE_MIN = 0.5
+TONE_FROM, TONE_FULL = 120, 200
 
 
 def load_icon() -> tuple[Image.Image, tuple[float, float, float, float]]:
@@ -62,10 +72,12 @@ def crop_layer(icon: Image.Image, frame: tuple[float, float, float, float]) -> I
 def monochrome(layer: Image.Image) -> Image.Image:
     rgba = np.asarray(layer).astype(np.float32)
     luma = rgba[..., :3] @ np.array([0.299, 0.587, 0.114], dtype=np.float32)
-    ink = np.clip((INK_LUMA + 30 - luma) / 30, 0, 1) * (rgba[..., 3] / 255)
+    fill = np.clip((luma - INK_LUMA) / INK_RAMP, 0, 1)
+    tone = TONE_MIN + (1 - TONE_MIN) * np.clip((luma - TONE_FROM) / (TONE_FULL - TONE_FROM), 0, 1)
     out = np.zeros_like(rgba)
     out[..., :3] = 255
-    out[..., 3] = ink * 255
+    # Светлое на цветном значке — прозрачное в слое, тёмное — плотное.
+    out[..., 3] = (1 - fill * tone) * rgba[..., 3]
     return Image.fromarray(out.astype(np.uint8), "RGBA")
 
 
