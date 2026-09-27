@@ -58,13 +58,14 @@ class PeriodTest {
     @Test
     fun `уровень пройден при 2 условиях из 3`() {
         val config = Fixtures.economy
-        fun result(needs: Boolean, plan: Boolean, savings: Boolean) =
-            PeriodResult(PeriodFacts(0, 0, 0, 0), needs, plan, savings, successfulTasks = 2, points = 0)
+        fun result(needs: Boolean, plan: Boolean, savings: Boolean, game: Boolean = true) =
+            PeriodResult(PeriodFacts(0, 0, 0, 0), needs, plan, savings, gamePassed = game, successfulTasks = 2, points = 0)
         assertTrue(Progression.passed(result(true, true, true), config))
         assertTrue(Progression.passed(result(true, false, true), config))
         assertTrue(Progression.passed(result(false, true, true), config))
         assertFalse("одного условия мало, даже с играми", Progression.passed(result(false, true, false), config))
         assertFalse(Progression.passed(result(false, false, false), config))
+        assertFalse("без игры уровня не пройти, даже со всеми тремя", Progression.passed(result(true, true, true, game = false), config))
     }
 
     @Test
@@ -111,6 +112,9 @@ class PeriodTest {
         assertTrue(check.planConfirmed)
         assertTrue(check.planMatched)
         assertTrue(check.savingsAdded)
+        assertFalse("без игры уровня", check.willPass)
+
+        check = game.levelCheck(game.passLevelGame(s))
         assertTrue(check.willPass)
     }
 

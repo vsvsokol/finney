@@ -57,6 +57,8 @@ import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneyPeach
 import ru.finney.pet.ui.theme.FinneyPink
 import ru.finney.pet.ui.theme.FinneyYellow
+import ru.finney.pet.ui.sound.LocalSounds
+import ru.finney.pet.ui.sound.Sfx
 import kotlin.math.roundToInt
 
 // «Дорога к цели», как ходилка в Тамагочи, только фишку двигает копилка, а не
@@ -76,6 +78,7 @@ internal fun GoalRaceGame(
     val day = deposits.size + 1
     val saved = task.startSaved + deposits.sum()
     val event = task.events.firstOrNull { it.day == day }
+    val sounds = LocalSounds.current
 
     GameScene(backdrop = Backdrop.FIELD, onClose = onClose) {
         Column(Modifier.fillMaxSize().padding(top = HudHeight), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -113,6 +116,7 @@ internal fun GoalRaceGame(
                 FinneyButton(
                     text = if (day == task.days) "Финиш" else "Готово",
                     onClick = {
+                        if (today > 0) sounds.play(Sfx.PiggyIn)
                         val all = deposits + today
                         if (all.size == task.days) onSubmit(TaskInput.DailyDeposits(all)) else deposits = all
                     },

@@ -5,6 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import ru.finney.pet.domain.Fixtures
 import ru.finney.pet.domain.model.BodyColor
 import ru.finney.pet.domain.model.EyesVariant
 import ru.finney.pet.domain.model.PetAppearance
@@ -18,7 +19,7 @@ class PeriodResultViewModelTest : ViewModelTest() {
         session.createProfile("Финни", PetAppearance(PetCharacter.PUSHISTIK, BodyColor.A, EyesVariant.ROUND))
     }
 
-    private fun viewModel(periodNumber: Int) = PeriodResultViewModel(periodNumber, session, game)
+    private fun viewModel(periodNumber: Int) = PeriodResultViewModel(periodNumber, session, game, Fixtures.content)
 
     @Test
     fun `итоги закрытого периода — план, факт и очки`() = test {

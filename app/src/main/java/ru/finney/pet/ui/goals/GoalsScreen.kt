@@ -17,6 +17,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -45,6 +46,8 @@ import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneySand
 import ru.finney.pet.ui.theme.FinneyTheme
 import ru.finney.pet.ui.theme.FinneyYellow
+import ru.finney.pet.ui.sound.LocalSounds
+import ru.finney.pet.ui.sound.Sfx
 
 // Сумма набирается тем же «минус — плюс», что на экране плана, и уходит одним нажатием.
 
@@ -71,6 +74,11 @@ fun GoalsScreen(
     }
 
     (state as? GoalsUiState.Ready)?.let { ready ->
+        val sounds = LocalSounds.current
+        LaunchedEffect(ready.savingsMove?.id) {
+            val move = ready.savingsMove ?: return@LaunchedEffect
+            sounds.play(if (move.delta > 0) Sfx.PiggyIn else Sfx.PiggyOut)
+        }
         ready.pendingWithdraw?.let {
             WithdrawConfirmDialog(
                 pending = it,

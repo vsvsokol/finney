@@ -47,6 +47,8 @@ data class PeriodResult(
     val needsCovered: Boolean,
     val planMatched: Boolean,
     val savingsAdded: Boolean,
+    /** Игра уровня пройдена. У периодов, закрытых до появления игры уровня, — true. */
+    val gamePassed: Boolean,
     val successfulTasks: Int,
     val points: Int,
 )
@@ -58,6 +60,12 @@ data class Period(
     val phase: PeriodPhase,
     val plan: Plan? = null,
     val result: PeriodResult? = null,
+    /**
+     * Игра уровня — мини-игра, которую обязательно пройти в этом периоде. Выбирается
+     * случайно при открытии периода, не та же, что в прошлом. null — игры нет:
+     * период открыт до её появления или ни одна игра ещё не открыта.
+     */
+    val levelTaskId: String? = null,
 )
 
 enum class EntryType {

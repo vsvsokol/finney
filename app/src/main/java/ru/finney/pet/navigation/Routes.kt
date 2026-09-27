@@ -64,6 +64,10 @@ data object GlossaryRoute
 
 // ---------- Взрослый ----------
 
+/** Настройки: звук, музыка и вход в раздел взрослого. */
+@Serializable
+data object SettingsRoute
+
 /** Раздел взрослого. Барьер (удержание кнопки или пример) — часть этого экрана (ТЗ п. 2.5.12). */
 @Serializable
 data object AdultRoute

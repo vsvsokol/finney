@@ -48,6 +48,7 @@ import ru.finney.pet.ui.components.CoinAmount
 import ru.finney.pet.ui.components.FinneyIconButton
 import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.components.fadingScroll
+import ru.finney.pet.ui.sound.Sfx
 import ru.finney.pet.ui.pet.PetMood
 import ru.finney.pet.ui.pet.PetPose
 import ru.finney.pet.ui.pet.PetView
@@ -91,7 +92,7 @@ internal fun GameScene(
             ) {
                 if (money != null) MoneyPill(money)
                 Box(Modifier.weight(1f))
-                FinneyIconButton(onClick = onClose, contentDescription = "Закрыть игру", size = 48.dp) {
+                FinneyIconButton(onClick = onClose, contentDescription = "Закрыть игру", size = 48.dp, sound = Sfx.Back) {
                     OutlinedText("✕", style = MaterialTheme.typography.titleLarge)
                 }
             }

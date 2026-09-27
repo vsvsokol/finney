@@ -41,6 +41,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import ru.finney.pet.ui.sound.LocalSounds
+import ru.finney.pet.ui.sound.Sfx
 import ru.finney.pet.ui.theme.strokeFor
 import ru.finney.pet.ui.theme.FinneyCream
 import ru.finney.pet.ui.theme.FinneyGlare
@@ -147,10 +149,14 @@ private const val RoundGlareTopFraction = 0.260f
  */
 private const val PressedScale = 0.96f
 
+/** Надписи кнопок, которые уводят назад: у них свой, более низкий щелчок. */
+private val BackLabels = setOf("Назад", "Закрыть", "Отмена", "Не сейчас", "Понятно", "Вернуться к полкам", "Ещё поиграю")
+
 /**
  * Основная кнопка: «Играть», «Закрыть», «Подтвердить план».
  *
  * [fillWidth] — растянуть по ширине родителя; иначе кнопка по размеру надписи.
+ * [sound] — щелчок при нажатии; у «Назад» и «Закрыть» по умолчанию свой.
  */
 @Composable
 fun FinneyButton(
@@ -159,7 +165,9 @@ fun FinneyButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     fillWidth: Boolean = true,
+    sound: Sfx = if (text in BackLabels) Sfx.Back else Sfx.Tap,
 ) {
+    val sounds = LocalSounds.current
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
     val shape = RoundedCornerShape(percent = 50)
@@ -170,7 +178,10 @@ fun FinneyButton(
     )
 
     Surface(
-        onClick = onClick,
+        onClick = {
+            sounds.play(sound)
+            onClick()
+        },
         modifier = modifier
             .then(if (fillWidth) Modifier.fillMaxWidth() else Modifier)
             .defaultMinSize(minHeight = ButtonHeight)
@@ -215,8 +226,10 @@ fun FinneyIconButton(
     size: Dp = 72.dp,
     enabled: Boolean = true,
     selected: Boolean = false,
+    sound: Sfx = Sfx.Tap,
     content: @Composable () -> Unit,
 ) {
+    val sounds = LocalSounds.current
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
@@ -226,7 +239,10 @@ fun FinneyIconButton(
     )
 
     Surface(
-        onClick = onClick,
+        onClick = {
+            sounds.play(sound)
+            onClick()
+        },
         // Содержимое кнопки — рисунок без текста, поэтому подпись для TalkBack
         // задаётся здесь и заменяет собой то, что внутри.
         modifier = modifier

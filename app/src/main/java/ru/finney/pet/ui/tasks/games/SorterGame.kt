@@ -69,6 +69,8 @@ import ru.finney.pet.ui.theme.FinneyGreen
 import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneyPeach
 import ru.finney.pet.ui.theme.FinneyPink
+import ru.finney.pet.ui.sound.LocalSounds
+import ru.finney.pet.ui.sound.Sfx
 
 // «Конвейер», как «Food Drop» в Pou, но без спешки: лента ждёт, пока вещь не
 // смахнут вниз, в корзину «Нужное» или «Хочется». Кто не умеет смахивать,
@@ -90,6 +92,7 @@ internal fun SorterGame(
     var mistake by remember { mutableStateOf<SortItem?>(null) }
     val bins = remember { mutableStateMapOf<Category, Rect>() }
     val item = task.items.getOrNull(index)
+    val sounds = LocalSounds.current
 
     fun finishIfLast() {
         if (index == task.items.size) onSubmit(TaskInput.Sorting(answers.toMap()))
@@ -100,8 +103,10 @@ internal fun SorterGame(
         if (mistake != null) return
         answers.putIfAbsent(current.id, category)
         if (category != current.category) {
+            sounds.play(Sfx.Wrong)
             mistake = current
         } else {
+            sounds.play(Sfx.Correct)
             index++
             finishIfLast()
         }

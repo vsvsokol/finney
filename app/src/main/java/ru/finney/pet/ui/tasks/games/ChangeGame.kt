@@ -52,6 +52,8 @@ import ru.finney.pet.ui.theme.FinneyCream
 import ru.finney.pet.ui.theme.FinneyGreen
 import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneyPink
+import ru.finney.pet.ui.sound.LocalSounds
+import ru.finney.pet.ui.sound.Sfx
 
 // «Касса Финни», как мини-игры на ловкость в Tom, только на счёт. Над прилавком —
 // покупатель и табло кассы, на прилавке — поднос, под ним — ящик с монетами.
@@ -77,10 +79,12 @@ internal fun ChangeGame(task: ChangeTask, character: PetCharacter, onClose: () -
     // Покупатель — любой питомец, кроме своего; в каждом раунде новый.
     val others = PetCharacter.entries.filter { it != character }
     val customer = others[round % others.size]
+    val sounds = LocalSounds.current
 
     fun check() {
         if (firsts.size == round) firsts = firsts + listOf(tray)
         checked = TaskEngines.changeDiff(current, tray)
+        sounds.play(if (checked == 0) Sfx.Correct else Sfx.Wrong)
     }
 
     fun next() {
@@ -138,7 +142,7 @@ internal fun ChangeGame(task: ChangeTask, character: PetCharacter, onClose: () -
                         label = if (give) "Сдача покупателю" else "На кассу · нужно ровно ${current.price}",
                         coins = tray,
                         solved = solved,
-                        onRemove = { i -> tray = tray.filterIndexed { j, _ -> j != i }; checked = null },
+                        onRemove = { i -> sounds.play(Sfx.Tap); tray = tray.filterIndexed { j, _ -> j != i }; checked = null },
                     )
                     val miss = checked
                     if (miss != null && miss != 0) {
@@ -148,8 +152,8 @@ internal fun ChangeGame(task: ChangeTask, character: PetCharacter, onClose: () -
                     }
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    if (give) Drawer(task.coins, enabled = !solved) { tray = tray + it; checked = null }
-                    else Wallet(current.wallet, tray, enabled = !solved) { tray = tray + it; checked = null }
+                    if (give) Drawer(task.coins, enabled = !solved) { sounds.play(Sfx.Coin); tray = tray + it; checked = null }
+                    else Wallet(current.wallet, tray, enabled = !solved) { sounds.play(Sfx.Coin); tray = tray + it; checked = null }
 
                     if (solved) {
                         FinneyButton(text = if (round + 1 == task.rounds.size) "Готово" else "Следующий покупатель", onClick = ::next)

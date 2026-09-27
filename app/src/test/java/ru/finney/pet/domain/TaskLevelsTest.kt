@@ -46,7 +46,7 @@ class TaskLevelsTest {
                 number = i - level + 1,
                 stage = 1,
                 phase = PeriodPhase.CLOSED,
-                result = PeriodResult(PeriodFacts(0, 0, 0, 0), true, true, true, 0, 6),
+                result = PeriodResult(PeriodFacts(0, 0, 0, 0), true, true, true, true, 0, 6),
             )
         }
         return copy(periods = passed + periods)

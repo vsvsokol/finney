@@ -42,6 +42,7 @@ ru.finney.pet
 │   ├── progress/    история и прогресс
 │   ├── adult/       раздел для взрослого
 │   ├── pet/         композит питомца, анимация слоёв
+│   ├── sound/       звуки и музыка: SoundPlayer, список Sfx, LocalSounds
 │   └── theme/       палитра, типографика, компоненты
 │
 ├── domain/          ИГРОВАЯ ЭКОНОМИКА              — [@lemonke68], только он
@@ -58,7 +59,7 @@ ru.finney.pet
 ├── data/            ХРАНИЛИЩЕ                      — [@lemonke68], только он
 │   ├── db/          Room: entity, dao, database, маппинг в domain
 │   ├── repository/  RoomGameStorage — реализация domain/game/GameStorage
-│   └── prefs/       DataStore — открытый профиль; настройки звука и анимаций (ещё не сделано)
+│   └── prefs/       DataStore — открытый профиль, звук и музыка; анимации (ещё не сделано)
 │
 └── content/         ЗАГРУЗКА УЧЕБНОГО КОНТЕНТА     — [@lemonke68]
                      ContentParser, ContentValidator, AssetContentLoader

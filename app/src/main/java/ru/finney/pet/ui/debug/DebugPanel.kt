@@ -38,6 +38,8 @@ import ru.finney.pet.ui.theme.FinneyTheme
 @Composable
 fun DebugPanel(
     onDismiss: () -> Unit,
+    /** Список всех мини-игр: ребёнку он не показывается, у него — одна игра на уровень. */
+    onOpenTasks: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: DebugViewModel = viewModel(factory = DebugViewModel.Factory),
 ) {
@@ -62,6 +64,7 @@ fun DebugPanel(
             onClosePeriod = viewModel::closePeriod,
             onFinishSleep = viewModel::finishSleep,
             onWipe = viewModel::wipeAll,
+            onOpenTasks = onOpenTasks,
             onDismiss = onDismiss,
             modifier = modifier,
         )
@@ -77,6 +80,7 @@ private fun DebugContent(
     onClosePeriod: () -> Unit,
     onWipe: () -> Unit,
     onFinishSleep: () -> Unit = {},
+    onOpenTasks: () -> Unit = {},
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -122,6 +126,8 @@ private fun DebugContent(
                 "Пустой план" to onSkipPlan,
                 "Закрыть период" to onClosePeriod,
             )
+
+            Buttons("Все мини-игры" to onOpenTasks)
 
             Buttons(
                 if (confirmWipe) {

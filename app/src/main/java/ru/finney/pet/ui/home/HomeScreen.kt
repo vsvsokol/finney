@@ -37,10 +37,14 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
+import ru.finney.pet.ui.sound.LocalSounds
+import ru.finney.pet.ui.sound.LoopWhile
+import ru.finney.pet.ui.sound.Sfx
 import ru.finney.pet.ui.theme.FinneyCream
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
@@ -65,6 +69,7 @@ import ru.finney.pet.domain.game.Rejection
 import kotlinx.coroutines.delay
 import ru.finney.pet.domain.game.LevelCheck
 import ru.finney.pet.ui.components.Coin
+import ru.finney.pet.ui.components.FeedbackSound
 import ru.finney.pet.ui.components.FinneyButton
 import ru.finney.pet.ui.components.FinneyIcon
 import ru.finney.pet.ui.components.FinneyIconButton
@@ -135,9 +140,10 @@ fun HomeScreen(
     onOpenShop: () -> Unit,
     onOpenGoals: () -> Unit,
     onOpenTasks: () -> Unit,
+    onOpenTask: (taskId: String) -> Unit,
     onOpenWardrobe: () -> Unit,
     onOpenProgress: () -> Unit,
-    onOpenAdult: () -> Unit,
+    onOpenSettings: () -> Unit,
     onOpenHelp: () -> Unit,
     onPeriodClosed: (periodNumber: Int) -> Unit,
     onOpenPetLab: () -> Unit,
@@ -179,9 +185,10 @@ fun HomeScreen(
             onOpenShop = onOpenShop,
             onOpenGoals = onOpenGoals,
             onOpenTasks = onOpenTasks,
+            onOpenTask = onOpenTask,
             onOpenWardrobe = onOpenWardrobe,
             onOpenProgress = onOpenProgress,
-            onOpenAdult = onOpenAdult,
+            onOpenSettings = onOpenSettings,
             onOpenHelp = onOpenHelp,
             onOpenPetLab = onOpenPetLab,
             onClosePeriod = viewModel::closePeriod,
@@ -191,6 +198,7 @@ fun HomeScreen(
         )
     }
 
+    FeedbackSound(feedback = purchased, rejection = null)
     purchased?.let { feedback ->
         Box(
             modifier = Modifier
@@ -216,6 +224,9 @@ fun HomeScreen(
 
 private const val PurchaseFeedbackMillis = 5_000L
 
+/** Настроения, на которые питомец вздыхает. */
+private val SadEmotions = setOf(Emotion.HUNGRY, Emotion.DIRTY, Emotion.TIRED, Emotion.SAD)
+
 /** Во сне всё, кроме «Разбудить», приглушено и не нажимается. */
 private const val NightDim = 0.45f
 
@@ -239,9 +250,10 @@ private fun HomeContent(
     onOpenShop: () -> Unit,
     onOpenGoals: () -> Unit,
     onOpenTasks: () -> Unit,
+    onOpenTask: (taskId: String) -> Unit,
     onOpenWardrobe: () -> Unit,
     onOpenProgress: () -> Unit,
-    onOpenAdult: () -> Unit,
+    onOpenSettings: () -> Unit,
     onOpenHelp: () -> Unit,
     onOpenPetLab: () -> Unit,
     onClosePeriod: () -> Unit,
@@ -279,6 +291,28 @@ private fun HomeContent(
     }
     val energyNow = sleep?.energyAt(now) ?: state.stats.energy
     var menuOpen by rememberSaveable { mutableStateOf(false) }
+
+    // Во сне — сопение и приглушённая музыка. Дверь капсулы щёлкает, когда
+    // питомец до неё дошёл; открыли приложение, а он уже спит, — без щелчка.
+    val sounds = LocalSounds.current
+    LoopWhile(Sfx.SleepLoop, active = eyesClosed)
+    DisposableEffect(sleeping) {
+        sounds.duckMusic(sleeping)
+        onDispose { sounds.duckMusic(false) }
+    }
+    var wasSleeping by remember { mutableStateOf(sleeping) }
+    LaunchedEffect(sleeping) {
+        if (sleeping != wasSleeping) {
+            if (sleeping) delay(WALK_MS.toLong())
+            sounds.play(Sfx.CapsuleDoor)
+            wasSleeping = sleeping
+        }
+    }
+
+    // Питомцу плохо — вздыхает, когда ребёнок это видит: на входе и при смене настроения.
+    LaunchedEffect(state.emotion, sleeping) {
+        if (!sleeping && state.emotion in SadEmotions) sounds.play(Sfx.PetSad)
+    }
 
     // Отладочная сборка — та, что ставится как ru.finney.pet.debug. Флаг читается
     // из манифеста, а не из BuildConfig: генерация BuildConfig в модуле выключена,
@@ -378,7 +412,12 @@ private fun HomeContent(
                         onClickLabel = "Погладить питомца",
                         onLongClick = if (isDebuggable) onOpenPetLab else null,
                         onLongClickLabel = if (isDebuggable) "Черновик анимаций" else null,
-                        onClick = { if (!sleeping) animation.playJoy() },
+                        onClick = {
+                            if (!sleeping) {
+                                sounds.play(Sfx.PetHappy)
+                                animation.playJoy()
+                            }
+                        },
                     ),
             )
         }
@@ -469,9 +508,8 @@ private fun HomeContent(
                         onDismiss = { menuOpen = false },
                         onOpenHelp = onOpenHelp,
                         onOpenBudget = onOpenBudget,
-                        onOpenTasks = onOpenTasks,
                         onOpenWardrobe = onOpenWardrobe,
-                        onOpenAdult = onOpenAdult,
+                        onOpenSettings = onOpenSettings,
                     )
                 }
             }
@@ -496,16 +534,18 @@ private fun HomeContent(
                 modifier = Modifier.weight(1f),
             )
 
-            // Раньше здесь стояло название следующей игры — «Дорога к цели» читалась
-            // как ещё одна цель рядом с копилкой. Теперь плашка — вход во все игры
-            // и счёт, сколько осталось.
-            InfoChip(
-                icon = FinneyIcons.Star,
-                text = if (state.gamesLeft > 0) "Мини-игры: ${state.gamesLeft}" else "Мини-игры ✓",
-                action = "Мини-игры",
-                onClick = { if (!sleeping) onOpenTasks() },
-                modifier = Modifier.weight(1f),
-            )
+            // Игра уровня — обязательное условие, поэтому вход в неё всегда на виду.
+            // Список всех игр ребёнку не нужен: на каждом уровне своя (он остался в отладке).
+            val levelTaskId = state.check.levelTaskId
+            if (levelTaskId != null && state.levelGame != null) {
+                InfoChip(
+                    icon = FinneyIcons.Star,
+                    text = if (state.check.gamePassed) "${state.levelGame} ✓" else "Игра: ${state.levelGame}",
+                    action = "Игра уровня",
+                    onClick = { if (!sleeping) onOpenTask(levelTaskId) },
+                    modifier = Modifier.weight(1f),
+                )
+            }
         }
 
         emotionReason(state.petName, state.emotion)?.takeIf { !sleeping }?.let { reason ->
@@ -741,6 +781,7 @@ private fun HomeContent(
                 LevelPanel(
                     level = state.level,
                     check = state.check,
+                    levelGame = state.levelGame,
                     onFinish = {
                         levelOpen = false
                         onClosePeriod()
@@ -769,6 +810,7 @@ private fun HomeContent(
             ) {
                 DebugPanel(
                     onDismiss = { debugOpen = false },
+                    onOpenTasks = { debugOpen = false; onOpenTasks() },
                     modifier = Modifier.pointerInput(Unit) { detectTapGestures { } },
                 )
             }
@@ -820,6 +862,7 @@ private fun SleepPanel(
 private fun LevelPanel(
     level: Int,
     check: LevelCheck,
+    levelGame: String?,
     onFinish: () -> Unit,
     onOpenBudget: () -> Unit,
     onOpenProgress: () -> Unit,
@@ -835,8 +878,16 @@ private fun LevelPanel(
             )
             FinneyButton(text = "Составить план", onClick = onOpenBudget)
         } else {
+            if (levelGame != null && check.levelTaskId != null) {
+                Text("Обязательно пройди игру уровня:", style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
+                CheckRow("«$levelGame»", check.gamePassed)
+            }
             Text(
-                "Чтобы пройти уровень, выполни ${check.toPass} из $LEVEL_CONDITIONS:",
+                if (check.levelTaskId != null) {
+                    "И выполни ${check.toPass} из $LEVEL_CONDITIONS:"
+                } else {
+                    "Чтобы пройти уровень, выполни ${check.toPass} из $LEVEL_CONDITIONS:"
+                },
                 style = MaterialTheme.typography.bodyLarge,
                 color = FinneyInk,
             )
@@ -881,9 +932,9 @@ private fun CheckRow(label: String, done: Boolean) {
 /**
  * Меню «бургера»: всё, что не про уход за питомцем и чего нет на экране.
  *
- * Порядок — от игры к служебному: играть, планировать, наряжать, потом подсказка
- * и раздел взрослого. Прогресс и итоги — в панели уровня (нажатие на значок),
- * отдельное задание — в плашке «Мини-игры»: дублей в меню нет.
+ * Порядок — от игры к служебному: планировать, наряжать, потом подсказка
+ * и настройки (звук, музыка, раздел взрослого). Прогресс и итоги — в панели уровня
+ * (нажатие на значок), игра уровня — в плашке над комнатой: дублей в меню нет.
  */
 @Composable
 private fun HomeMenu(
@@ -891,9 +942,8 @@ private fun HomeMenu(
     onDismiss: () -> Unit,
     onOpenHelp: () -> Unit,
     onOpenBudget: () -> Unit,
-    onOpenTasks: () -> Unit,
     onOpenWardrobe: () -> Unit,
-    onOpenAdult: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     DropdownMenu(
         expanded = expanded,
@@ -902,21 +952,24 @@ private fun HomeMenu(
     ) {
         // Каждый пункт сначала закрывает меню: иначе после возврата с экрана
         // оно осталось бы раскрытым поверх главного.
-        HomeMenuItem("Мини-игры") { onDismiss(); onOpenTasks() }
         HomeMenuItem("План расходов") { onDismiss(); onOpenBudget() }
         HomeMenuItem("Гардероб") { onDismiss(); onOpenWardrobe() }
         // Знакомство в режиме подсказки: в конце «Понятно» и назад, без «Создать питомца».
         HomeMenuItem("Как играть") { onDismiss(); onOpenHelp() }
-        HomeMenuItem("Для взрослых") { onDismiss(); onOpenAdult() }
+        HomeMenuItem("Настройки") { onDismiss(); onOpenSettings() }
     }
 }
 
 /** Пункт меню «бургера». */
 @Composable
 private fun HomeMenuItem(text: String, onClick: () -> Unit) {
+    val sounds = LocalSounds.current
     DropdownMenuItem(
         text = { Text(text, style = MaterialTheme.typography.bodyLarge, color = FinneyInk) },
-        onClick = onClick,
+        onClick = {
+            sounds.play(Sfx.Tap)
+            onClick()
+        },
     )
 }
 
@@ -1100,6 +1153,8 @@ private fun HomeContentPreview() {
                     planMatched = false,
                     savingsAdded = false,
                     toPass = 2,
+                    levelTaskId = "change_1",
+                    gamePassed = false,
                 ),
                 stage = 1,
                 balance = 50,
@@ -1108,12 +1163,12 @@ private fun HomeContentPreview() {
                 periodNumber = 1,
                 phase = PeriodPhase.PLANNING,
                 needsHint = 40,
-                gamesLeft = 3,
+                levelGame = "Касса Финни",
                 food = emptyList(),
                 care = emptyList(),
             ),
-            onOpenBudget = {}, onOpenShop = {}, onOpenGoals = {}, onOpenTasks = {}, onOpenWardrobe = {},
-            onOpenProgress = {}, onOpenAdult = {}, onOpenHelp = {}, onOpenPetLab = {},
+            onOpenBudget = {}, onOpenShop = {}, onOpenGoals = {}, onOpenTasks = {}, onOpenTask = {}, onOpenWardrobe = {},
+            onOpenProgress = {}, onOpenSettings = {}, onOpenHelp = {}, onOpenPetLab = {},
             onClosePeriod = {}, onBuy = {},
         )
     }

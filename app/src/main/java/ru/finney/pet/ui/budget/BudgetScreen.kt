@@ -14,7 +14,11 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,6 +34,7 @@ import ru.finney.pet.domain.model.Plan
 import ru.finney.pet.ui.components.AMOUNT_STEP
 import ru.finney.pet.ui.components.AmountStepper
 import ru.finney.pet.ui.components.CoinAmount
+import ru.finney.pet.ui.components.FeedbackSound
 import ru.finney.pet.ui.components.FinneyButton
 import ru.finney.pet.ui.components.FinneyCard
 import ru.finney.pet.ui.components.FinneyPanel
@@ -43,6 +48,8 @@ import ru.finney.pet.ui.theme.FinneyTheme
 import ru.finney.pet.ui.theme.RadiusCard
 import ru.finney.pet.ui.theme.StrokeRegular
 import ru.finney.pet.ui.theme.FinneyYellow
+import ru.finney.pet.ui.sound.LocalSounds
+import ru.finney.pet.ui.sound.Sfx
 
 // Экран плана (ТЗ п. 2.5.5). Суммы набираются кнопками «плюс» и «минус» (AmountStepper),
 // и в каждое из трёх направлений нужно положить хоть что-то.
@@ -55,6 +62,20 @@ fun BudgetScreen(
     viewModel: BudgetViewModel = viewModel(factory = BudgetViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    // План подтверждён — часть дохода сразу ушла в копилку: монета падает в неё.
+    val sounds = LocalSounds.current
+    var plannedSavings by remember { mutableStateOf(0) }
+    LaunchedEffect(state) {
+        when (val s = state) {
+            is BudgetUiState.Planning -> plannedSavings = s.savings
+            is BudgetUiState.Active -> {
+                if (plannedSavings > 0) sounds.play(Sfx.PiggyIn)
+                plannedSavings = 0
+            }
+            BudgetUiState.Loading -> Unit
+        }
+    }
 
     when (val s = state) {
         BudgetUiState.Loading -> FinneyScreen {
@@ -146,6 +167,7 @@ private fun PlanningContent(
 
         Remainder(remainder = state.remainder)
 
+        FeedbackSound(feedback = null, rejection = state.rejection)
         state.rejection?.let { RejectionNote(it) }
 
         // Почему кнопка погашена — словами, а не догадкой.

@@ -39,6 +39,8 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import ru.finney.pet.ui.components.FinneyIcons
+import ru.finney.pet.ui.sound.LocalSounds
+import ru.finney.pet.ui.sound.Sfx
 import kotlin.math.hypot
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -95,6 +97,7 @@ fun FeedingGame(
     val currentMouth by rememberUpdatedState(mouth)
     val currentOnMouthOpen by rememberUpdatedState(onMouthOpen)
     val currentOnEaten by rememberUpdatedState(onEaten)
+    val sounds = LocalSounds.current
 
     CareGameFrame(
         hint = "Брось еду питомцу в рот",
@@ -132,6 +135,7 @@ fun FeedingGame(
 
             fun eat() {
                 food.phase = FoodPhase.EATEN
+                sounds.play(Sfx.PetEat)
                 scope.launch {
                     val from = food.at(rest)
                     val to = mouthLocal()
@@ -242,6 +246,7 @@ fun FeedingGame(
                             if (v.y < -MIN_THROW * px) {
                                 food.velocity = v * (min(speed, MAX_THROW * px) / speed)
                                 food.phase = FoodPhase.FLY
+                                sounds.play(Sfx.FoodThrow)
                             } else {
                                 // Не бросил, а отпустил — еда возвращается на место.
                                 respawn()

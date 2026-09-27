@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -21,6 +22,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import ru.finney.pet.domain.game.Rejection
 import ru.finney.pet.domain.model.GameState
+import ru.finney.pet.ui.sound.LocalSounds
+import ru.finney.pet.ui.sound.Sfx
 import ru.finney.pet.ui.theme.FinneyGreen
 import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneyPink
@@ -150,6 +153,35 @@ fun changesBetween(before: GameState, after: GameState): List<ChangeLine> = list
     ChangeLine("Радость", before.pet.mood, after.pet.mood),
 ).filter { it.delta != 0 }
 
+/**
+ * Звук итога по тому, что сдвинулось: копилка важнее денег, потому что пополнение
+ * копилки тоже уменьшает деньги. Шкалы питомца своего звука здесь не дают:
+ * еду и мытьё озвучивают сами игры ухода.
+ */
+fun feedbackSound(feedback: ActionFeedback): Sfx? {
+    val savings = feedback.lines.firstOrNull { it.label == "Копилка" }?.delta ?: 0
+    val money = feedback.lines.firstOrNull { it.label == "Деньги" }?.delta ?: 0
+    return when {
+        savings > 0 -> Sfx.PiggyIn
+        savings < 0 -> Sfx.PiggyOut
+        money < 0 -> Sfx.Purchase
+        money > 0 -> Sfx.Coin
+        else -> null
+    }
+}
+
+/** Звук итога один раз, когда итог или отказ появился на экране. */
+@Composable
+fun FeedbackSound(feedback: ActionFeedback?, rejection: Rejection?) {
+    val sounds = LocalSounds.current
+    LaunchedEffect(feedback, rejection) {
+        when {
+            rejection != null -> sounds.play(Sfx.Denied)
+            feedback != null -> feedbackSound(feedback)?.let(sounds::play)
+        }
+    }
+}
+
 @Composable
 fun ActionFeedbackCard(feedback: ActionFeedback, modifier: Modifier = Modifier) {
     FeedbackBox(color = FinneyGreen, modifier = modifier) {
@@ -190,6 +222,7 @@ fun FeedbackDialog(
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
 ) {
+    FeedbackSound(feedback, rejection)
     if (feedback == null && rejection == null) return
     Dialog(onDismissRequest = onDismiss) {
         FinneyPanel(title = if (feedback != null) "Готово" else "Не вышло") {

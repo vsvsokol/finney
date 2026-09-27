@@ -26,6 +26,7 @@ import ru.finney.pet.domain.tasks.TaskDetails
 import ru.finney.pet.domain.tasks.TaskEngines
 import ru.finney.pet.domain.tasks.TaskEvaluation
 import ru.finney.pet.domain.tasks.TaskInput
+import kotlin.random.Random
 
 data class GoalProgress(
     val goal: Goal,
@@ -71,11 +72,15 @@ data class LevelCheck(
     val needsCovered: Boolean,
     val planMatched: Boolean,
     val savingsAdded: Boolean,
-    /** Сколько условий нужно для прохождения. */
+    /** Сколько из трёх условий выше нужно для прохождения. */
     val toPass: Int,
+    /** Игра уровня; null — в этом периоде её нет, условие не действует. */
+    val levelTaskId: String? = null,
+    /** Игра уровня пройдена в этом периоде. Обязательна сверх [toPass]. */
+    val gamePassed: Boolean = true,
 ) {
     val met: Int get() = listOf(needsCovered, planMatched, savingsAdded).count { it }
-    val willPass: Boolean get() = met >= toPass
+    val willPass: Boolean get() = gamePassed && met >= toPass
 }
 
 sealed interface TaskResult {
@@ -97,6 +102,8 @@ sealed interface TaskResult {
  */
 class Game(
     private val content: GameContent,
+    /** Выбор игры уровня. В тестах — с зерном. */
+    private val random: Random = Random.Default,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     private val economy get() = content.economy
@@ -141,7 +148,17 @@ class Game(
             planMatched = plan != null && PeriodRules.planMatched(plan, facts, economy.planTolerance),
             savingsAdded = facts.savings > 0,
             toPass = economy.conditionsToPass,
+            levelTaskId = period.levelTaskId,
+            gamePassed = levelGamePassed(state, period),
         )
+    }
+
+    /** Игра уровня пройдена успешно именно в этом периоде. Нет игры — условие выполнено. */
+    private fun levelGamePassed(state: GameState, period: Period): Boolean {
+        val taskId = period.levelTaskId ?: return true
+        return state.attempts.any {
+            it.periodNumber == period.number && it.taskId == taskId && it.outcome == TaskOutcome.SUCCESS
+        }
     }
 
     fun stage(state: GameState): Int = Progression.stage(level(state), economy)
@@ -430,12 +447,14 @@ class Game(
         val needsCovered = PetRules.needsCovered(state.pet, economy.pet)
         val planMatched = PeriodRules.planMatched(plan, facts, economy.planTolerance)
         val savingsAdded = facts.savings > 0
+        val gamePassed = levelGamePassed(state, period)
         val successfulTasks = firstSuccessesIn(state, period.number)
         val result = PeriodResult(
             facts = facts,
             needsCovered = needsCovered,
             planMatched = planMatched,
             savingsAdded = savingsAdded,
+            gamePassed = gamePassed,
             successfulTasks = successfulTasks,
             points = Progression.periodPoints(needsCovered, planMatched, savingsAdded, successfulTasks, economy.points),
         )
@@ -458,7 +477,28 @@ class Game(
             periods = state.periods + Period(number = number, stage = stage, phase = PeriodPhase.PLANNING),
         )
         val income = entry(opened, EntryType.INCOME, balanceDelta = economy.income(stage))
-        return opened.copy(ledger = opened.ledger + income)
+        val withGame = opened.withCurrentPeriod(opened.currentPeriod.copy(levelTaskId = pickLevelGame(opened)))
+        return withGame.copy(ledger = withGame.ledger + income)
+    }
+
+    /**
+     * Выдать игру уровня периоду, открытому до её появления (база до версии 6).
+     * Уже выдана — состояние не меняется.
+     */
+    fun assignLevelGame(state: GameState): GameResult {
+        val period = state.currentPeriod
+        if (period.levelTaskId != null || period.phase == PeriodPhase.CLOSED) return ok(state)
+        return ok(state.withCurrentPeriod(period.copy(levelTaskId = pickLevelGame(state))))
+    }
+
+    /**
+     * Игра уровня: случайная из открытых, в варианте по уровню питомца. Та же игра
+     * два уровня подряд не выпадает — разве что открыта всего одна.
+     */
+    private fun pickLevelGame(state: GameState): String? {
+        val previous = state.periods.dropLast(1).lastOrNull()?.levelTaskId?.let(content::task)?.seriesId
+        val open = currentTasks(state).filter { isTaskAvailable(state, it) }
+        return open.filter { it.seriesId != previous }.ifEmpty { open }.randomOrNull(random)?.id
     }
 
     // ---------- Служебное ----------

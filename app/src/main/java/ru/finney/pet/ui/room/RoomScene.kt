@@ -29,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,6 +52,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import ru.finney.pet.ui.theme.FinneyCream
 import ru.finney.pet.ui.theme.FinneyTheme
+import ru.finney.pet.ui.sound.LocalSounds
+import ru.finney.pet.ui.sound.Sfx
 import kotlinx.coroutines.delay
 import kotlin.math.PI
 import kotlin.math.sin
@@ -182,7 +185,10 @@ fun RoomScene(
         )
     }
     // НЛО летает одно на все комнаты: окна во время перехода два, а пролёт один.
-    LaunchedEffect(ufo) { ufo.fly() }
+    // Гудит, только если окно сейчас видно.
+    val sounds = LocalSounds.current
+    val currentSpot by rememberUpdatedState(spot)
+    LaunchedEffect(ufo) { ufo.fly(onStart = { if (currentSpot.hasWindow) sounds.play(Sfx.Ufo) }) }
 
     // Отход ко сну: питомец идёт в капсулу (walk 0 → 1), потом закрывается дверь.
     // Живёт на всю сцену, а не на зал: переход между комнатами его не сбрасывает.
@@ -259,6 +265,8 @@ fun RoomScene(
                         from + (target - from) * i / hops,
                         tween(HOP_FLIGHT_MS, easing = FastOutSlowInEasing),
                     )
+                    // Приземлился — лёгкий шажок.
+                    sounds.play(Sfx.Tap)
                 }
             }
         }
@@ -487,12 +495,13 @@ private class UfoState {
         private set
     val progress = Animatable(0f)
 
-    suspend fun fly() {
+    suspend fun fly(onStart: () -> Unit) {
         var pause = UfoFirstPauseMs
         while (true) {
             delay(Random.nextLong(pause.first, pause.last))
             val next = Random.nextUfoFlight()
             flight = next
+            onStart()
             progress.snapTo(0f)
             progress.animateTo(1f, tween(next.durationMs, easing = LinearEasing))
             flight = null

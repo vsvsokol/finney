@@ -10,6 +10,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -19,6 +20,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.delay
 import ru.finney.pet.domain.model.TaskOutcome
 import ru.finney.pet.domain.model.TaskTheme
 import ru.finney.pet.ui.components.Coin
@@ -35,6 +37,8 @@ import ru.finney.pet.ui.tasks.games.ScenePanel
 import ru.finney.pet.ui.tasks.games.TaskGame
 import ru.finney.pet.ui.tasks.games.backdropFor
 import ru.finney.pet.ui.theme.FinneyInk
+import ru.finney.pet.ui.sound.LocalSounds
+import ru.finney.pet.ui.sound.Sfx
 
 /** Подпись темы задания — те же три темы, что в ТЗ п. 2.5.8. */
 fun TaskTheme.label(): String = when (this) {
@@ -153,6 +157,15 @@ private fun TaskIntro(state: TaskUiState.Ready, onStart: () -> Unit, onBack: () 
 private fun TaskResultScene(state: TaskUiState.Ready, onReplay: () -> Unit, onDone: () -> Unit) {
     val result = state.result ?: return
     val success = result.outcome == TaskOutcome.SUCCESS
+    // Джингл итога, следом — монеты награды. Раз на попытку: поворот экрана не повторяет.
+    val sounds = LocalSounds.current
+    LaunchedEffect(state.attempt) {
+        sounds.play(if (success) Sfx.GameWin else Sfx.GameFail)
+        if (result.reward > 0) {
+            delay(RewardCoinDelayMs)
+            sounds.play(Sfx.Coin)
+        }
+    }
     GameScene(backdrop = backdropFor(state.task, finished = true), onClose = onDone, money = state.balance) {
         // Разбор бывает длиннее экрана — прокручивается он, а «Ещё раз» и «Дальше»
         // всегда видны: раньше они уезжали вниз, и ребёнок не знал, как выйти.
@@ -190,3 +203,6 @@ private fun TaskResultScene(state: TaskUiState.Ready, onReplay: () -> Unit, onDo
         }
     }
 }
+
+/** Монеты награды звенят, когда джингл итога почти отыграл. */
+private const val RewardCoinDelayMs = 900L

@@ -20,6 +20,7 @@ import ru.finney.pet.domain.model.StatEffect
 import ru.finney.pet.domain.model.TaskReward
 import ru.finney.pet.domain.model.TaskTheme
 import ru.finney.pet.domain.tasks.TaskInput
+import kotlin.random.Random
 
 /**
  * Контент для тестов правил. Не зависит от assets: @vsvsokol меняет числа в JSON,
@@ -91,7 +92,7 @@ object Fixtures {
 
     fun game(): Game {
         var now = 0L
-        return Game(content) { ++now }
+        return Game(content, Random(7)) { ++now }
     }
 }
 
@@ -120,13 +121,17 @@ fun Game.coverNeeds(start: GameState): GameState {
     return s
 }
 
-/** Период с максимумом очков: нужное, план, копилка, два новых успешных задания. */
+/** Период с максимумом очков: нужное, план, копилка, игра уровня и два новых успешных задания. */
 fun Game.playPerfectPeriod(start: GameState): GameState {
     var s = start
     if (s.activeGoalId == null) s = selectGoal(s, "bike").state()
     s = confirmPlan(s, needs = needsHint(s)!!, wants = 0, savings = 10).state()
-    val done = s.attempts.map { it.taskId }.toSet()
-    Fixtures.tasks.map { it.id }.filter { it !in done && isTaskAvailable(s, content(it)) }.take(2).forEach {
+    // Игра уровня — первое из двух новых заданий (если её уже проходили, новых добирается два).
+    s = passLevelGame(s)
+    val done = s.attempts.filter { it.periodNumber < s.currentPeriod.number }.map { it.taskId }.toSet()
+    val fresh = s.attempts.count { it.periodNumber == s.currentPeriod.number && it.taskId !in done }
+    val tried = s.attempts.map { it.taskId }.toSet()
+    Fixtures.tasks.map { it.id }.filter { it !in tried && isTaskAvailable(s, content(it)) }.take(2 - fresh).forEach {
         s = submitTask(s, it, Fixtures.success).submitted().state
     }
     s = coverNeeds(s)
@@ -135,6 +140,12 @@ fun Game.playPerfectPeriod(start: GameState): GameState {
 }
 
 private fun content(id: String) = Fixtures.content.task(id)!!
+
+/** Пройти игру уровня текущего периода. Все задания фикстур проходятся одним [Fixtures.success]. */
+fun Game.passLevelGame(start: GameState): GameState {
+    val taskId = start.currentPeriod.levelTaskId ?: return start
+    return submitTask(start, taskId, Fixtures.success).submitted().state
+}
 
 /** Новая игра с подтверждённым пустым планом: мини-игры — только после плана. */
 fun Game.newPlannedGame(isDemo: Boolean = false): GameState = confirmPlan(newGame(isDemo), 0, 0, 0).state()

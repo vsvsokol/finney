@@ -73,6 +73,9 @@ data class PeriodEntity(
     val savingsAdded: Boolean?,
     val successfulTasks: Int?,
     val pointsEarned: Int?,
+    /** Игра уровня и пройдена ли она. Колонки с версии 6, см. [FinneyDatabase.MIGRATION_5_6]. */
+    val levelTaskId: String? = null,
+    val gamePassed: Boolean? = null,
 )
 
 @Entity(

@@ -29,7 +29,6 @@ import ru.finney.pet.domain.model.PetAppearance
 import ru.finney.pet.domain.model.PetStats
 import ru.finney.pet.domain.model.SavedGame
 import ru.finney.pet.domain.model.ShopItem
-import ru.finney.pet.domain.model.TaskOutcome
 import ru.finney.pet.domain.pet.Emotion
 import ru.finney.pet.ui.components.ActionFeedback
 import ru.finney.pet.ui.components.changesBetween
@@ -59,8 +58,8 @@ sealed interface HomeUiState {
         val phase: PeriodPhase,
         /** Сколько стоит закрыть нужное при текущих шкалах. */
         val needsHint: Int?,
-        /** Сколько открытых мини-игр ещё не пройдено. */
-        val gamesLeft: Int,
+        /** Название игры уровня: её id — в [check]. null — игры в этом периоде нет. */
+        val levelGame: String?,
         /** Чем покормить: всё из магазина, что поднимает сытость. */
         val food: List<PurchasePreview>,
         /** Чем помыть: всё, что поднимает чистоту. */
@@ -73,8 +72,12 @@ sealed interface HomeUiState {
         /** Уровень завершается только после подтверждения плана. */
         val canClosePeriod: Boolean get() = phase == PeriodPhase.ACTIVE
 
-        /** Дуга вокруг значка уровня: сколько условий уровня уже выполнено, 0..1. */
-        val levelProgress: Float get() = check.met / LEVEL_CONDITIONS.toFloat()
+        /** Дуга вокруг значка уровня: сколько условий уровня уже выполнено, 0..1. Игра уровня — ещё одно. */
+        val levelProgress: Float get() {
+            val hasGame = check.levelTaskId != null
+            val done = check.met + if (hasGame && check.gamePassed) 1 else 0
+            return done / (LEVEL_CONDITIONS + if (hasGame) 1 else 0).toFloat()
+        }
     }
 }
 
@@ -121,6 +124,14 @@ class HomeViewModel(
 
     private val _events = Channel<HomeEvent>(Channel.BUFFERED)
     val events: Flow<HomeEvent> = _events.receiveAsFlow()
+
+    init {
+        // Сохранение до игры уровня: текущему периоду она выдаётся при первом входе.
+        viewModelScope.launch {
+            val saved = session.activeGame.filterNotNull().first()
+            if (saved.state.currentPeriod.levelTaskId == null) session.execute { assignLevelGame(it) }
+        }
+    }
 
     fun closePeriod() {
         viewModelScope.launch {
@@ -195,7 +206,6 @@ class HomeViewModel(
     /** Надеть купленную вещь. Бесплатно: деньги ушли при покупке. */
     private fun toUiState(saved: SavedGame): HomeUiState.Ready {
         val state = saved.state
-        val passed = state.attempts.filter { it.outcome == TaskOutcome.SUCCESS }.map { it.taskId }.toSet()
         val level = game.level(state)
         return HomeUiState.Ready(
             petName = saved.profile.petName,
@@ -212,7 +222,7 @@ class HomeViewModel(
             periodNumber = state.currentPeriod.number,
             phase = state.currentPeriod.phase,
             needsHint = game.needsHint(state),
-            gamesLeft = game.currentTasks(state).count { it.id !in passed && game.isTaskAvailable(state, it) },
+            levelGame = state.currentPeriod.levelTaskId?.let { content.task(it)?.title },
             // Что лежит на столе и что в ванной, решает не список имён, а эффект
             // предмета: добавят в контент новую еду — она появится на столе сама.
             food = previews(state) { it.effect.satiety > 0 },

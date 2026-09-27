@@ -3,11 +3,14 @@ package ru.finney.pet.navigation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import androidx.navigation.NavDestination.Companion.hasRoute
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -23,7 +26,10 @@ import ru.finney.pet.ui.period.PeriodResultScreen
 import ru.finney.pet.ui.pet.PetLabScreen
 import ru.finney.pet.ui.progress.GlossaryScreen
 import ru.finney.pet.ui.progress.ProgressScreen
+import ru.finney.pet.ui.settings.SettingsScreen
 import ru.finney.pet.ui.shop.ShopScreen
+import ru.finney.pet.ui.sound.LocalSounds
+import ru.finney.pet.ui.sound.Music
 import ru.finney.pet.ui.wardrobe.WardrobeScreen
 import ru.finney.pet.ui.tasks.TaskScreen
 import ru.finney.pet.ui.tasks.TasksScreen
@@ -46,6 +52,7 @@ fun FinneyNavHost(
     }
 
     val navController = rememberNavController()
+    BackgroundMusic(navController)
     NavHost(navController = navController, startDestination = start, modifier = modifier) {
 
         // ---------- Первый запуск ----------
@@ -80,9 +87,10 @@ fun FinneyNavHost(
                 onOpenShop = { navController.navigate(ShopRoute) },
                 onOpenGoals = { navController.navigate(GoalsRoute) },
                 onOpenTasks = { navController.navigate(TasksRoute) },
+                onOpenTask = { taskId -> navController.navigate(TaskRoute(taskId)) },
                 onOpenWardrobe = { navController.navigate(WardrobeRoute) },
                 onOpenProgress = { navController.navigate(ProgressRoute) },
-                onOpenAdult = { navController.navigate(AdultRoute) },
+                onOpenSettings = { navController.navigate(SettingsRoute) },
                 onOpenHelp = { navController.navigate(OnboardingRoute(isReplay = true)) },
                 onPeriodClosed = { number -> navController.navigate(PeriodResultRoute(number)) },
                 onOpenPetLab = { navController.navigate(PetLabRoute) },
@@ -156,6 +164,13 @@ fun FinneyNavHost(
 
         // ---------- Взрослый ----------
 
+        composable<SettingsRoute> {
+            SettingsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenAdult = { navController.navigate(AdultRoute) },
+            )
+        }
+
         composable<AdultRoute> {
             AdultScreen(
                 onBack = { navController.popBackStack() },
@@ -172,6 +187,21 @@ fun FinneyNavHost(
             )
         }
     }
+}
+
+/** Музыка по текущему экрану: в играх — своя, в знакомстве — своя, иначе — тема комнаты. */
+@Composable
+private fun BackgroundMusic(navController: NavController) {
+    val sounds = LocalSounds.current
+    val entry by navController.currentBackStackEntryAsState()
+    val destination = entry?.destination
+    val track = when {
+        destination == null -> null
+        destination.hasRoute<TaskRoute>() -> Music.Games
+        destination.hasRoute<OnboardingRoute>() || destination.hasRoute<PetSetupRoute>() -> Music.Setup
+        else -> Music.Room
+    }
+    LaunchedEffect(track) { sounds.music(track) }
 }
 
 /** Вход в игру после создания профиля: знакомство и настройка уходят из стека, «назад» закрывает приложение. */

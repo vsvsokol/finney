@@ -53,10 +53,15 @@ sealed interface GoalsUiState {
         val feedback: ActionFeedback? = null,
         /** Итог последнего взноса или снятия одной строкой под кнопками — без всплывающих окон. */
         val note: String? = null,
+        /** На сколько сдвинулась копилка последним действием: звук монеты в копилку или из неё. */
+        val savingsMove: SavingsMove? = null,
         /** Снятие ждёт подтверждения: как изменятся копилка и срок (ТЗ п. 2.5.7). */
         val pendingWithdraw: PendingWithdraw? = null,
     ) : GoalsUiState
 }
+
+/** Сдвиг копилки. [id] растёт с каждым действием: два одинаковых взноса подряд — два звука. */
+data class SavingsMove(val id: Int, val delta: Int)
 
 /** Снятие, которое ещё не подтвердили. */
 data class PendingWithdraw(val amount: Int, val preview: WithdrawPreview)
@@ -67,6 +72,7 @@ private data class GoalsScreenState(
     val feedback: ActionFeedback? = null,
     val note: String? = null,
     val pendingWithdraw: PendingWithdraw? = null,
+    val savingsMove: SavingsMove? = null,
 )
 
 /**
@@ -144,10 +150,15 @@ class GoalsViewModel(
     ) {
         viewModelScope.launch {
             val before = session.activeGame.first()?.state
+            val moveId = (screen.value.savingsMove?.id ?: 0) + 1
             screen.value = when (val result = command()) {
                 is GameResult.Ok -> GoalsScreenState(
                     feedback = if (feedback != null && before != null) feedback(before, result.state) else null,
                     note = if (note != null && before != null) note(before, result.state) else null,
+                    savingsMove = before
+                        ?.let { result.state.totalSavings - it.totalSavings }
+                        ?.takeIf { it != 0 && note != null }
+                        ?.let { SavingsMove(moveId, it) },
                 )
                 is GameResult.Rejected -> GoalsScreenState(rejection = result.reason)
             }
@@ -174,6 +185,7 @@ class GoalsViewModel(
             feedback = screen.feedback,
             note = screen.note,
             pendingWithdraw = screen.pendingWithdraw,
+            savingsMove = screen.savingsMove,
         )
     }
 

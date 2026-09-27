@@ -7,8 +7,8 @@ import ru.finney.pet.domain.model.PointsRule
 /**
  * Уровни и стадии. docs/economy.md, раздел 8.
  *
- * Уровень — это игровой период, который ребёнок прошёл: составил план, позаботился
- * о питомце, отложил — и завершил. Отдельного счёта очков ребёнок не видит: уровень
+ * Уровень — это игровой период, который ребёнок прошёл: составил план, прошёл игру
+ * уровня, позаботился о питомце, отложил — и завершил. Отдельного счёта очков ребёнок не видит: уровень
  * растёт на один за каждый пройденный период и никогда не падает.
  */
 object Progression {
@@ -17,9 +17,10 @@ object Progression {
     fun conditionsMet(needsCovered: Boolean, planMatched: Boolean, savingsAdded: Boolean): Int =
         listOf(needsCovered, planMatched, savingsAdded).count { it }
 
-    /** Пройден ли уровень, сыгранный в этом периоде. */
+    /** Пройден ли уровень, сыгранный в этом периоде: игра уровня обязательна, из остальных — [EconomyConfig.conditionsToPass]. */
     fun passed(result: PeriodResult, config: EconomyConfig): Boolean =
-        conditionsMet(result.needsCovered, result.planMatched, result.savingsAdded) >= config.conditionsToPass
+        result.gamePassed &&
+            conditionsMet(result.needsCovered, result.planMatched, result.savingsAdded) >= config.conditionsToPass
 
     /** Уровень после [passedLevels] пройденных периодов. */
     fun level(passedLevels: Int, config: EconomyConfig): Int =

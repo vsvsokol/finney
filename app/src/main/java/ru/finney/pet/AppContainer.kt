@@ -1,15 +1,20 @@
 package ru.finney.pet
 
 import android.content.Context
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import ru.finney.pet.content.AssetContentLoader
 import ru.finney.pet.data.db.FinneyDatabase
 import ru.finney.pet.data.prefs.DataStoreActiveProfileStorage
+import ru.finney.pet.data.prefs.DataStoreSettingsStorage
 import ru.finney.pet.data.prefs.settingsDataStore
 import ru.finney.pet.data.repository.RoomGameStorage
 import ru.finney.pet.domain.game.Game
 import ru.finney.pet.domain.game.GameStore
 import ru.finney.pet.domain.game.Session
 import ru.finney.pet.domain.model.GameContent
+import ru.finney.pet.ui.sound.SoundPlayer
 
 /**
  * Ручной DI: единственное место, где создаются база, репозитории и загрузчик контента.
@@ -31,5 +36,14 @@ class AppContainer(context: Context) {
     /** Открытый профиль: его состояние и команды без profileId. */
     val session: Session by lazy {
         Session(gameStore, DataStoreActiveProfileStorage(appContext.settingsDataStore))
+    }
+
+    /** Звуки и музыка на всё приложение. Экраны получают их через LocalSounds из MainActivity. */
+    val sounds: SoundPlayer by lazy {
+        SoundPlayer(
+            appContext,
+            DataStoreSettingsStorage(appContext.settingsDataStore),
+            CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
+        )
     }
 }

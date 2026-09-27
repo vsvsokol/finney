@@ -14,6 +14,7 @@ import ru.finney.pet.domain.game.Game
 import ru.finney.pet.domain.game.Session
 import ru.finney.pet.domain.model.PeriodFacts
 import ru.finney.pet.domain.model.Plan
+import ru.finney.pet.domain.model.GameContent
 import ru.finney.pet.domain.model.SavedGame
 
 sealed interface PeriodResultUiState {
@@ -50,6 +51,10 @@ sealed interface PeriodResultUiState {
         /** Названия игр, которые с новым уровнем стали сложнее или открылись. */
         val harderGames: List<String>,
         val balance: Int,
+        /** Название игры уровня; null — в этом периоде её не было. */
+        val levelGame: String? = null,
+        /** Игра уровня пройдена — обязательное условие. */
+        val gamePassed: Boolean = true,
     ) : PeriodResultUiState {
         /** Перерасход по нужному и желаемому сверх плана; 0, если уложились. */
         val overspend: Int
@@ -66,6 +71,7 @@ class PeriodResultViewModel(
     private val periodNumber: Int,
     session: Session,
     private val game: Game,
+    private val content: GameContent,
 ) : ViewModel() {
 
     val uiState: StateFlow<PeriodResultUiState> = session.activeGame
@@ -96,12 +102,14 @@ class PeriodResultViewModel(
             leveledUp = after > before,
             harderGames = game.tasksUnlockedBetween(before, after).map { it.title }.distinct(),
             balance = state.balance,
+            levelGame = period.levelTaskId?.let { content.task(it)?.title },
+            gamePassed = result.gamePassed,
         )
     }
 
     companion object {
         fun factory(periodNumber: Int) = viewModelFactory {
-            initializer { appContainer().let { PeriodResultViewModel(periodNumber, it.session, it.game) } }
+            initializer { appContainer().let { PeriodResultViewModel(periodNumber, it.session, it.game, it.content) } }
         }
     }
 }

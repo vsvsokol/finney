@@ -13,7 +13,11 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,6 +34,8 @@ import ru.finney.pet.ui.components.FinneyPanel
 import ru.finney.pet.ui.components.FinneyScreen
 import ru.finney.pet.ui.components.LevelBadge
 import ru.finney.pet.ui.components.OutlinedText
+import ru.finney.pet.ui.sound.LocalSounds
+import ru.finney.pet.ui.sound.Sfx
 import ru.finney.pet.ui.theme.FinneyGreen
 import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneyTheme
@@ -67,6 +73,15 @@ fun PeriodResultScreen(
 
 @Composable
 private fun PeriodResultContent(state: PeriodResultUiState.Ready, onBack: () -> Unit) {
+    // Новый уровень — праздничный джингл. Один раз на экран: поворот его не повторяет.
+    val sounds = LocalSounds.current
+    var celebrated by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(state.leveledUp) {
+        if (state.leveledUp && !celebrated) {
+            sounds.play(Sfx.LevelUp)
+            celebrated = true
+        }
+    }
     // «На главный» закреплена внизу: разбор длиннее экрана, и в конце прокрутки
     // кнопку не находили — выйти можно было только системным «назад».
     FinneyScreen(
@@ -104,6 +119,7 @@ private fun PeriodResultContent(state: PeriodResultUiState.Ready, onBack: () -> 
 
         // Каждое условие отдельной строкой: ребёнку видно, что получилось и чего не хватило.
         FinneyPanel(title = "Условия уровня: нужно ${state.toPass} из 3") {
+            state.levelGame?.let { ScoreRow("Игра уровня «$it» — обязательно", state.gamePassed) }
             ScoreRow("Питомец сыт, чист и выспался", state.needsCovered)
             ScoreRow("Траты по плану", state.planMatched)
             ScoreRow("Отложено в копилку", state.savingsAdded)

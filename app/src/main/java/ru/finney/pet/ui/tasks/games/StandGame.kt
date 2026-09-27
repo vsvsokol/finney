@@ -57,6 +57,8 @@ import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneyPeach
 import ru.finney.pet.ui.theme.FinneyPink
 import ru.finney.pet.ui.theme.FinneyYellow
+import ru.finney.pet.ui.sound.LocalSounds
+import ru.finney.pet.ui.sound.Sfx
 
 // «Лимонадная лавка», как подработки в Pou, но с расходами. Утром закупка,
 // днём ребёнок сам наливает каждому гостю — без таймера, гости ждут. Лавка
@@ -141,6 +143,7 @@ private fun Day(task: StandTask, character: PetCharacter, count: Int, money: Int
     val waiting = task.guests - served
     val cupsLeft = cups - served
     val done = waiting == 0 || cupsLeft == 0
+    val sounds = LocalSounds.current
 
     GameScene(backdrop = Backdrop.SKY, onClose = onClose, money = money + served * task.cupPrice) {
         Column(Modifier.fillMaxSize().padding(top = HudHeight), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -166,7 +169,10 @@ private fun Day(task: StandTask, character: PetCharacter, count: Int, money: Int
                 if (done) {
                     FinneyButton(text = "Закрыть лавку", onClick = onDone, fillWidth = false)
                 } else {
-                    PourButton { served++ }
+                    PourButton {
+                        sounds.play(Sfx.Pour)
+                        served++
+                    }
                 }
             }
             Text("Гостей ждёт: $waiting", style = MaterialTheme.typography.titleMedium, color = FinneyInk)

@@ -79,6 +79,8 @@ private fun Period.toEntity(profileId: Long) = PeriodEntity(
     savingsAdded = result?.savingsAdded,
     successfulTasks = result?.successfulTasks,
     pointsEarned = result?.points,
+    levelTaskId = levelTaskId,
+    gamePassed = result?.gamePassed,
 )
 
 private fun PeriodEntity.toDomain() = Period(
@@ -92,10 +94,12 @@ private fun PeriodEntity.toDomain() = Period(
             needsCovered = needsCovered!!,
             planMatched = planMatched!!,
             savingsAdded = savingsAdded!!,
+            gamePassed = gamePassed ?: true,
             successfulTasks = successfulTasks!!,
             points = it,
         )
     },
+    levelTaskId = levelTaskId,
 )
 
 private fun LedgerEntry.toEntity(profileId: Long) = LedgerEntryEntity(

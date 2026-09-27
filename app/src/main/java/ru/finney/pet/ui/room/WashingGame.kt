@@ -53,6 +53,8 @@ import ru.finney.pet.ui.components.FinneyIcons
 import ru.finney.pet.ui.components.ProgressRing
 import ru.finney.pet.ui.theme.FinneyGlare
 import ru.finney.pet.ui.theme.FinneyInk
+import ru.finney.pet.ui.sound.LocalSounds
+import ru.finney.pet.ui.sound.Sfx
 import kotlin.math.PI
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -123,6 +125,7 @@ fun WashingGame(
     var origin by remember { mutableStateOf(Offset.Zero) }
     val currentOnScrub by rememberUpdatedState(onScrub)
     val currentOnClean by rememberUpdatedState(onClean)
+    val sounds = LocalSounds.current
     val soapScale = remember { Animatable(1f) }
 
     // Часы пены: пузыри дышат и растут, мелкие улетают. Идут, пока игра на экране.
@@ -151,6 +154,7 @@ fun WashingGame(
             fun finish() {
                 if (wash.poppedAtMs >= 0) return
                 wash.poppedAtMs = wash.nowMs
+                sounds.play(Sfx.WashClean)
                 scope.launch {
                     soapScale.animateTo(0f, tween(durationMillis = 200))
                     delay(POP_MS)
@@ -184,6 +188,7 @@ fun WashingGame(
                     wash.scrubbedCount = wash.scrubbed.size
                     wash.progress = wash.scrubbed.size / (SCRUB_COLS * SCRUB_ROWS).toFloat()
                     currentOnScrub()
+                    sounds.play(Sfx.WashBubble)
                     if (wash.progress >= SCRUB_DONE) finish()
                 }
             }
