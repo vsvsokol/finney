@@ -21,6 +21,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -119,10 +121,14 @@ private fun PeriodResultContent(state: PeriodResultUiState.Ready, onBack: () -> 
 
         // Каждое условие отдельной строкой: ребёнку видно, что получилось и чего не хватило.
         FinneyPanel(title = "Условия уровня: нужно ${state.toPass} из 3") {
-            state.levelGame?.let { ScoreRow("Игра уровня «$it» — обязательно", state.gamePassed) }
-            ScoreRow("Питомец сыт, чист и выспался", state.needsCovered)
-            ScoreRow("Траты по плану", state.planMatched)
-            ScoreRow("Отложено в копилку", state.savingsAdded)
+            // Коротко: знак и одно слово — про что условие. Полная фраза — для TalkBack.
+            state.levelGame?.let {
+                val need = if (state.gameRequired) "обязательно" else "по желанию"
+                ScoreRow("Игра «$it»", state.gamePassed, "Игра уровня «$it» — $need")
+            }
+            ScoreRow("Нужное", state.needsCovered, "Питомец сыт, чист и выспался")
+            ScoreRow("План", state.planMatched, "Траты по плану")
+            ScoreRow("Копилка", state.savingsAdded, "Отложено в копилку")
         }
 
         if (state.harderGames.isNotEmpty()) {
@@ -133,13 +139,7 @@ private fun PeriodResultContent(state: PeriodResultUiState.Ready, onBack: () -> 
             )
         }
 
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text("Осталось:", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
-            CoinAmount(amount = state.balance)
-        }
+        CoinAmount(amount = state.balance)
 
         // План отдельно: это главный навык игры (ТЗ п. 2.5.5).
         Text(
@@ -171,12 +171,17 @@ private fun FactRow(label: String, fact: Int, planned: Int) {
     }
 }
 
-/** Условие уровня: галочка или прочерк плюс подпись — цвет здесь ничего не решает. */
+/** Условие уровня: ✓ или ↺ и одно слово — про что оно; цвет здесь ничего не решает. */
 @Composable
-private fun ScoreRow(label: String, earned: Boolean) {
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+private fun ScoreRow(label: String, earned: Boolean, description: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth().clearAndSetSemantics {
+            contentDescription = "$description: ${if (earned) "выполнено" else "не выполнено"}"
+        },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Text(
-            text = if (earned) "✓" else "—",
+            text = if (earned) "✓" else "↺",
             style = MaterialTheme.typography.titleLarge,
             color = FinneyInk,
             modifier = Modifier.padding(end = 12.dp),

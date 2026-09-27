@@ -11,7 +11,8 @@ import ru.finney.pet.domain.pet.PetRules
 
 /**
  * Сон — третья потребность: убывает за период, восстанавливается бесплатно сном в капсуле.
- * Полный сон — час (в демо — 10 секунд), сон растёт постепенно, будить можно раньше.
+ * Сон от 0 до 100 — час (в демо — 10 секунд): спит столько, сколько не хватает до 100,
+ * сон растёт постепенно, будить можно раньше.
  */
 class SleepTest {
 
@@ -21,38 +22,48 @@ class SleepTest {
 
     private fun tired() = game.newGame().also { assertTrue(it.pet.energy < PetRules.STAT_MAX) }
 
+    private fun withEnergy(energy: Int) = game.newGame().let { it.copy(pet = it.pet.copy(energy = energy)) }
+
     @Test
-    fun `лёг спать — бесплатно, до подтверждения плана, сон растёт за час до 100`() {
-        val before = tired()
+    fun `лёг спать — бесплатно, до подтверждения плана, сон растёт 100 за час`() {
+        val before = withEnergy(40)
         val asleep = game.sleep(before).state()
 
         assertEquals(before.balance, asleep.balance)
         assertEquals(before.ledger, asleep.ledger)
-        assertEquals(before.pet.energy, game.energyAt(asleep, now))
+        assertEquals(40, game.energyAt(asleep, now))
 
-        now += hour / 2
-        val half = before.pet.energy + (PetRules.STAT_MAX - before.pet.energy) / 2
-        assertEquals(half, game.energyAt(asleep, now))
+        now += hour / 4
+        assertEquals(65, game.energyAt(asleep, now))
 
         now += hour
         assertEquals(PetRules.STAT_MAX, game.energyAt(asleep, now))
     }
 
     @Test
+    fun `время сна зависит от шкалы — с нуля час, с 37 — 63 процента часа`() {
+        assertEquals(hour, game.sleepMillis(withEnergy(0)))
+        assertEquals(hour * 63 / 100, game.sleepMillis(withEnergy(37)))
+        assertEquals(hour / 100, game.sleepMillis(withEnergy(99)))
+    }
+
+    @Test
     fun `разбудили раньше — сон сколько успел набрать`() {
-        val before = tired()
-        val asleep = game.sleep(before).state()
+        val asleep = game.sleep(withEnergy(20)).state()
         now += hour / 4
         val woke = game.wake(asleep).state()
 
         assertNull(woke.sleepingSince)
-        assertEquals(before.pet.energy + (PetRules.STAT_MAX - before.pet.energy) / 4, woke.pet.energy)
+        assertEquals(45, woke.pet.energy)
     }
 
     @Test
-    fun `через час просыпается сам`() {
-        val asleep = game.sleep(tired()).state()
-        now += hour - 1
+    fun `просыпается сам, когда сон дорос до 100`() {
+        val asleep = game.sleep(withEnergy(37)).state()
+        val left = hour * 63 / 100
+        assertEquals(asleep.sleepingSince!! + left, game.sleepEndsAt(asleep))
+
+        now += left - 1
         assertEquals(asleep, game.settleSleep(asleep))
         now += 1
         val settled = game.settleSleep(asleep)
@@ -61,10 +72,12 @@ class SleepTest {
     }
 
     @Test
-    fun `в демо-режиме полный сон — 10 секунд`() {
-        val asleep = game.sleep(game.newGame(isDemo = true)).state()
-        assertEquals(10_000L, game.sleepMillis(asleep))
-        now += 10_000L
+    fun `в демо-режиме сон от 0 до 100 — 10 секунд`() {
+        val demo = game.newGame(isDemo = true)
+        val asleep = game.sleep(demo.copy(pet = demo.pet.copy(energy = 50))).state()
+        assertEquals(10_000L, game.fullSleepMillis(asleep))
+        assertEquals(5_000L, game.sleepMillis(asleep))
+        now += 5_000L
         assertEquals(PetRules.STAT_MAX, game.energyAt(asleep, now))
     }
 

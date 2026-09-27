@@ -36,6 +36,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -137,19 +139,15 @@ internal fun ChangeGame(task: ChangeTask, character: PetCharacter, onClose: () -
                     Modifier.weight(1f).fadingScroll(rememberScrollState()).padding(top = 30.dp, bottom = 10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    Text("Раунд ${round + 1} из ${task.rounds.size}", style = MaterialTheme.typography.labelLarge, color = FinneyInk)
+                    // Раунды — точками, а не «Раунд 1 из 4». Что класть на поднос, говорят
+                    // табло и реплика; подпись подноса — только для TalkBack.
+                    RoundDots(round, task.rounds.size)
                     Tray(
-                        label = if (give) "Сдача покупателю" else "На кассу · нужно ровно ${current.price}",
+                        label = if (give) "Сдача покупателю" else "На кассу, нужно ровно ${current.price}",
                         coins = tray,
                         solved = solved,
                         onRemove = { i -> sounds.play(Sfx.Tap); tray = tray.filterIndexed { j, _ -> j != i }; checked = null },
                     )
-                    val miss = checked
-                    if (miss != null && miss != 0) {
-                        ScenePanel(title = null, modifier = Modifier.fillMaxWidth()) {
-                            Text(explain(give, current.price, current.paid ?: 0, current.target, tray.sum()), style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
-                        }
-                    }
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     if (give) Drawer(task.coins, enabled = !solved) { sounds.play(Sfx.Coin); tray = tray + it; checked = null }
@@ -181,10 +179,6 @@ private fun ownLine(price: Int, sum: Int, checked: Int?): String = when {
     else -> "Тут $sum — не хватает ${-checked}"
 }
 
-private fun explain(give: Boolean, price: Int, paid: Int, target: Int, sum: Int): String =
-    if (give) "Цена $price, дали $paid. Сдача $paid − $price = $target. Сейчас на подносе $sum — поправь."
-    else "Стоит $price, на кассе $sum. Убери лишнее или добавь — и проверь ещё раз."
-
 /** Табло кассы: тёмный экран с зелёными цифрами. */
 @Composable
 private fun Display(price: Int, paid: Int, change: String) {
@@ -211,11 +205,11 @@ private fun Tray(label: String, coins: List<Int>, solved: Boolean, onRemove: (In
             .clip(RoundedCornerShape(18.dp))
             .background(FinneyCream)
             .border(4.dp, FinneyInk, RoundedCornerShape(18.dp))
+            .semantics { contentDescription = label }
             .padding(10.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Row {
-            Text(label, style = MaterialTheme.typography.titleMedium, color = FinneyInk, modifier = Modifier.weight(1f))
+        Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
             Text(
                 if (coins.isEmpty()) "0" else coins.joinToString(" + ") + " = ${coins.sum()}",
                 style = MaterialTheme.typography.titleMedium,
@@ -239,7 +233,7 @@ private fun Tray(label: String, coins: List<Int>, solved: Boolean, onRemove: (In
                     contentAlignment = Alignment.Center,
                 ) { Text("✓", style = MaterialTheme.typography.titleLarge, color = FinneyInk) }
             }
-            if (coins.isEmpty()) Text("нажми на монету внизу", style = MaterialTheme.typography.bodyMedium, color = FinneyInk)
+            if (coins.isEmpty()) BouncingArrow(description = "Нажми на монету внизу")
         }
     }
 }
@@ -299,6 +293,22 @@ private fun Wallet(wallet: List<Int>, tray: List<Int>, enabled: Boolean, onTake:
                     },
                 )
             }
+        }
+    }
+}
+
+/** Раунды точками: пройденные закрашены, текущий — с обводкой толще. */
+@Composable
+private fun RoundDots(round: Int, total: Int) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = "Раунд ${round + 1} из $total" },
+    ) {
+        repeat(total) { i ->
+            Box(
+                Modifier.size(14.dp).clip(CircleShape).background(if (i < round) FinneyGreen else FinneyCream)
+                    .border(if (i == round) 3.dp else 2.dp, FinneyInk, CircleShape),
+            )
         }
     }
 }

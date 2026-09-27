@@ -111,7 +111,8 @@ private fun PetSetupContent(
             style = MaterialTheme.typography.headlineLarge,
         )
 
-        SectionTitle("Кто это будет")
+        // Заголовки «Кто это будет» и «Какого цвета» убраны: выбор — картинками самих
+        // питомцев, он понятен без подписи. Имя без подписи не понять — она осталась.
         CharacterPicker(
             selected = state.appearance.character,
             bodyColor = state.appearance.bodyColor,
@@ -119,7 +120,6 @@ private fun PetSetupContent(
             onSelect = onCharacterChange,
         )
 
-        SectionTitle("Какого цвета")
         ColorPicker(
             character = state.appearance.character,
             selected = state.appearance.bodyColor,

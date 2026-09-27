@@ -1,6 +1,7 @@
 package ru.finney.pet.domain.game
 
 import ru.finney.pet.domain.economy.SavingsRules
+import ru.finney.pet.domain.model.EconomyConfig
 import ru.finney.pet.domain.model.EntryType
 import ru.finney.pet.domain.model.GameContent
 import ru.finney.pet.domain.model.GameState
@@ -76,11 +77,13 @@ data class LevelCheck(
     val toPass: Int,
     /** Игра уровня; null — в этом периоде её нет, условие не действует. */
     val levelTaskId: String? = null,
-    /** Игра уровня пройдена в этом периоде. Обязательна сверх [toPass]. */
+    /** Игра уровня пройдена в этом периоде. Обязательна сверх [toPass], если [gameRequired]. */
     val gamePassed: Boolean = true,
+    /** Обязательна ли игра уровня. В демо-режиме — нет: эксперт проходит уровни быстро. */
+    val gameRequired: Boolean = true,
 ) {
     val met: Int get() = listOf(needsCovered, planMatched, savingsAdded).count { it }
-    val willPass: Boolean get() = gamePassed && met >= toPass
+    val willPass: Boolean get() = (gamePassed || !gameRequired) && met >= toPass
 }
 
 sealed interface TaskResult {
@@ -147,11 +150,22 @@ class Game(
             needsCovered = PetRules.needsCovered(state.pet.copy(energy = energyAt(state)), economy.pet),
             planMatched = plan != null && PeriodRules.planMatched(plan, facts, economy.planTolerance),
             savingsAdded = facts.savings > 0,
-            toPass = economy.conditionsToPass,
+            toPass = conditionsToPass(state),
             levelTaskId = period.levelTaskId,
             gamePassed = levelGamePassed(state, period),
+            gameRequired = levelGameRequired(state),
         )
     }
+
+    /** Сколько из трёх условий нужно для уровня: в демо-режиме меньше, см. [EconomyConfig.demoConditionsToPass]. */
+    fun conditionsToPass(state: GameState): Int =
+        if (state.isDemo) economy.demoConditionsToPass else economy.conditionsToPass
+
+    private fun levelGameRequired(state: GameState): Boolean = !state.isDemo || economy.demoLevelGameRequired
+
+    /** Как часто напоминать о питомце: раз в сутки, в демо-режиме — раз в несколько минут. */
+    fun reminderEveryMillis(state: GameState): Long =
+        if (state.isDemo) economy.reminders.demoReminderMinutes * 60_000L else economy.reminders.everyHours * 3_600_000L
 
     /** Игра уровня пройдена успешно именно в этом периоде. Нет игры — условие выполнено. */
     private fun levelGamePassed(state: GameState, period: Period): Boolean {
@@ -265,7 +279,8 @@ class Game(
         val item = content.item(itemId) ?: return reject(Rejection.UnknownItem(itemId))
         if (state.currentPeriod.phase != PeriodPhase.ACTIVE) return reject(Rejection.PlanNotConfirmed)
         content.goalFor(item.id)?.let { return reject(Rejection.NotForSale(item.id, it.label)) }
-        if (item.kind == ItemKind.ACCESSORY && state.owns(item.id)) return reject(Rejection.AlreadyOwned)
+        // Аксессуар и игрушка покупаются один раз: они остаются у питомца.
+        if (item.kind != ItemKind.CONSUMABLE && state.owns(item.id)) return reject(Rejection.AlreadyOwned)
         if (item.price > state.balance) return reject(Rejection.InsufficientFunds(item.price, state.balance))
         val entry = entry(state, EntryType.PURCHASE, balanceDelta = -item.price)
             .copy(category = item.category, itemId = item.id)
@@ -278,21 +293,31 @@ class Game(
 
     // ---------- Сон ----------
 
-    /** Сколько длится полный сон: час, в демо-режиме — секунды, чтобы эксперт увидел весь цикл. */
-    fun sleepMillis(state: GameState): Long =
+    /** Сколько спать от 0 до 100: час, в демо-режиме — секунды, чтобы эксперт увидел весь цикл. */
+    fun fullSleepMillis(state: GameState): Long =
         if (state.isDemo) economy.pet.demoSleepSeconds * 1_000L else economy.pet.sleepMinutes * 60_000L
+
+    /**
+     * Сколько спать с того сна, с каким уснул, до 100: доля от [fullSleepMillis].
+     * Уснул с 37 — спит 63 % часа, с 0 — час. Округление вверх, чтобы к концу сон был ровно 100.
+     */
+    fun sleepMillis(state: GameState): Long {
+        val missing = (PetRules.STAT_MAX - state.pet.energy).coerceAtLeast(0)
+        return (fullSleepMillis(state) * missing + PetRules.STAT_MAX - 1) / PetRules.STAT_MAX
+    }
 
     /** Когда питомец проснётся сам; null — не спит. */
     fun sleepEndsAt(state: GameState): Long? = state.sleepingSince?.plus(sleepMillis(state))
 
     /**
-     * Сон сейчас. У спящего растёт ровно от того, с чем уснул, до 100 за [sleepMillis];
-     * в [GameState.pet] лежит значение на момент засыпания.
+     * Сон сейчас. У спящего растёт с одной скоростью — 100 за [fullSleepMillis] — от того,
+     * с чем уснул, до 100; в [GameState.pet] лежит значение на момент засыпания.
      */
     fun energyAt(state: GameState, now: Long = clock()): Int {
         val since = state.sleepingSince ?: return state.pet.energy
-        val slept = ((now - since).toDouble() / sleepMillis(state)).coerceIn(0.0, 1.0)
-        return state.pet.energy + ((PetRules.STAT_MAX - state.pet.energy) * slept).toInt()
+        val slept = (now - since).coerceAtLeast(0L)
+        val gained = slept * PetRules.STAT_MAX / fullSleepMillis(state)
+        return (state.pet.energy + gained).coerceAtMost(PetRules.STAT_MAX.toLong()).toInt()
     }
 
     /**
@@ -335,6 +360,59 @@ class Game(
     /** Купленные и заработанные целями аксессуары в порядке магазина. */
     fun wardrobe(state: GameState): List<ShopItem> =
         content.shop.filter { it.kind == ItemKind.ACCESSORY && state.owns(it.id) }
+
+    // ---------- Игрушки ----------
+
+    /** Купленные игрушки в порядке магазина — то, что лежит в зале. */
+    fun toys(state: GameState): List<ShopItem> =
+        content.shop.filter { it.kind == ItemKind.TOY && state.owns(it.id) }
+
+    /** Сколько длится сессия игры: после неё игрушки снова радуют. В демо-режиме — секунды. */
+    fun playSessionMillis(state: GameState): Long =
+        if (state.isDemo) economy.play.demoSessionSeconds * 1_000L else economy.play.sessionMinutes * 60_000L
+
+    /** Сессия игры кончилась или не начиналась: следующая прибавка начнёт новую. */
+    private fun playSessionOver(state: GameState, now: Long): Boolean {
+        val since = state.playSince ?: return true
+        return now - since >= playSessionMillis(state)
+    }
+
+    /**
+     * Сколько настроения игрушки ещё могут дать сейчас. 0 — питомец наигрался:
+     * ждать конца сессии или нового уровня.
+     */
+    fun playMoodLeft(state: GameState, now: Long = clock()): Int =
+        if (playSessionOver(state, now)) economy.play.sessionMoodCap
+        else maxOf(0, economy.play.sessionMoodCap - state.playMood)
+
+    /**
+     * Поиграть с игрушкой: [shakes] потряхиваний рядом с питомцем. Бесплатно и в любой фазе
+     * периода — игрушка уже куплена. Прибавка к настроению — [ru.finney.pet.domain.model.PlayRule.moodPerShake]
+     * за потряхивание, но не больше того, что осталось в сессии ([playMoodLeft]), и не выше 100.
+     * Прибавки нет — состояние не меняется, сессия не начинается. Во сне не играют.
+     */
+    fun play(state: GameState, toyId: String, shakes: Int): GameResult {
+        if (state.sleepingSince != null) return reject(Rejection.Asleep)
+        val item = content.item(toyId) ?: return reject(Rejection.UnknownItem(toyId))
+        if (item.kind != ItemKind.TOY) return reject(Rejection.NotPlayable(toyId))
+        if (!state.owns(toyId)) return reject(Rejection.NotOwned(toyId))
+        if (shakes <= 0) return reject(Rejection.InvalidAmount)
+        val now = clock()
+        val gain = minOf(
+            shakes * economy.play.moodPerShake,
+            playMoodLeft(state, now),
+            PetRules.STAT_MAX - state.pet.mood,
+        )
+        if (gain <= 0) return ok(state)
+        val fresh = playSessionOver(state, now)
+        return ok(
+            state.copy(
+                pet = PetRules.apply(state.pet, StatEffect(mood = gain)),
+                playMood = (if (fresh) 0 else state.playMood) + gain,
+                playSince = if (fresh) now else state.playSince,
+            ),
+        )
+    }
 
     // ---------- Накопления ----------
 
@@ -457,6 +535,11 @@ class Game(
             gamePassed = gamePassed,
             successfulTasks = successfulTasks,
             points = Progression.periodPoints(needsCovered, planMatched, savingsAdded, successfulTasks, economy.points),
+            passed = Progression.decide(
+                needsCovered, planMatched, savingsAdded, gamePassed,
+                toPass = conditionsToPass(state),
+                gameRequired = levelGameRequired(state),
+            ),
         )
         val closed = state.withCurrentPeriod(period.copy(phase = PeriodPhase.CLOSED, result = result))
         return ok(openPeriod(closed))
@@ -474,6 +557,9 @@ class Game(
         val stage = stage(state)
         val opened = state.copy(
             pet = PetRules.decay(state.pet, economy.decay(stage)),
+            // Новый уровень — новая сессия игры: игрушки снова радуют в полную силу.
+            playMood = 0,
+            playSince = null,
             periods = state.periods + Period(number = number, stage = stage, phase = PeriodPhase.PLANNING),
         )
         val income = entry(opened, EntryType.INCOME, balanceDelta = economy.income(stage))

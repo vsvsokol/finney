@@ -111,6 +111,7 @@ fun rejectionMessage(rejection: Rejection): RejectionMessage = when (rejection) 
     is Rejection.UnknownGoal,
     is Rejection.UnknownItem,
     is Rejection.NotWearable,
+    is Rejection.NotPlayable,
     is Rejection.UnknownTask,
     is Rejection.InvalidTaskInput,
     Rejection.NotAsleep,
@@ -196,7 +197,9 @@ fun ActionFeedbackCard(feedback: ActionFeedback, modifier: Modifier = Modifier) 
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(line.label, style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
+                // Подпись — значком: монета, копилка, вилка, ванна, лампа, лицо. Слово
+                // осталось для TalkBack. Причина и следующий шаг ниже — словами (ТЗ п. 2.5.9).
+                ChangeIcon(line.label)
                 Text(
                     text = "${line.before} → ${line.after}  (${if (line.delta > 0) "+" else ""}${line.delta})",
                     style = MaterialTheme.typography.bodyLarge,
@@ -231,8 +234,28 @@ fun FeedbackDialog(
             if (actionLabel != null && onAction != null) {
                 FinneyButton(text = actionLabel, onClick = { onDismiss(); onAction() })
             }
-            FinneyButton(text = "Понятно", onClick = onDismiss)
+            FinneyIconButton(
+                onClick = onDismiss,
+                contentDescription = "Понятно",
+                size = 64.dp,
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+            ) { OutlinedText("✓", style = MaterialTheme.typography.headlineMedium) }
         }
+    }
+}
+
+/** Значок строки «было → стало» по её подписи. */
+@Composable
+private fun ChangeIcon(label: String) {
+    val size = 28.dp
+    when (label) {
+        "Деньги" -> Coin(size = size)
+        "Копилка" -> FinneyIcon(FinneyIcons.Piggy, size = size)
+        "Сытость" -> FinneyIcon(FinneyIcons.Food, size = size)
+        "Чистота" -> FinneyIcon(FinneyIcons.Bath, size = size)
+        "Сон" -> FinneyIcon(FinneyIcons.Lamp, size = size)
+        "Радость" -> MoodFace(size = size)
+        else -> Text(label, style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
     }
 }
 

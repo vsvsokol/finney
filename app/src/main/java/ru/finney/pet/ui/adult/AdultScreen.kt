@@ -30,7 +30,15 @@ import ru.finney.pet.ui.components.FinneyTextField
 import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.theme.FinneyInk
 
-private val StageNames = mapOf(1 to "малыш", 2 to "подросток", 3 to "взрослый")
+/** Стадия роста = уровень: у каждого из шести уровней своё имя. */
+private val StageNames = mapOf(
+    1 to "малыш",
+    2 to "карапуз",
+    3 to "непоседа",
+    4 to "школьник",
+    5 to "подросток",
+    6 to "взрослый",
+)
 
 /** Чему учит приложение — компетенции базового уровня из Единой рамки (ТЗ раздел 1). */
 private val AppGoals = listOf(
@@ -83,7 +91,7 @@ private fun GateContent(gate: AdultGate, onAnswer: (String) -> Unit, onBack: () 
     var answer by rememberSaveable(gate) { mutableStateOf("") }
     FinneyScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
-        bottom = { FinneyButton(text = "Назад", onClick = onBack) },
+        onClose = onBack,
     ) {
         OutlinedText("Для взрослых", style = MaterialTheme.typography.headlineLarge)
         Text(
@@ -119,7 +127,7 @@ private fun AdultContent(
     FinneyScreen(
         scrollable = true,
         verticalArrangement = Arrangement.spacedBy(16.dp),
-        bottom = { FinneyButton(text = "Назад", onClick = onBack) },
+        onClose = onBack,
     ) {
         OutlinedText("Для взрослых", style = MaterialTheme.typography.headlineLarge)
         if (state.isDemo) Body("Открыт тестовый профиль демо-режима: все мини-игры доступны сразу.")

@@ -158,6 +158,10 @@ private val UfoPauseMs = 20_000L..45_000L
  * @param wander гулять ли питомцу по залу самому. Выключается, пока с ним что-то
  *   делают: во сне, в играх ухода, в других комнатах.
  * @param onHop питомец скакнул — запустить прыжок в его анимации: поза живёт снаружи.
+ * @param toys купленные игрушки — лежат на полу зала, см. RoomToys.kt.
+ * @param toysEnabled можно ли их брать: во сне и в играх ухода нельзя.
+ * @param onToyDrag игрушку тащат: где её середина на экране и на сколько сдвинули.
+ * @param onToyDrop игрушку отпустили.
  */
 @Composable
 fun RoomScene(
@@ -169,6 +173,10 @@ fun RoomScene(
     onTapItem: (() -> Unit)? = null,
     wander: Boolean = false,
     onHop: () -> Unit = {},
+    toys: List<String> = emptyList(),
+    toysEnabled: Boolean = false,
+    onToyDrag: (toyId: String, centre: Offset, delta: Offset) -> Unit = { _, _, _ -> },
+    onToyDrop: (toyId: String) -> Unit = {},
     pet: @Composable BoxScope.() -> Unit = {},
 ) {
     // Где питомец в зале сейчас: сдвиг от его обычного места, доля ширины холста.
@@ -228,6 +236,9 @@ fun RoomScene(
         val visibleRight = (maxWidth - shiftX) / canvasW
         val strollMin = visibleLeft - home.left - home.width * PET_MARGIN
         val strollMax = visibleRight - home.right + home.width * PET_MARGIN
+        // Игрушки — на полу по бокам видимой части комнаты, см. RoomToys.kt.
+        val toyPlaces = toys.mapNotNull { id -> itemArt(id)?.let { id to it } }
+            .let { found -> found.zip(toySlots(found.size, -shiftX / canvasW, visibleRight)) }
         // Какая комната на экране сейчас: во время перехода это ещё старая.
         var shown by remember { mutableStateOf(spot) }
         // Проступающая комната и насколько она уже видна. Пока она проступает,
@@ -286,6 +297,10 @@ fun RoomScene(
                     stroll = { stroll.value },
                     door = { door.value },
                     onTapItem = onTapItem,
+                    toys = toyPlaces,
+                    toysEnabled = toysEnabled,
+                    onToyDrag = onToyDrag,
+                    onToyDrop = onToyDrop,
                     pet = pet,
                     // Питомец в старой комнате тает, пока проступает новая: иначе
                     // посреди перехода на экране два питомца разного размера.
@@ -319,6 +334,10 @@ private fun RoomCanvas(
     stroll: () -> Float,
     door: () -> Float,
     onTapItem: (() -> Unit)?,
+    toys: List<Pair<Pair<String, Int>, RelRect>>,
+    toysEnabled: Boolean,
+    onToyDrag: (toyId: String, centre: Offset, delta: Offset) -> Unit,
+    onToyDrop: (toyId: String) -> Unit,
     pet: @Composable BoxScope.() -> Unit,
     modifier: Modifier = Modifier,
     petVisibility: () -> Float = { 1f },
@@ -342,19 +361,41 @@ private fun RoomCanvas(
             // Тень у питомца только в зале: за столом и в ванне она
             // упала бы на мебель, а мебель пола не знает.
             when (room) {
-                RoomSpot.LIVING -> if (capsule) {
-                    // Капсула в углу, питомец перед ней. Засыпая, он уходит
-                    // в капсулу и становится меньше — она дальше от зрителя.
-                    // Дверь закрывается перед ним, стекло у неё полупрозрачное,
-                    // и спящего видно. Тень на полу — только пока он стоит на месте.
-                    LitLayer(Room.Capsule, canvasW, canvasH, lighting, Solids.Capsule, visibility)
-                    TapZone(Room.Capsule.rect, canvasW, canvasH, "Уложить спать", onTapItem)
-                    val t = walk()
-                    val footing = if (t == 0f) PetFooting else null
-                    Pet(ground.lerp(Room.PetInCapsule, t), canvasW, canvasH, lighting, footing, visibility, pet)
-                    CapsuleDoor(canvasW, canvasH, lighting, shut = door)
-                } else {
-                    Pet(ground, canvasW, canvasH, lighting, PetFooting, visibility, pet)
+                RoomSpot.LIVING -> {
+                    // Игрушки лежат за питомцем: он может пройти перед ними, а они его не заслоняют.
+                    val toysOnFloor: @Composable () -> Unit = {
+                        for ((toy, place) in toys) {
+                            key(toy.first) {
+                                RoomToy(
+                                    toyId = toy.first,
+                                    art = toy.second,
+                                    place = place,
+                                    canvasW = canvasW,
+                                    canvasH = canvasH,
+                                    lighting = lighting,
+                                    enabled = toysEnabled,
+                                    onDrag = onToyDrag,
+                                    onDrop = onToyDrop,
+                                )
+                            }
+                        }
+                    }
+                    if (capsule) {
+                        // Капсула в углу, питомец перед ней. Засыпая, он уходит
+                        // в капсулу и становится меньше — она дальше от зрителя.
+                        // Дверь закрывается перед ним, стекло у неё полупрозрачное,
+                        // и спящего видно. Тень на полу — только пока он стоит на месте.
+                        LitLayer(Room.Capsule, canvasW, canvasH, lighting, Solids.Capsule, visibility)
+                        TapZone(Room.Capsule.rect, canvasW, canvasH, "Уложить спать", onTapItem)
+                        toysOnFloor()
+                        val t = walk()
+                        val footing = if (t == 0f) PetFooting else null
+                        Pet(ground.lerp(Room.PetInCapsule, t), canvasW, canvasH, lighting, footing, visibility, pet)
+                        CapsuleDoor(canvasW, canvasH, lighting, shut = door)
+                    } else {
+                        toysOnFloor()
+                        Pet(ground, canvasW, canvasH, lighting, PetFooting, visibility, pet)
+                    }
                 }
 
                 // Питомец рисуется раньше стола: столешница перекрывает

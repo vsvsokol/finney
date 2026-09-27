@@ -14,7 +14,9 @@ import ru.finney.pet.domain.model.ItemKind
 import ru.finney.pet.domain.model.ParentBonusRule
 import ru.finney.pet.domain.model.PetRule
 import ru.finney.pet.domain.model.PetStats
+import ru.finney.pet.domain.model.PlayRule
 import ru.finney.pet.domain.model.PointsRule
+import ru.finney.pet.domain.model.ReminderRule
 import ru.finney.pet.domain.model.ShopItem
 import ru.finney.pet.domain.model.StatEffect
 import ru.finney.pet.domain.model.TaskReward
@@ -38,6 +40,8 @@ object Fixtures {
         planDirections = 0,
         points = PointsRule(needsCovered = 2, planMatched = 2, savingsAdded = 2, taskSuccess = 1, taskSuccessMaxPerPeriod = 2),
         conditionsToPass = 2,
+        demoConditionsToPass = 1,
+        demoLevelGameRequired = false,
         maxLevel = 9,
         stageStartLevels = listOf(1, 3, 5),
         pet = PetRule(
@@ -49,6 +53,8 @@ object Fixtures {
             sleepMinutes = 60,
             demoSleepSeconds = 10,
         ),
+        play = PlayRule(moodPerShake = 2, sessionMoodCap = 20, sessionMinutes = 60, demoSessionSeconds = 30),
+        reminders = ReminderRule(everyHours = 24, demoReminderMinutes = 2),
     )
 
     val shop = listOf(
@@ -60,6 +66,7 @@ object Fixtures {
         ShopItem("ball", "Мячик", 15, Category.WANTS, effect = StatEffect(mood = 30)),
         ShopItem("lamp", "Лампа", 25, Category.WANTS, effect = StatEffect(mood = 50)),
         ShopItem("hat", "Шапка", 30, Category.WANTS, ItemKind.ACCESSORY, StatEffect(mood = 20)),
+        ShopItem("teddy", "Мишка", 20, Category.WANTS, ItemKind.TOY, StatEffect(mood = 10)),
         // Награда за цель «Корона»: в магазине не продаётся.
         ShopItem("crown_hat", "Корона", 50, Category.WANTS, ItemKind.ACCESSORY, StatEffect(mood = 20)),
     )

@@ -42,7 +42,14 @@ object ContentValidator {
         if (e.pet.decayByStage.any { it.energy <= 0 }) add("economy.json: pet.decayByStage — сон должен убывать за период")
         if (e.pet.sleepMinutes <= 0 || e.pet.demoSleepSeconds <= 0) add("economy.json: pet.sleepMinutes и demoSleepSeconds должны быть > 0")
 
+        if (e.play.moodPerShake <= 0 || e.play.sessionMoodCap <= 0) add("economy.json: play.moodPerShake и sessionMoodCap должны быть > 0")
+        if (e.play.sessionMinutes <= 0 || e.play.demoSessionSeconds <= 0) add("economy.json: play.sessionMinutes и demoSessionSeconds должны быть > 0")
+
         duplicates(content.shop.map { it.id }).forEach { add("shop.json: повторяется id $it") }
+        // Игрушка — радость, а не потребность: её покупают из «хочется».
+        content.shop.filter { it.kind == ItemKind.TOY && it.category != Category.WANTS }.forEach {
+            add("shop.json: ${it.id} — игрушка должна быть в категории wants")
+        }
         content.goals.forEach { goal ->
             val reward = goal.reward ?: return@forEach
             val item = content.item(reward)

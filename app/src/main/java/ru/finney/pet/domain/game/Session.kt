@@ -59,6 +59,9 @@ class Session(
     suspend fun submitTask(taskId: String, input: TaskInput): TaskResult =
         store.submitTask(requireProfileId(), taskId, input)
 
+    /** Включить или выключить демо-режим открытого профиля. См. [GameStore.setDemo]. */
+    suspend fun setDemo(isDemo: Boolean) = store.setDemo(requireProfileId(), isDemo)
+
     /** Прогресс открытого профиля — к исходному состоянию, питомец остаётся. См. [GameStore.resetProgress]. */
     suspend fun resetProgress() = store.resetProgress(requireProfileId())
 

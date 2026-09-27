@@ -9,6 +9,7 @@ import ru.finney.pet.domain.model.ChangeMode
 import ru.finney.pet.domain.model.ChangeTask
 import ru.finney.pet.domain.model.ChoresTask
 import ru.finney.pet.domain.model.GoalRaceTask
+import ru.finney.pet.domain.model.ItemKind
 import ru.finney.pet.domain.model.PetStats
 import ru.finney.pet.domain.model.ReceiptTask
 import ru.finney.pet.domain.model.ReserveTask
@@ -56,6 +57,16 @@ class ContentTest {
             .filterNot { File("src/main/res/drawable-nodpi/$it.webp").exists() }
             .toSet()
         assertEquals("нет рисунка в drawable-nodpi", emptySet<String>(), missing)
+    }
+
+    /** Игрушка лежит в зале рисунком: без файла она была бы невидимой. */
+    @Test
+    fun `у каждой игрушки магазина есть рисунок`() {
+        val toys = content.shop.filter { it.kind == ItemKind.TOY }
+        // Больше четырёх в зале не помещается: посередине пола кнопка уровня (RoomToys.MAX_ROOM_TOYS).
+        assertEquals(4, toys.size)
+        val missing = toys.map { it.id }.filterNot { File("src/main/res/drawable-nodpi/item_$it.webp").exists() }
+        assertEquals(emptyList<String>(), missing)
     }
 
     @Test

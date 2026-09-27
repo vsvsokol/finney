@@ -1,6 +1,11 @@
 package ru.finney.pet.ui.tasks.games
 
 import android.annotation.SuppressLint
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -20,15 +25,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -294,4 +302,22 @@ internal fun inputErrorText(error: TaskInputError): String = when (error) {
     is TaskInputError.DayOverloaded -> "В этот день столько не успеть."
     is TaskInputError.ChoreTooOften -> "Это дело дают только ${error.max} раза в неделю."
     else -> "Так не получится. Попробуй по-другому."
+}
+
+/** Стрелка вниз, которая подпрыгивает: «тяни сюда». */
+@Composable
+internal fun BouncingArrow(modifier: Modifier = Modifier, description: String = "Смахни вещь вниз, в корзину") {
+    val bounce by rememberInfiniteTransition(label = "arrow").animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(600), RepeatMode.Reverse),
+        label = "bounce",
+    )
+    OutlinedText(
+        "↓",
+        style = MaterialTheme.typography.headlineLarge,
+        modifier = modifier
+            .graphicsLayer { translationY = bounce * 10.dp.toPx() }
+            .semantics { contentDescription = description },
+    )
 }

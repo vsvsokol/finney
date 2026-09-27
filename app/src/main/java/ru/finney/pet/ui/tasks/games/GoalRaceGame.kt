@@ -51,6 +51,9 @@ import ru.finney.pet.domain.model.PetCharacter
 import ru.finney.pet.domain.tasks.TaskEngines
 import ru.finney.pet.domain.tasks.TaskInput
 import ru.finney.pet.ui.components.FinneyButton
+import ru.finney.pet.ui.components.FinneyIcon
+import ru.finney.pet.ui.components.FinneyIcons
+import ru.finney.pet.ui.components.HeartIcon
 import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.theme.FinneyCream
 import ru.finney.pet.ui.theme.FinneyGreen
@@ -94,7 +97,7 @@ internal fun GoalRaceGame(
             Board(task = task, day = day, character = character, sad = mood == 0, modifier = Modifier.weight(1f).fillMaxWidth())
 
             ScenePanel(title = null, modifier = Modifier.fillMaxWidth()) {
-                OutlinedText("День $day · получил ${task.incomePerDay}", style = MaterialTheme.typography.titleLarge)
+                OutlinedText("День $day", style = MaterialTheme.typography.titleLarge)
                 CoinSplit(income = task.incomePerDay, step = task.step, deposit = today, onChange = { today = it })
                 event?.let {
                     val taken = TaskEngines.raceTaken(task, it, today)
@@ -129,18 +132,13 @@ internal fun GoalRaceGame(
     }
 }
 
-/** Прогноз одной фразой: сколько откладывать дальше, чтобы успеть. */
+/** Прогноз коротко: сколько осталось и успеть ли. Сколько откладывать в день — видно по монетам. */
 private fun forecast(task: GoalRaceTask, savedAfterToday: Int, daysLeft: Int): String {
     val left = task.goal.price - savedAfterToday
     // Набрано — дальше копить незачем, а Финни радость нужна: не толкаем отложить и это.
-    if (left <= 0) return "${task.goal.label} уже набран — можно порадовать Финни."
-    if (daysLeft == 0) return "Не хватит $left. Накопленное останется."
-    val perDay = ((left + daysLeft - 1) / daysLeft + task.step - 1) / task.step * task.step
-    return if (perDay <= task.incomePerDay) {
-        "Успею? Осталось $left — откладывай по $perDay в день."
-    } else {
-        "Осталось $left — к сроку уже не успеть, но копилка не пропадёт."
-    }
+    if (left <= 0) return "Набрано — можно порадовать Финни."
+    val perDay = if (daysLeft == 0) Int.MAX_VALUE else ((left + daysLeft - 1) / daysLeft + task.step - 1) / task.step * task.step
+    return if (perDay <= task.incomePerDay) "Осталось $left." else "Осталось $left — к сроку не успеть."
 }
 
 @Composable
@@ -290,8 +288,11 @@ private fun CoinSplit(income: Int, step: Int, deposit: Int, onChange: (Int) -> U
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         SmallButton("− $step", enabled = deposit >= step) { onChange(deposit - step) }
         Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("в копилку $deposit", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
-            Text("потратить ${income - deposit}", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
+            // «в копилку 5 / потратить 5» повторяло монеты с чертой — осталась копилка с числом.
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FinneyIcon(FinneyIcons.Piggy, size = 28.dp)
+                OutlinedText("+$deposit", style = MaterialTheme.typography.titleLarge)
+            }
         }
         SmallButton("+ $step", enabled = deposit + step <= income) { onChange(deposit + step) }
     }
@@ -337,22 +338,7 @@ internal fun Hearts(count: Int, max: Int, size: Dp = 22.dp) {
 }
 
 @Composable
-private fun Heart(filled: Boolean, size: Dp) {
-    Canvas(Modifier.size(size)) {
-        val w = this.size.width
-        val h = this.size.height
-        val heart = Path().apply {
-            moveTo(w / 2, h * 0.92f)
-            cubicTo(w * 0.1f, h * 0.62f, -w * 0.04f, h * 0.28f, w * 0.24f, h * 0.1f)
-            cubicTo(w * 0.38f, h * 0.02f, w * 0.5f, h * 0.12f, w * 0.5f, h * 0.24f)
-            cubicTo(w * 0.5f, h * 0.12f, w * 0.62f, h * 0.02f, w * 0.76f, h * 0.1f)
-            cubicTo(w * 1.04f, h * 0.28f, w * 0.9f, h * 0.62f, w / 2, h * 0.92f)
-            close()
-        }
-        drawPath(heart, if (filled) FinneyPink else FinneyCream)
-        drawPath(heart, FinneyInk, style = Stroke(2.dp.toPx()))
-    }
-}
+private fun Heart(filled: Boolean, size: Dp) = HeartIcon(filled = filled, size = size)
 
 /** «+♥» или «−♥» у соблазна дня. [enabled] false — Финни уже загрустил, сердечки не меняются. */
 @Composable

@@ -112,4 +112,23 @@ class ShopViewModelTest : ViewModelTest() {
 
         assertFalse(viewModel.ready().wants.any { it.item.id == "hat" })
     }
+
+    @Test
+    fun `игрушки — отдельный раздел, куплена — уходит с витрины и ждёт в зале`() = test {
+        val viewModel = viewModel()
+        backgroundScope.launch { viewModel.uiState.collect {} }
+        session.execute { confirmPlan(it, needs = 0, wants = 50, savings = 0) }
+        settle()
+
+        assertEquals(listOf("teddy"), viewModel.ready().toys.map { it.item.id })
+        assertFalse("игрушка не среди прочего «хочется»", viewModel.ready().wants.any { it.item.id == "teddy" })
+
+        viewModel.buy("teddy")
+        settle()
+
+        val state = viewModel.ready()
+        assertTrue(state.toys.isEmpty())
+        assertEquals(30, state.balance)
+        assertTrue("подсказано, как играть", checkNotNull(state.feedback).next.contains("потряси"))
+    }
 }
