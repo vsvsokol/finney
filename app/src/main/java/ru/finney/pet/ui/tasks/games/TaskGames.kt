@@ -134,8 +134,14 @@ fun ColumnScope.ResultBody(task: TaskDefinition, details: TaskDetails, input: Ta
                     }
                 }
             }
+            race?.let {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Настроение", style = MaterialTheme.typography.titleMedium, color = FinneyInk, modifier = Modifier.weight(1f))
+                    Hearts(details.mood, it.mood, size = 26.dp)
+                }
+            }
             if (details.shortfall > 0) Summary("Не хватило ${details.shortfall}")
-            Summary("Соблазнов позволил себе: ${details.eventsTaken}")
+            if (details.mood == 0) Summary("Финни загрустил по дороге — радостей было мало.")
         }
 
         is TaskDetails.Reserve -> {

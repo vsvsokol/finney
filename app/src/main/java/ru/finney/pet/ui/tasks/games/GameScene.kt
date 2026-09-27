@@ -1,5 +1,8 @@
 package ru.finney.pet.ui.tasks.games
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -23,6 +26,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -37,11 +44,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.lerp
 import ru.finney.pet.domain.model.BodyColor
 import ru.finney.pet.domain.model.PetCharacter
 import ru.finney.pet.ui.components.CoinAmount
@@ -73,6 +82,10 @@ enum class Backdrop { ROOM, ROOM_RAIN, SHOP, FIELD, SKY, SUNSET, STORE }
 /**
  * Экран игры: фон, верхняя полоса и содержимое.
  * [money] — число в кошельке этой игры; null — кошелёк не показываем.
+ *
+ * Внутри [SceneStage] фон рисует сцена, а экран только говорит, какой он: так
+ * вступление, игра и итог стоят на одном фоне, и смена фона плавная. Без сцены
+ * (превью) экран рисует фон сам.
  */
 @Composable
 internal fun GameScene(
@@ -82,8 +95,10 @@ internal fun GameScene(
     money: Int? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
+    val stage = LocalStageBackdrop.current
+    if (stage != null) SideEffect { stage.value = backdrop }
     Box(modifier = modifier.fillMaxSize()) {
-        BackdropLayer(backdrop)
+        if (stage == null) BackdropLayer(backdrop)
         Box(modifier = Modifier.fillMaxSize().systemBarsPadding().padding(horizontal = SceneEdge, vertical = 8.dp)) {
             content()
             Row(
@@ -99,6 +114,25 @@ internal fun GameScene(
         }
     }
 }
+
+/**
+ * Один фон на всё задание: вступление, игру и итог. Раньше каждый экран рисовал
+ * фон заново, и при переходе комната начинала жить с начала — облака за окном
+ * отскакивали назад, НЛО вылетало снова, — а лавка из полудня рывком
+ * становилась закатом. Теперь фон живёт, пока открыто задание, и меняется плавно:
+ * в комнате начинается дождь, над лавкой садится солнце.
+ */
+@Composable
+internal fun SceneStage(initial: Backdrop, content: @Composable () -> Unit) {
+    val backdrop = remember { mutableStateOf(initial) }
+    Box(Modifier.fillMaxSize()) {
+        BackdropLayer(backdrop.value)
+        CompositionLocalProvider(LocalStageBackdrop provides backdrop, content = content)
+    }
+}
+
+/** Какой фон просит экран — для [SceneStage]. null — сцены нет, экран рисует фон сам. */
+private val LocalStageBackdrop = staticCompositionLocalOf<MutableState<Backdrop>?> { null }
 
 /** Поле сцены по бокам. Кнопки и панели держатся в нём, а лента и полки выходят за него — см. [bleed]. */
 internal val SceneEdge: Dp = 12.dp
@@ -162,13 +196,22 @@ private fun MoneyPill(amount: Int) {
     )
 }
 
+/**
+ * Фон. Дождь и закат — не отдельные картинки, а состояние той же комнаты и того
+ * же луга: они наступают постепенно, и комната при этом не пересоздаётся.
+ */
 @Composable
 private fun BackdropLayer(backdrop: Backdrop) {
+    val rain = animateFloatAsState(if (backdrop == Backdrop.ROOM_RAIN) 1f else 0f, tween(RAIN_MS), label = "rain")
+    val dusk = animateFloatAsState(
+        if (backdrop == Backdrop.SUNSET) 1f else 0f,
+        tween(DUSK_MS, easing = FastOutSlowInEasing),
+        label = "dusk",
+    )
     when (backdrop) {
-        Backdrop.ROOM -> RoomScene(spot = RoomSpot.LIVING, capsule = false, modifier = Modifier.fillMaxSize())
-        Backdrop.ROOM_RAIN -> Box(Modifier.fillMaxSize()) {
+        Backdrop.ROOM, Backdrop.ROOM_RAIN -> Box(Modifier.fillMaxSize()) {
             RoomScene(spot = RoomSpot.LIVING, capsule = false, modifier = Modifier.fillMaxSize())
-            Rain()
+            Rain { rain.value }
         }
         // Пол — под нижней полкой: полки прижаты к тележке, и стеллаж стоит на полу.
         Backdrop.SHOP -> Split(top = Color(0xFFF9E2B8), bottom = Color(0xFFC99A76), at = 0.85f, dots = true)
@@ -177,19 +220,37 @@ private fun BackdropLayer(backdrop: Backdrop) {
             drawCircle(Color(0xFF9BD8A2), size.width * 0.55f, Offset(size.width * 0.3f, size.height * 0.2f))
             drawCircle(Color(0xFF9BD8A2), size.width * 0.4f, Offset(size.width * 0.85f, size.height * 0.62f))
         }
-        Backdrop.SKY -> Box(Modifier.fillMaxSize()) {
-            Split(top = Color(0xFF9CCBF0), bottom = FinneyGreen, at = 0.58f, dots = false)
-            Canvas(Modifier.fillMaxSize()) {
-                val c = Offset(size.width * 0.84f, size.height * 0.16f)
-                drawCircle(FinneyYellow.copy(alpha = 0.5f), 42.dp.toPx(), c)
-                drawCircle(FinneyInk, 32.dp.toPx(), c)
-                drawCircle(FinneyYellow, 28.dp.toPx(), c)
-            }
-        }
-        Backdrop.SUNSET -> Split(top = Color(0xFFF4A98E), bottom = Color(0xFF6FB679), at = 0.58f, dots = false)
+        Backdrop.SKY, Backdrop.SUNSET -> Meadow { dusk.value }
         Backdrop.STORE -> Split(top = Color(0xFFCFE3F5), bottom = FinneyYellow, at = 0.42f, dots = true, desk = true)
     }
 }
+
+/**
+ * Луг у лавки. [dusk] 0 — полдень, 1 — закат: небо розовеет, солнце опускается
+ * и уходит за траву. Читается только на отрисовке — закат не пересобирает экран.
+ */
+@Composable
+private fun Meadow(dusk: () -> Float) {
+    Canvas(Modifier.fillMaxSize()) {
+        val t = dusk()
+        val horizon = size.height * HORIZON_AT
+        // Небо через золотистый: напрямую голубой в персиковый проходил через серый.
+        val sky = if (t < 0.5f) lerp(Color(0xFF9CCBF0), Color(0xFFF6D9A0), t * 2) else lerp(Color(0xFFF6D9A0), Color(0xFFF4A98E), t * 2 - 1)
+        drawRect(sky, size = size.copy(height = horizon))
+        // Солнце до травы: садясь, оно прячется за горизонт, а не ложится поверх луга.
+        val c = Offset(size.width * 0.84f, lerp(size.height * 0.16f, horizon - 8.dp.toPx(), t))
+        val sun = lerp(FinneyYellow, Color(0xFFF7A35C), t)
+        drawCircle(sun.copy(alpha = 0.5f), 42.dp.toPx(), c)
+        drawCircle(FinneyInk, 32.dp.toPx(), c)
+        drawCircle(sun, 28.dp.toPx(), c)
+        drawRect(lerp(FinneyGreen, Color(0xFF6FB679), t), topLeft = Offset(0f, horizon), size = size.copy(height = size.height - horizon))
+    }
+}
+
+/** Линия горизонта на лугу — доля высоты. */
+private const val HORIZON_AT = 0.58f
+private const val RAIN_MS = 700
+private const val DUSK_MS = 1600
 
 /** Стена и пол: верх до доли [at], низ после. [desk] — деревянная столешница на стыке, как у кассы. */
 @Composable
@@ -218,11 +279,16 @@ private fun Split(top: Color, bottom: Color, at: Float, dots: Boolean, desk: Boo
     }
 }
 
-/** Дождь за окном и в комнате: косые светлые штрихи и лёгкая синева. Без анимации — не отвлекает. */
+/**
+ * Дождь за окном и в комнате: косые светлые штрихи и лёгкая синева. Без анимации — не отвлекает.
+ * [amount] 0…1 — насколько он уже начался; 0 — дождя нет.
+ */
 @Composable
-private fun Rain() {
+private fun Rain(amount: () -> Float) {
     Canvas(Modifier.fillMaxSize()) {
-        drawRect(FinneyInk.copy(alpha = 0.25f))
+        val a = amount()
+        if (a <= 0f) return@Canvas
+        drawRect(FinneyInk.copy(alpha = 0.25f * a))
         val step = 40.dp.toPx()
         val len = 60.dp.toPx()
         var x = -size.height
@@ -230,7 +296,7 @@ private fun Rain() {
             var y = 0f
             while (y < size.height) {
                 drawLine(
-                    Color.White.copy(alpha = 0.5f),
+                    Color.White.copy(alpha = 0.5f * a),
                     Offset(x + y * 0.27f, y),
                     Offset(x + (y + len) * 0.27f, y + len),
                     strokeWidth = 2.dp.toPx(),
