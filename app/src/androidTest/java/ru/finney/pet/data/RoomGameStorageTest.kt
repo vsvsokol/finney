@@ -23,9 +23,11 @@ import ru.finney.pet.domain.game.ProfileResult
 import ru.finney.pet.domain.game.TaskResult
 import ru.finney.pet.domain.model.BodyColor
 import ru.finney.pet.domain.model.EyesVariant
+import ru.finney.pet.domain.model.GameState
 import ru.finney.pet.domain.model.PetAppearance
 import ru.finney.pet.domain.model.PetCharacter
 import ru.finney.pet.domain.tasks.TaskInput
+import kotlin.random.Random
 
 /** ТЗ п. 2.5.13: профиль, баланс, покупки, накопления, цель и прогресс переживают перезапуск. */
 @RunWith(AndroidJUnit4::class)
@@ -33,7 +35,15 @@ class RoomGameStorageTest {
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val dbName = "room-storage-test.db"
-    private val game = Game(AssetContentLoader(context).load())
+    private val content = AssetContentLoader(context).load()
+
+    /**
+     * Игра уровня выбирается случайно, поэтому каждому сценарию — своя игра с одним
+     * и тем же зерном: база и сценарий в памяти выбирают одинаково.
+     */
+    private fun seededGame() = Game(content, Random(SEED))
+
+    private val game = seededGame()
     private lateinit var db: FinneyDatabase
 
     @Before
@@ -50,7 +60,7 @@ class RoomGameStorageTest {
 
     private fun open() = Room.databaseBuilder(context, FinneyDatabase::class.java, dbName).build()
 
-    private fun store(database: FinneyDatabase) = GameStore(game, RoomGameStorage(database.gameDao()))
+    private fun store(database: FinneyDatabase) = GameStore(seededGame(), RoomGameStorage(database.gameDao()))
 
     private suspend fun GameStore.ok(id: Long, command: Game.(ru.finney.pet.domain.model.GameState) -> GameResult) {
         val result = execute(id, command)
@@ -124,6 +134,7 @@ class RoomGameStorageTest {
         playTwoPeriods(store, id)
 
         // Тот же сценарий без базы: сохранение не должно ничего терять или добавлять.
+        val game = seededGame()
         var expected = game.newGame()
         fun apply(result: GameResult) {
             expected = (result as GameResult.Ok).state
@@ -182,13 +193,21 @@ class RoomGameStorageTest {
         val reset = RoomGameStorage(db.gameDao()).load(id)!!
         assertEquals("Финни", reset.profile.petName)
         assertEquals(look, reset.profile.appearance)
-        val fresh = game.newGame(isDemo = true)
-        assertEquals(fresh, reset.state.copy(ledger = reset.state.ledger.map { it.copy(createdAt = fresh.ledger.first().createdAt) }))
+        // Игра уровня у нового начала своя, случайная: сравниваем без неё.
+        assertTrue(reset.state.currentPeriod.levelTaskId != null)
+        val fresh = game.newGame(isDemo = true).withoutLevelGame()
+        assertEquals(fresh, reset.state.withoutLevelGame().let { it.copy(ledger = it.ledger.map { e -> e.copy(createdAt = fresh.ledger.first().createdAt) }) })
 
         // После сброса игра продолжается обычными командами: хвосты операций считаются с нуля.
         store.ok(id) { selectGoal(it, "goal_bike") }
         store.ok(id) { confirmPlan(it, needs = 5, wants = 5, savings = 5) }
         store.ok(id) { closePeriod(it) }
         assertEquals(2, RoomGameStorage(db.gameDao()).load(id)!!.state.periods.size)
+    }
+
+    private fun GameState.withoutLevelGame() = copy(periods = periods.map { it.copy(levelTaskId = null) })
+
+    private companion object {
+        const val SEED = 7
     }
 }

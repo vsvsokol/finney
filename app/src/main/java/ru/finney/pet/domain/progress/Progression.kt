@@ -17,10 +17,26 @@ object Progression {
     fun conditionsMet(needsCovered: Boolean, planMatched: Boolean, savingsAdded: Boolean): Int =
         listOf(needsCovered, planMatched, savingsAdded).count { it }
 
-    /** Пройден ли уровень, сыгранный в этом периоде: игра уровня обязательна, из остальных — [EconomyConfig.conditionsToPass]. */
+    /**
+     * Пройден ли уровень, сыгранный в этом периоде. Решение записано при закрытии
+     * ([PeriodResult.passed]); у периодов до базы версии 8 — по обычным правилам:
+     * игра уровня обязательна, из остальных — [EconomyConfig.conditionsToPass].
+     */
     fun passed(result: PeriodResult, config: EconomyConfig): Boolean =
-        result.gamePassed &&
-            conditionsMet(result.needsCovered, result.planMatched, result.savingsAdded) >= config.conditionsToPass
+        result.passed ?: decide(
+            result.needsCovered, result.planMatched, result.savingsAdded, result.gamePassed,
+            toPass = config.conditionsToPass, gameRequired = true,
+        )
+
+    /** Правило прохождения: игра уровня (если обязательна) и [toPass] из трёх условий. */
+    fun decide(
+        needsCovered: Boolean,
+        planMatched: Boolean,
+        savingsAdded: Boolean,
+        gamePassed: Boolean,
+        toPass: Int,
+        gameRequired: Boolean,
+    ): Boolean = (gamePassed || !gameRequired) && conditionsMet(needsCovered, planMatched, savingsAdded) >= toPass
 
     /** Уровень после [passedLevels] пройденных периодов. */
     fun level(passedLevels: Int, config: EconomyConfig): Int =

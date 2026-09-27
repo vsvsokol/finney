@@ -39,6 +39,9 @@ abstract class GameDao {
         eyes: EyesVariant,
     )
 
+    @Query("UPDATE profiles SET isDemo = :isDemo WHERE id = :profileId")
+    abstract suspend fun setDemo(profileId: Long, isDemo: Boolean)
+
     @Query("UPDATE profiles SET activeGoalId = :goalId WHERE id = :profileId")
     abstract suspend fun setActiveGoal(profileId: Long, goalId: String?)
 

@@ -111,6 +111,7 @@ fun rejectionMessage(rejection: Rejection): RejectionMessage = when (rejection) 
     is Rejection.UnknownGoal,
     is Rejection.UnknownItem,
     is Rejection.NotWearable,
+    is Rejection.NotPlayable,
     is Rejection.UnknownTask,
     is Rejection.InvalidTaskInput,
     Rejection.NotAsleep,

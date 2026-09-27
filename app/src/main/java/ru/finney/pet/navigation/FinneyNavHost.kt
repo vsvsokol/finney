@@ -21,6 +21,7 @@ import ru.finney.pet.ui.budget.BudgetScreen
 import ru.finney.pet.ui.goals.GoalsScreen
 import ru.finney.pet.ui.home.HomeScreen
 import ru.finney.pet.ui.onboarding.OnboardingScreen
+import ru.finney.pet.notifications.AskNotificationsOnce
 import ru.finney.pet.ui.onboarding.PetSetupScreen
 import ru.finney.pet.ui.period.PeriodResultScreen
 import ru.finney.pet.ui.progress.GlossaryScreen
@@ -81,6 +82,8 @@ fun FinneyNavHost(
         // ---------- Игра ----------
 
         composable<HomeRoute> {
+            // Питомец уже есть — теперь понятно, о ком будут напоминания.
+            AskNotificationsOnce()
             HomeScreen(
                 onOpenBudget = { navController.navigate(BudgetRoute) },
                 onOpenShop = { navController.navigate(ShopRoute) },

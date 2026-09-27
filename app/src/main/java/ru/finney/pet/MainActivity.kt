@@ -16,7 +16,8 @@ import ru.finney.pet.ui.theme.FinneyTheme
 
 class MainActivity : ComponentActivity() {
 
-    private val sounds by lazy { (application as FinneyApplication).container.sounds }
+    private val container by lazy { (application as FinneyApplication).container }
+    private val sounds by lazy { container.sounds }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -42,6 +43,8 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         sounds.resume()
+        // Заглянули — следующее напоминание не раньше чем через сутки (в демо — минуты).
+        container.notifications.appOpened()
     }
 
     override fun onStop() {

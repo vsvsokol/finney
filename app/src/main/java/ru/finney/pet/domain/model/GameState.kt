@@ -51,6 +51,13 @@ data class PeriodResult(
     val gamePassed: Boolean,
     val successfulTasks: Int,
     val points: Int,
+    /**
+     * Пройден ли уровень — решено при закрытии по правилам, которые тогда действовали
+     * (в демо — облегчённым). Хранится, чтобы выключенный демо-режим не пересчитал
+     * прошлые уровни и уровень не упал. null — период закрыт до базы версии 8,
+     * решается по обычным правилам.
+     */
+    val passed: Boolean? = null,
 )
 
 data class Period(
@@ -116,6 +123,10 @@ data class GameState(
     val wornItemId: String? = null,
     /** Когда питомец лёг спать, мс; null — не спит. Сколько он уже выспался — [ru.finney.pet.domain.game.Game.energyAt]. */
     val sleepingSince: Long? = null,
+    /** Сколько настроения уже дала игра с игрушками в текущей сессии, см. [ru.finney.pet.domain.game.Game.play]. */
+    val playMood: Int = 0,
+    /** Когда началась текущая сессия игры, мс; null — сессии нет. */
+    val playSince: Long? = null,
 ) {
     val currentPeriod: Period get() = periods.last()
 

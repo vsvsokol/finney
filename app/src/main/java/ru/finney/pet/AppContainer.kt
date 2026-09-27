@@ -14,6 +14,8 @@ import ru.finney.pet.domain.game.Game
 import ru.finney.pet.domain.game.GameStore
 import ru.finney.pet.domain.game.Session
 import ru.finney.pet.domain.model.GameContent
+import ru.finney.pet.notifications.NotificationPrefs
+import ru.finney.pet.notifications.NotificationScheduler
 import ru.finney.pet.ui.sound.SoundPlayer
 
 /**
@@ -37,6 +39,25 @@ class AppContainer(context: Context) {
     val session: Session by lazy {
         Session(gameStore, DataStoreActiveProfileStorage(appContext.settingsDataStore))
     }
+
+    /** Что уведомлениям нужно помнить: когда открывали приложение, спрашивали ли разрешение. */
+    val notificationPrefs: NotificationPrefs by lazy { NotificationPrefs(appContext.settingsDataStore) }
+
+    /** Расписание уведомлений: «проснулся» и напоминания. Запускается в [FinneyApplication]. */
+    val notifications: NotificationScheduler by lazy {
+        NotificationScheduler(
+            appContext,
+            session,
+            game,
+            content.economy.reminders,
+            notificationPrefs,
+            CoroutineScope(SupervisorJob() + Dispatchers.Default),
+        )
+    }
+
+    /** Приложение на экране. Тогда уведомления не нужны: ребёнок и так с питомцем. */
+    @Volatile
+    var appVisible: Boolean = false
 
     /** Звуки и музыка на всё приложение. Экраны получают их через LocalSounds из MainActivity. */
     val sounds: SoundPlayer by lazy {

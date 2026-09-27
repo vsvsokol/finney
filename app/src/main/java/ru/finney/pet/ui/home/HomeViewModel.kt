@@ -68,6 +68,14 @@ sealed interface HomeUiState {
         val worn: String? = null,
         /** Питомец спит; null — не спит. */
         val sleep: SleepInfo? = null,
+        /** Купленные игрушки — id из магазина. Лежат на полу в зале. */
+        val toys: List<String> = emptyList(),
+        /** Сколько настроения игрушки ещё дадут в этой сессии игры; 0 — питомец наигрался. */
+        val playLeft: Int = 0,
+        /** Прибавка настроения за одно потряхивание игрушкой. */
+        val moodPerShake: Int = 0,
+        /** Настроение ниже порога грусти: питомец вздыхает, шкала зовёт на неё нажать. */
+        val moodLow: Boolean = false,
     ) : HomeUiState {
         /** Уровень завершается только после подтверждения плана. */
         val canClosePeriod: Boolean get() = phase == PeriodPhase.ACTIVE
@@ -203,7 +211,15 @@ class HomeViewModel(
         }
     }
 
-    /** Надеть купленную вещь. Бесплатно: деньги ушли при покупке. */
+    /**
+     * Поиграли с игрушкой: [shakes] потряхиваний рядом с питомцем с прошлого раза.
+     * Экран копит их и присылает пачкой — сохранять каждое движение пальца незачем.
+     */
+    fun play(toyId: String, shakes: Int) {
+        if (shakes <= 0) return
+        viewModelScope.launch { session.execute { play(it, toyId, shakes) } }
+    }
+
     private fun toUiState(saved: SavedGame): HomeUiState.Ready {
         val state = saved.state
         val level = game.level(state)
@@ -231,6 +247,10 @@ class HomeViewModel(
             sleep = state.sleepingSince?.let { since ->
                 SleepInfo(since = since, endsAt = game.sleepEndsAt(state)!!, energyFrom = state.pet.energy)
             },
+            toys = game.toys(state).map { it.id },
+            playLeft = game.playMoodLeft(state),
+            moodPerShake = content.economy.play.moodPerShake,
+            moodLow = state.pet.mood < content.economy.pet.emotionLow,
         )
     }
 

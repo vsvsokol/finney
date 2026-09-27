@@ -53,8 +53,10 @@ sealed interface PeriodResultUiState {
         val balance: Int,
         /** Название игры уровня; null — в этом периоде её не было. */
         val levelGame: String? = null,
-        /** Игра уровня пройдена — обязательное условие. */
+        /** Игра уровня пройдена. */
         val gamePassed: Boolean = true,
+        /** Игра уровня обязательна; в демо-режиме — нет. */
+        val gameRequired: Boolean = true,
     ) : PeriodResultUiState {
         /** Перерасход по нужному и желаемому сверх плана; 0, если уложились. */
         val overspend: Int
@@ -104,6 +106,7 @@ class PeriodResultViewModel(
             balance = state.balance,
             levelGame = period.levelTaskId?.let { content.task(it)?.title },
             gamePassed = result.gamePassed,
+            gameRequired = game.levelCheck(state).gameRequired,
         )
     }
 
