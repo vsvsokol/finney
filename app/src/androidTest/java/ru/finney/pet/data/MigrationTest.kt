@@ -10,7 +10,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import ru.finney.pet.data.db.FinneyDatabase
 
-/** Обновление приложения не стирает прогресс: база версии 3 переносится в 4 и 5 с данными. */
+/** Обновление приложения не стирает прогресс: база версии 3 переносится в 4, 5 и 6 с данными. */
 @RunWith(AndroidJUnit4::class)
 class MigrationTest {
 
@@ -60,6 +60,29 @@ class MigrationTest {
             db.query("SELECT wornItemId FROM profiles WHERE id = 1").use { c ->
                 assertTrue(c.moveToFirst())
                 assertEquals("hat_cowboy", c.getString(0))
+            }
+        }
+    }
+
+    @Test
+    fun migrate5To6KeepsPeriodsWithoutLevelGame() {
+        helper.createDatabase(dbName, 5).use { db ->
+            db.execSQL(
+                "INSERT INTO profiles (id, petName, petCharacter, bodyColor, eyes, activeGoalId, isDemo, createdAt, wornItemId) " +
+                    "VALUES (1, 'Финни', 'PUSHISTIK', 'A', 'ROUND', NULL, 0, 1, NULL)",
+            )
+            db.execSQL(
+                "INSERT INTO periods (profileId, number, stage, phase, needsCovered, planMatched, savingsAdded, " +
+                    "successfulTasks, pointsEarned) VALUES (1, 1, 1, 'CLOSED', 1, 1, 0, 1, 5)",
+            )
+        }
+
+        helper.runMigrationsAndValidate(dbName, 6, true, FinneyDatabase.MIGRATION_5_6).use { db ->
+            db.query("SELECT pointsEarned, levelTaskId, gamePassed FROM periods WHERE profileId = 1").use { c ->
+                assertTrue(c.moveToFirst())
+                assertEquals(5, c.getInt(0))
+                assertTrue("у старого периода игры уровня нет", c.isNull(1))
+                assertTrue("итог по игре не записан — читается как пройдено", c.isNull(2))
             }
         }
     }

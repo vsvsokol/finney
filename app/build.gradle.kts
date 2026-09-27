@@ -17,6 +17,16 @@ val keystoreProperties = Properties().apply {
     }
 }
 
+// Версия — в version.properties в корне. Сборка берёт её оттуда: номер меняется
+// одной строкой, а versionCode растёт вместе с versionName и не расходится с ним.
+val appVersion = Properties().apply {
+    rootProject.file("version.properties").inputStream().use { load(it) }
+}
+val versionMajor = appVersion.getProperty("major").toInt()
+val versionMinor = appVersion.getProperty("minor").toInt()
+val versionPatch = appVersion.getProperty("patch").toInt()
+check(versionMinor in 0..99 && versionPatch in 0..99) { "version.properties: minor и patch — от 0 до 99" }
+
 android {
     namespace = "ru.finney.pet"
     compileSdk {
@@ -27,8 +37,8 @@ android {
         applicationId = "ru.finney.pet"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = versionMajor * 10_000 + versionMinor * 100 + versionPatch
+        versionName = "$versionMajor.$versionMinor.$versionPatch"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
