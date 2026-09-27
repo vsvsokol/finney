@@ -31,6 +31,8 @@ data class WardrobeItem(
     val owned: Boolean,
     /** Как получить, если ещё нет: «копи: …» или «в магазине за …». null — уже твоя. */
     val howToGet: String?,
+    /** Накоплено и цена цели, если вещь дают за цель, — для полосы под «копи: …». */
+    val progress: Pair<Int, Int>? = null,
 )
 
 sealed interface WardrobeUiState {
@@ -87,6 +89,7 @@ class WardrobeViewModel(
                         goal != null -> "копи: ${state.goalSaved(goal.id)} из ${goal.price}"
                         else -> "в магазине за ${item.price}"
                     },
+                    progress = goal?.takeIf { item.id !in owned }?.let { state.goalSaved(it.id) to it.price },
                 )
             },
             rejection = rejection,

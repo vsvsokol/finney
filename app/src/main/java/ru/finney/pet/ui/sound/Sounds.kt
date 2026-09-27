@@ -26,6 +26,12 @@ interface Sounds {
 
     fun play(sfx: Sfx)
 
+    /**
+     * Тот же звук, но выше или ниже: [rate] 1 — как записан, 2 — октавой выше.
+     * Так тики удержания «−/+» поднимаются в тоне без отдельных файлов.
+     */
+    fun play(sfx: Sfx, rate: Float)
+
     /** Зацикленный звук, пока его не остановят: сопение во сне. */
     fun startLoop(sfx: Sfx)
 
@@ -51,6 +57,7 @@ interface Sounds {
 object NoSounds : Sounds {
     override val settings: StateFlow<SoundSettings> = MutableStateFlow(SoundSettings())
     override fun play(sfx: Sfx) = Unit
+    override fun play(sfx: Sfx, rate: Float) = Unit
     override fun startLoop(sfx: Sfx) = Unit
     override fun stopLoop(sfx: Sfx) = Unit
     override fun music(track: Music?) = Unit
@@ -131,10 +138,14 @@ class SoundPlayer(
         }
     }
 
-    override fun play(sfx: Sfx) {
+    override fun play(sfx: Sfx) = play(sfx, 1f)
+
+    override fun play(sfx: Sfx, rate: Float) {
         if (!foreground || !settings.value.sound) return
         val id = ids.getValue(sfx)
-        pool.play(id, 1f, 1f, 1, 0, 1f)
+        // SoundPool принимает скорость только в 0.5..2, остальное молча обрезает сам,
+        // но лучше обрезать явно — чтобы потолок был виден здесь.
+        pool.play(id, 1f, 1f, 1, 0, rate.coerceIn(0.5f, 2f))
     }
 
     override fun startLoop(sfx: Sfx) {

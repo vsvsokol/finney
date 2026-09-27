@@ -32,8 +32,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import ru.finney.pet.domain.model.BasketRule
 import ru.finney.pet.domain.model.BasketTask
@@ -42,8 +42,11 @@ import ru.finney.pet.domain.model.ShelfItem
 import ru.finney.pet.domain.tasks.TaskEngines
 import ru.finney.pet.domain.tasks.TaskInput
 import ru.finney.pet.domain.tasks.TaskInputError
+import ru.finney.pet.ui.components.StableOutlinedText
+import ru.finney.pet.ui.components.CheckBadge
 import ru.finney.pet.ui.components.Coin
 import ru.finney.pet.ui.components.FinneyButton
+import ru.finney.pet.ui.components.SpendBar
 import ru.finney.pet.ui.components.FinneyIcon
 import ru.finney.pet.ui.components.FinneyIconButton
 import ru.finney.pet.ui.components.FinneyIcons
@@ -145,7 +148,11 @@ private fun Shelves(
     }
 }
 
-/** Листок со списком: галочка ставится сама, когда правило выполнено. */
+/**
+ * Листок со списком: галочка ставится сама, когда правило выполнено. Отметка —
+ * зелёный «✓», а не перечёркнутая строка с крестиком: на плейтесте крест
+ * и зачёркивание читали как «ошибка в чеке», а не «уже взял».
+ */
 @Composable
 private fun ShoppingList(task: BasketTask, rules: List<BasketRule>, cart: Set<String>, modifier: Modifier) {
     Column(
@@ -162,18 +169,17 @@ private fun ShoppingList(task: BasketTask, rules: List<BasketRule>, cart: Set<St
         task.goalText?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = FinneyInk) }
         rules.forEach { rule ->
             val done = TaskEngines.ruleMet(task, rule, cart)
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Box(
-                    Modifier.size(20.dp).clip(RoundedCornerShape(5.dp)).background(if (done) FinneyPeach else FinneyYellow)
-                        .border(2.dp, FinneyInk, RoundedCornerShape(5.dp)),
-                    contentAlignment = Alignment.Center,
-                ) { if (done) Text("✕", style = MaterialTheme.typography.labelMedium, color = FinneyInk) }
-                Text(
-                    rule.label!!,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = FinneyInk,
-                    textDecoration = if (done) TextDecoration.LineThrough else null,
-                )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.semantics(mergeDescendants = true) { stateDescription = if (done) "взято" else "ещё нет" },
+            ) {
+                if (done) {
+                    CheckBadge(size = 22.dp)
+                } else {
+                    Box(Modifier.size(22.dp).clip(CircleShape).background(Color.White).border(2.dp, FinneyInk, CircleShape))
+                }
+                Text(rule.label!!, style = MaterialTheme.typography.bodyMedium, color = FinneyInk)
             }
         }
     }
@@ -343,11 +349,12 @@ private fun Checkout(
                 modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = "Итого $total, в кошельке ${task.limit}" },
             ) {
                 Coin(size = 24.dp)
-                OutlinedText("$total / ${task.limit}", style = MaterialTheme.typography.titleLarge)
+                StableOutlinedText("$total / ${task.limit}", widest = "${task.limit}0 / ${task.limit}", style = MaterialTheme.typography.titleLarge)
+                SpendBar(total, task.limit, Modifier.weight(1f))
             }
         }
         Spacer(Modifier.weight(1f))
         // Реплика «Что-то подождёт… / Всё по списку? Платим!» повторяла «Не хватает N» и кнопку «Оплатить».
-        ScenePet(character, 100.dp, Modifier.width(100.dp))
+        PetAtRight(character, 100.dp)
     }
 }

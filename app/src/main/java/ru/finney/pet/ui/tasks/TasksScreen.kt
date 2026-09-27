@@ -6,10 +6,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -20,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,15 +48,18 @@ import ru.finney.pet.appContainer
 import ru.finney.pet.domain.game.Game
 import ru.finney.pet.domain.game.Session
 import ru.finney.pet.domain.model.GameContent
+import ru.finney.pet.domain.model.ItemArt
 import ru.finney.pet.domain.model.PeriodPhase
 import ru.finney.pet.domain.model.TaskDefinition
 import ru.finney.pet.domain.model.TaskOutcome
+import ru.finney.pet.ui.components.StableText
+import ru.finney.pet.ui.components.FillBar
 import ru.finney.pet.ui.components.FinneyButton
 import ru.finney.pet.ui.components.FinneyScreen
 import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.components.fadingScroll
 import ru.finney.pet.ui.tasks.games.ItemPicture
-import ru.finney.pet.ui.tasks.games.taskIcon
+import ru.finney.pet.ui.tasks.games.distinctTaskIcons
 import ru.finney.pet.ui.theme.FinneyCream
 import ru.finney.pet.ui.theme.FinneyGreen
 import ru.finney.pet.ui.theme.FinneyInk
@@ -125,11 +132,12 @@ fun TasksScreen(
 
     FinneyScreen(scrollable = false, onClose = onBack) {
         OutlinedText("Мини-игры", style = MaterialTheme.typography.headlineLarge)
-        Text(
-            "Пройдено ${list.count { it.done }} из ${list.size}",
-            style = MaterialTheme.typography.titleMedium,
-            color = FinneyInk,
-        )
+        val passed = list.count { it.done }
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Пройдено", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
+            FillBar(passed, list.size, Modifier.weight(1f))
+            StableText("$passed из ${list.size}", widest = "${list.size} из ${list.size}", style = MaterialTheme.typography.titleMedium)
+        }
         // Игры — часть уровня, а уровень начинается с плана.
         if (needsPlan) {
             Text(
@@ -143,9 +151,12 @@ fun TasksScreen(
             Modifier.weight(1f).fadingScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            // Карточки в ряду одной высоты: у «Лимонадной лавки» название в две строки,
+            // у закрытой игры — плашка «с уровня N», и соседка рядом была короче.
+            val icons = remember(list) { list.map { it.task.id }.zip(distinctTaskIcons(list.map { it.task })).toMap() }
             list.chunked(2).forEach { pair ->
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    pair.forEach { row -> GameCard(row, Modifier.weight(1f)) { onOpenTask(row.task.id) } }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.height(IntrinsicSize.Max)) {
+                    pair.forEach { row -> GameCard(row, icons[row.task.id], Modifier.weight(1f).fillMaxHeight()) { onOpenTask(row.task.id) } }
                     if (pair.size == 1) Spacer(Modifier.weight(1f))
                 }
             }
@@ -160,7 +171,7 @@ fun TasksScreen(
  * «Пройденных темах» и звучит в описании для TalkBack.
  */
 @Composable
-private fun GameCard(row: TaskRow, modifier: Modifier, onClick: () -> Unit) {
+private fun GameCard(row: TaskRow, icon: ItemArt?, modifier: Modifier, onClick: () -> Unit) {
     val shape = RoundedCornerShape(22.dp)
     val status = when {
         row.lockedUntilLevel != null -> "откроется на уровне ${row.lockedUntilLevel}"
@@ -185,7 +196,7 @@ private fun GameCard(row: TaskRow, modifier: Modifier, onClick: () -> Unit) {
             Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(FinneyCream).padding(10.dp),
             contentAlignment = Alignment.Center,
         ) {
-            taskIcon(row.task)?.let { ItemPicture(it, row.task.title, 72.dp) }
+            icon?.let { ItemPicture(it, row.task.title, 72.dp) }
             if (row.done) {
                 Box(
                     Modifier.align(Alignment.TopEnd).size(28.dp).clip(CircleShape).background(FinneyGreen).border(2.dp, FinneyInk, CircleShape),

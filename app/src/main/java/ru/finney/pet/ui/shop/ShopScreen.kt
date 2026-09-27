@@ -1,9 +1,15 @@
 package ru.finney.pet.ui.shop
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -11,6 +17,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -21,10 +29,16 @@ import ru.finney.pet.ui.components.FinneyButton
 import ru.finney.pet.ui.components.FinneyScreen
 import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.components.FeedbackDialog
-import ru.finney.pet.ui.room.CareBlock
 import ru.finney.pet.ui.room.CareOption
 import ru.finney.pet.ui.room.CarePanel
+import ru.finney.pet.ui.room.ItemPicture
+import ru.finney.pet.ui.room.PickHint
+import ru.finney.pet.ui.room.itemFallback
+import ru.finney.pet.ui.theme.FinneyGreen
 import ru.finney.pet.ui.theme.FinneyInk
+import ru.finney.pet.ui.theme.FinneyPink
+import ru.finney.pet.ui.theme.RadiusField
+import ru.finney.pet.ui.theme.StrokeRegular
 
 /**
  * Магазин: открывается кнопкой с деньгами на главном (так в макете — «при нажатии
@@ -69,10 +83,14 @@ private fun ShopContent(
     onOpenBudget: () -> Unit,
     onOpenHistory: () -> Unit,
 ) {
+    val selected = (state.needs + state.wants + state.toys).firstOrNull { it.item.id == state.selectedId }
     FinneyScreen(
         scrollable = true,
         verticalArrangement = Arrangement.spacedBy(16.dp),
         onClose = onBack,
+        // Кнопка «Купить» одна на весь магазин и всегда на виду: раньше в каждой из трёх
+        // панелей стояла своя, а в ней — подсказка «Выбери, что купить» вместо действия.
+        bottom = { BuyBar(state, selected, onBuy, onOpenBudget) },
     ) {
         OutlinedText("Магазин", style = MaterialTheme.typography.headlineLarge)
 
@@ -86,45 +104,32 @@ private fun ShopContent(
             onAction = onOpenBudget,
         )
 
-        val block = if (state.canBuy) {
-            null
-        } else {
-            CareBlock(
-                reason = "Сначала составь план — потом покупки",
-                actionLabel = "К плану расходов",
-                onAction = onOpenBudget,
-            )
-        }
-
         ShopSection(
             title = "Нужное",
+            kind = SectionKind.NEEDS,
             planLeft = state.needsLeft,
             previews = state.needs,
             selectedId = state.selectedId,
-            block = block,
             onSelect = onSelect,
-            onBuy = onBuy,
         )
         ShopSection(
             title = "Хочется",
+            kind = SectionKind.WANTS,
             planLeft = state.wantsLeft,
             previews = state.wants,
             selectedId = state.selectedId,
-            block = block,
             onSelect = onSelect,
-            onBuy = onBuy,
         )
-        // Игрушки — тоже «хочется» и тратятся из той же части плана (остаток — строкой выше).
+        // Игрушки — тоже «хочется» и тратятся из той же части плана (остаток — в полосе выше).
         // Отдельно — потому что покупаются один раз и остаются в зале. Все куплены — раздел уходит.
         if (state.toys.isNotEmpty()) {
             ShopSection(
                 title = "Игрушки",
+                kind = SectionKind.TOYS,
                 planLeft = null,
                 previews = state.toys,
                 selectedId = state.selectedId,
-                block = block,
                 onSelect = onSelect,
-                onBuy = onBuy,
             )
         }
 
@@ -132,31 +137,82 @@ private fun ShopContent(
     }
 }
 
+/** Что за раздел магазина: от этого цвет и слова его полосы. */
+private enum class SectionKind { NEEDS, WANTS, TOYS }
+
 @Composable
 private fun ShopSection(
     title: String,
+    kind: SectionKind,
     planLeft: Int?,
     previews: List<PurchasePreview>,
     selectedId: String?,
-    block: CareBlock?,
     onSelect: (String) -> Unit,
-    onBuy: (String) -> Unit,
 ) {
-    // Сколько осталось по плану на эту категорию — числом с монеткой. Что в
-    // категории лежит, видно по картинкам, подпись «Еда и мытьё» убрана.
-    planLeft?.let {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("по плану осталось", style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
-            CoinAmount(amount = it, coinSize = 22.dp)
-        }
-    }
     CarePanel(
         title = title,
         options = previews.map { CareOption(it.item, it, isSelected = it.item.id == selectedId) },
         onPick = onSelect,
-        onConfirm = onBuy,
+        onConfirm = {},
         onDismiss = null,
-        block = block,
         allowShortage = true,
+        header = { CategoryBanner(kind, planLeft) },
+        withConfirm = false,
     )
+}
+
+/**
+ * Цветная полоса категории во всю ширину панели: зачем это и сколько на это
+ * осталось по плану. Плейтест: заголовок «Нужное» над панелью не замечали и видели
+ * просто набор продуктов. Полоса стоит прямо над товарами; цвет в ней не
+ * единственный признак — слово категории в заголовке панели, смысл — словами
+ * в самой полосе (ТЗ п. 3.6). У игрушек заголовок «Игрушки», поэтому «хочется»
+ * сказано в полосе.
+ */
+@Composable
+private fun CategoryBanner(kind: SectionKind, planLeft: Int?) {
+    val (color, why) = when (kind) {
+        SectionKind.NEEDS -> FinneyGreen to "Без этого Финни плохо"
+        SectionKind.WANTS -> FinneyPink to "Для радости. Можно и потом"
+        SectionKind.TOYS -> FinneyPink to "Это «хочется». Игрушка лежит в зале"
+    }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(RadiusField))
+            .background(color)
+            .border(StrokeRegular, FinneyInk, RoundedCornerShape(RadiusField))
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .semantics(mergeDescendants = true) {},
+    ) {
+        Text(why, style = MaterialTheme.typography.titleMedium, color = FinneyInk, modifier = Modifier.weight(1f))
+        planLeft?.let {
+            Column(horizontalAlignment = Alignment.End) {
+                Text("по плану", style = MaterialTheme.typography.labelMedium, color = FinneyInk)
+                CoinAmount(amount = it, coinSize = 22.dp)
+            }
+        }
+    }
+}
+
+/**
+ * Низ магазина: что выбрано и «Купить». Пока ничего не выбрано — подсказка
+ * со стрелкой к товарам. Без плана — почему нельзя и путь к плану.
+ */
+@Composable
+private fun BuyBar(state: ShopUiState.Ready, selected: PurchasePreview?, onBuy: (String) -> Unit, onOpenBudget: () -> Unit) {
+    when {
+        !state.canBuy -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Сначала составь план — потом покупки", style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
+            FinneyButton(text = "К плану расходов", onClick = onOpenBudget)
+        }
+        selected == null -> PickHint()
+        else -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            ItemPicture(selected.item.id, itemFallback(selected.item.id), size = 48.dp)
+            CoinAmount(amount = selected.item.price)
+            FinneyButton(text = "Купить", onClick = { onBuy(selected.item.id) }, modifier = Modifier.weight(1f))
+        }
+    }
 }

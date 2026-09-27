@@ -1,6 +1,9 @@
 package ru.finney.pet.ui.goals
 
 import androidx.compose.foundation.Image
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -43,6 +46,7 @@ import ru.finney.pet.ui.components.AmountStepper
 import ru.finney.pet.ui.components.Coin
 import ru.finney.pet.ui.components.CoinAmount
 import ru.finney.pet.ui.components.FeedbackDialog
+import ru.finney.pet.ui.components.FillBar
 import ru.finney.pet.ui.components.FinneyButton
 import ru.finney.pet.ui.components.FinneyIcon
 import ru.finney.pet.ui.components.FinneyIcons
@@ -93,6 +97,7 @@ fun GoalsScreen(
             WithdrawConfirmDialog(
                 pending = it,
                 goalLabel = ready.progress?.goal?.label.orEmpty(),
+                goalPrice = ready.progress?.goal?.price ?: 0,
                 onConfirm = viewModel::confirmWithdraw,
                 onCancel = viewModel::cancelWithdraw,
             )
@@ -113,18 +118,30 @@ fun GoalsScreen(
 private fun WithdrawConfirmDialog(
     pending: PendingWithdraw,
     goalLabel: String,
+    goalPrice: Int,
     onConfirm: () -> Unit,
     onCancel: () -> Unit,
 ) {
     val p = pending.preview
     Dialog(onDismissRequest = onCancel) {
-        FinneyPanel(title = "Снять ${pending.amount}?") {
+        FinneyPanel(title = "Взять ${pending.amount}?") {
             Text(
-                text = "Это деньги на «$goalLabel». Если снять, до цели дальше.",
+                text = "Это деньги на «$goalLabel». Если взять, до цели станет дальше.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = FinneyInk,
             )
             InfoRow("В копилке", "${p.savedBefore} → ${p.savedAfter}")
+            // То же «станет меньше» картинкой: уходящая часть заштрихована крестом.
+            if (goalPrice > 0) {
+                FillBar(
+                    value = p.savedBefore,
+                    max = goalPrice,
+                    pending = p.savedBefore - p.savedAfter,
+                    removing = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    description = "В копилке ${p.savedBefore} из $goalPrice",
+                )
+            }
             // В первом периоде темпа пополнений ещё нет — срок не показываем вовсе.
             if (p.periodsBefore != null || p.periodsAfter != null) {
                 InfoRow(
@@ -133,7 +150,7 @@ private fun WithdrawConfirmDialog(
                 )
             }
             FinneyButton(text = "Оставить в копилке", onClick = onCancel)
-            FinneyButton(text = "Снять ${pending.amount}", onClick = onConfirm)
+            FinneyButton(text = "Взять ${pending.amount}", onClick = onConfirm)
         }
     }
 }
@@ -165,13 +182,32 @@ private fun GoalsContent(
             FinneyPanel(title = progress.goal.label) {
                 // Накоплено — полоской и числом «30 / 100» с монеткой; остаток и срок —
                 // числами со словом: цена, накопленное и остаток должны быть видны (ТЗ п. 2.5.7).
-                SavedBar(saved = progress.saved, price = progress.goal.price)
-                InfoRow("Осталось собрать", progress.remaining.toString())
+                // Пока выбирается сумма, полоса показывает штриховкой, куда дойдёт взнос.
+                // Превью — выбранная сумма, но не больше, чем реально можно положить.
+                val preview = if (state.canMoveMoney && !state.canComplete) {
+                    minOf(amount, state.balance, progress.remaining).coerceAtLeast(0)
+                } else {
+                    0
+                }
+                SavedBar(saved = progress.saved, price = progress.goal.price, pending = preview, previews = state.canMoveMoney)
+                // Остаток и срок — двумя плитками «число над словом», а не строками
+                // «подпись … число» через весь экран: там глаз терял, что к чему.
                 if (progress.remaining > 0) {
-                    InfoRow(
-                        "Уровней до цели",
-                        progress.periodsToGoal?.toString() ?: "пока не посчитать",
-                    )
+                    Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        StatTile(
+                            value = progress.remaining.toString(),
+                            caption = "осталось собрать",
+                            coin = true,
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                        )
+                        val periods = progress.periodsToGoal
+                        StatTile(
+                            value = periods?.toString() ?: "?",
+                            // Срок считается по среднему взносу — до первого взноса его нет.
+                            caption = if (periods == null) "уровней до цели — узнаем после взноса" else "уровней до цели",
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                        )
+                    }
                 }
             }
         }
@@ -197,15 +233,12 @@ private fun GoalsContent(
                 canAdd = amount + AMOUNT_STEP <= limit,
                 canRemove = amount > AMOUNT_STEP,
             )
-            FinneyButton(
-                text = "Отложить $amount",
-                onClick = { onDeposit(amount) },
-                enabled = state.balance >= amount,
-            )
-            FinneyButton(
-                text = "Снять $amount",
-                onClick = { onWithdraw(amount) },
-                enabled = progress.saved >= amount,
+            SavingsSwitch(
+                amount = amount,
+                onTake = { onWithdraw(amount) },
+                onPut = { onDeposit(amount) },
+                canTake = progress.saved >= amount,
+                canPut = state.balance >= amount,
             )
             state.note?.let {
                 Text(text = it, style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
@@ -254,50 +287,72 @@ private fun GoalCard(row: GoalRow, onSelect: () -> Unit) {
                 },
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Text(
-                    text = row.goal.label,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = FinneyInk,
-                )
+                // Значок — в строке названия, а не отдельной колонкой справа: полосе
+                // остаётся вся ширина карточки. Место под него есть всегда.
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = row.goal.label,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = FinneyInk,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) {
+                        when {
+                            row.isCompleted -> Box(
+                                Modifier.size(32.dp).clip(CircleShape).background(FinneyGreen).border(2.dp, FinneyInk, CircleShape),
+                                contentAlignment = Alignment.Center,
+                            ) { Text("✓", style = MaterialTheme.typography.titleMedium, color = FinneyInk) }
+                            row.isActive -> FinneyIcon(FinneyIcons.Piggy, size = 32.dp)
+                        }
+                    }
+                }
                 if (!row.isCompleted) SavedBar(saved = row.saved, price = row.goal.price)
-            }
-            when {
-                row.isCompleted -> Box(
-                    Modifier.size(32.dp).clip(CircleShape).background(FinneyGreen).border(2.dp, FinneyInk, CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) { Text("✓", style = MaterialTheme.typography.titleMedium, color = FinneyInk) }
-                row.isActive -> FinneyIcon(FinneyIcons.Piggy, size = 32.dp)
             }
         }
     }
 }
 
-/** Накоплено: полоска и «30 / 100» с монеткой. */
+/**
+ * Накоплено: полоска во всю ширину, под ней «30 / 100» с монеткой. Полоска — общая
+ * шкала прогресса: от розового к зелёному, полная — с «✓». Число стоит под полосой,
+ * а не сбоку: сбоку оно отнимало у полосы ширину, и в узкой карточке от неё
+ * оставался огрызок.
+ */
 @Composable
-private fun SavedBar(saved: Int, price: Int) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) { contentDescription = "Накоплено $saved из $price" },
+private fun SavedBar(saved: Int, price: Int, pending: Int = 0, previews: Boolean = false) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+        horizontalAlignment = Alignment.End,
+        modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) {
+            contentDescription = if (pending > 0) "Накоплено $saved из $price, положишь ещё $pending" else "Накоплено $saved из $price"
+        },
     ) {
-        Box(
-            Modifier
-                .weight(1f)
-                .height(14.dp)
-                .clip(RoundedCornerShape(7.dp))
-                .background(FinneyCream)
-                .border(2.dp, FinneyInk, RoundedCornerShape(7.dp)),
-        ) {
-            Box(
-                Modifier
-                    .fillMaxWidth((saved.toFloat() / price).coerceIn(0f, 1f))
-                    .height(14.dp)
-                    .clip(RoundedCornerShape(7.dp))
-                    .background(FinneyGreen),
-            )
+        FillBar(saved, price, Modifier.fillMaxWidth(), pending = pending, previews = previews)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            OutlinedText("$saved / $price", style = MaterialTheme.typography.titleMedium)
+            Coin(size = 20.dp)
         }
-        OutlinedText("$saved / $price", style = MaterialTheme.typography.titleMedium)
-        Coin(size = 20.dp)
+    }
+}
+
+/** Число крупно, под ним что оно значит. [coin] — число в монетах. */
+@Composable
+private fun StatTile(value: String, caption: String, modifier: Modifier = Modifier, coin: Boolean = false) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(18.dp))
+            .background(FinneySand)
+            .border(2.dp, FinneyInk, RoundedCornerShape(18.dp))
+            .semantics(mergeDescendants = true) {}
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            OutlinedText(value, style = MaterialTheme.typography.headlineMedium)
+            if (coin) Coin(size = 24.dp)
+        }
+        Text(caption, style = MaterialTheme.typography.bodyMedium, color = FinneyInk, textAlign = TextAlign.Center)
     }
 }
 

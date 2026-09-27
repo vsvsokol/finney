@@ -70,6 +70,9 @@ enum class FinneyIcons {
 
     /** Тетрадь — план расходов. */
     Plan,
+
+    /** Замок — нужное: из плана не убрать. */
+    Lock,
 }
 
 /**
@@ -98,6 +101,7 @@ fun FinneyIcon(
             FinneyIcons.Star -> drawStar(tint)
             FinneyIcons.Trophy -> drawTrophy(tint)
             FinneyIcons.Plan -> drawPlan(tint)
+            FinneyIcons.Lock -> drawLock(tint)
         }
     }
 }
@@ -385,6 +389,31 @@ private fun DrawScope.drawPlan(tint: Color) {
             StrokeCap.Round,
         )
     }
+}
+
+// Замок: дужка сверху и корпус с вырезанной скважиной. Скважина вырезается,
+// а не закрашивается — по той же причине, что прорезь копилки.
+private fun DrawScope.drawLock(tint: Color) {
+    val s = size.minDimension
+    drawArc(
+        color = tint,
+        startAngle = 180f,
+        sweepAngle = 180f,
+        useCenter = false,
+        topLeft = Offset(s * 0.28f, s * 0.10f),
+        size = Size(s * 0.44f, s * 0.44f),
+        style = Stroke(width = s * 0.12f),
+    )
+    drawRect(tint, Offset(s * 0.22f, s * 0.30f), Size(s * 0.12f, s * 0.14f))
+    drawRect(tint, Offset(s * 0.66f, s * 0.30f), Size(s * 0.12f, s * 0.14f))
+    val body = Path().apply {
+        addRoundRect(RoundRect(s * 0.14f, s * 0.42f, s * 0.86f, s * 0.92f, CornerRadius(s * 0.10f)))
+    }
+    val hole = Path().apply {
+        addOval(androidx.compose.ui.geometry.Rect(Offset(s * 0.50f, s * 0.60f), s * 0.07f))
+        addRect(androidx.compose.ui.geometry.Rect(s * 0.47f, s * 0.62f, s * 0.53f, s * 0.78f))
+    }
+    drawPath(Path().apply { op(body, hole, PathOperation.Difference) }, tint)
 }
 
 /** Скруглённый прямоугольник сплошной заливкой — самая частая фигура в значках. */

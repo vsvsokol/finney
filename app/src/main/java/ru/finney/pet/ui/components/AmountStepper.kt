@@ -1,14 +1,10 @@
 package ru.finney.pet.ui.components
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 
 /** Шаг сумм в плане и копилке. Совпадает с шагом родительского бонуса из economy.json. */
 const val AMOUNT_STEP = 5
@@ -19,6 +15,7 @@ const val AMOUNT_STEP = 5
  *
  * Одна и та же на экране плана и в копилке: ребёнок учится одному движению.
  * [canAdd] и [canRemove] гасят кнопки, когда шаг уже не поместится.
+ * Держать кнопку можно — см. [HoldStepper].
  */
 @Composable
 fun AmountStepper(
@@ -30,31 +27,17 @@ fun AmountStepper(
     canRemove: Boolean = value > 0,
     step: Int = AMOUNT_STEP,
 ) {
-    Row(
+    HoldStepper(
+        onMinus = { onChange((value - step).coerceAtLeast(0)) },
+        onPlus = { onChange(value + step) },
+        minusEnabled = canRemove,
+        plusEnabled = canAdd,
+        minusDescription = "$label: убавить",
+        plusDescription = "$label: добавить",
         modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        FinneyIconButton(
-            onClick = { onChange((value - step).coerceAtLeast(0)) },
-            contentDescription = "$label: убавить",
-            size = 56.dp,
-            enabled = canRemove,
-        ) {
-            OutlinedText("−", style = MaterialTheme.typography.headlineMedium)
-        }
-
+    ) { bump ->
         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-            CoinAmount(amount = value)
-        }
-
-        FinneyIconButton(
-            onClick = { onChange(value + step) },
-            contentDescription = "$label: добавить",
-            size = 56.dp,
-            enabled = canAdd,
-        ) {
-            OutlinedText("+", style = MaterialTheme.typography.headlineMedium)
+            CoinAmount(amount = value, modifier = bump)
         }
     }
 }

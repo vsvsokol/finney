@@ -16,19 +16,32 @@ import ru.finney.pet.domain.game.Session
 import ru.finney.pet.domain.model.Category
 import ru.finney.pet.domain.model.EntryType
 import ru.finney.pet.domain.model.GameContent
+import ru.finney.pet.domain.model.ItemArt
 import ru.finney.pet.domain.model.LedgerEntry
 import ru.finney.pet.domain.model.SavedGame
 import ru.finney.pet.domain.model.TaskOutcome
 import ru.finney.pet.domain.model.TaskTheme
+import ru.finney.pet.ui.tasks.games.taskIcon
 
-/** Строка истории: откуда деньги или куда ушли — словами, и сколько. */
-data class HistoryRow(val label: String, val balanceDelta: Int, val savingsDelta: Int)
+/**
+ * Строка истории: откуда деньги или куда ушли — словами, и сколько.
+ * [type] — вид операции для значка строки; [game] — картинка мини-игры у награды,
+ * [itemId] — купленный предмет: у строки видно, про что она, а не только слова.
+ */
+data class HistoryRow(
+    val label: String,
+    val balanceDelta: Int,
+    val savingsDelta: Int,
+    val type: EntryType = EntryType.INCOME,
+    val game: ItemArt? = null,
+    val itemId: String? = null,
+)
 
 /** Операции одного игрового периода; ребёнку он подписан уровнем, который тогда играли. */
 data class HistoryPeriod(val number: Int, val level: Int, val rows: List<HistoryRow>)
 
-/** Задание, которое пробовали: лучший исход и сколько было попыток. */
-data class TaskRow(val title: String, val theme: String, val passed: Boolean, val attempts: Int)
+/** Задание, которое пробовали: лучший исход и сколько было попыток. [icon] — картинка игры, как в её сцене. */
+data class TaskRow(val title: String, val theme: String, val passed: Boolean, val attempts: Int, val icon: ItemArt? = null)
 
 sealed interface ProgressUiState {
     data object Loading : ProgressUiState
@@ -36,6 +49,8 @@ sealed interface ProgressUiState {
     data class Ready(
         val petName: String,
         val level: Int,
+        /** Сколько всего уровней — для «3 из 6» и полосы рядом. */
+        val maxLevel: Int = 6,
         val stage: Int,
         val goal: GoalProgress?,
         val goalsCompleted: Int,
@@ -69,6 +84,7 @@ class ProgressViewModel(
         return ProgressUiState.Ready(
             petName = saved.profile.petName,
             level = game.level(state),
+            maxLevel = content.economy.maxLevel,
             stage = game.stage(state),
             goal = game.goalProgress(state),
             goalsCompleted = state.ledger.count { it.type == EntryType.GOAL_COMPLETE },
@@ -83,6 +99,7 @@ class ProgressViewModel(
                         theme = task.theme.label(),
                         passed = attempts.any { it.outcome == TaskOutcome.SUCCESS },
                         attempts = attempts.size,
+                        icon = taskIcon(task),
                     )
                 },
             history = state.ledger
@@ -95,7 +112,14 @@ class ProgressViewModel(
                         // Лента в порядке записи; новые сверху. По времени не сортируем:
                         // у операций одной команды оно совпадает.
                         rows = entries.asReversed().map {
-                            HistoryRow(content.entryLabel(it), it.balanceDelta, it.savingsDelta)
+                            HistoryRow(
+                                label = content.entryLabel(it),
+                                balanceDelta = it.balanceDelta,
+                                savingsDelta = it.savingsDelta,
+                                type = it.type,
+                                game = it.taskId?.let(content::task)?.let(::taskIcon),
+                                itemId = it.itemId,
+                            )
                         },
                     )
                 },

@@ -45,7 +45,7 @@ import ru.finney.pet.domain.model.Category
 import ru.finney.pet.domain.model.ItemArt
 import ru.finney.pet.domain.tasks.TaskInputError
 import ru.finney.pet.ui.components.FinneyIcon
-import ru.finney.pet.ui.components.FinneyIconButton
+import ru.finney.pet.ui.components.HoldStepper
 import ru.finney.pet.ui.components.FinneyIcons
 import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.components.fadingScroll
@@ -230,7 +230,7 @@ internal fun GameCard(
     )
 }
 
-/** Число с кнопками «−» и «+». Кнопки 56 dp — больше минимума ТЗ п. 3.6. */
+/** Число с кнопками «−» и «+» — тот же [HoldStepper], что в плане и копилке. */
 @Composable
 internal fun Stepper(
     value: String,
@@ -241,18 +241,16 @@ internal fun Stepper(
     what: String,
     modifier: Modifier = Modifier,
 ) {
-    Row(
+    HoldStepper(
+        onMinus = onMinus,
+        onPlus = onPlus,
+        minusEnabled = minusEnabled,
+        plusEnabled = plusEnabled,
+        minusDescription = "Меньше: $what",
+        plusDescription = "Больше: $what",
         modifier = modifier,
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        FinneyIconButton(onClick = onMinus, contentDescription = "Меньше: $what", size = 56.dp, enabled = minusEnabled) {
-            OutlinedText("−", style = MaterialTheme.typography.headlineMedium)
-        }
-        OutlinedText(value, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(horizontal = 4.dp))
-        FinneyIconButton(onClick = onPlus, contentDescription = "Больше: $what", size = 56.dp, enabled = plusEnabled) {
-            OutlinedText("+", style = MaterialTheme.typography.headlineMedium)
-        }
+    ) { bump ->
+        OutlinedText(value, style = MaterialTheme.typography.headlineMedium, modifier = bump.padding(horizontal = 4.dp))
     }
 }
 

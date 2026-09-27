@@ -15,7 +15,9 @@ import ru.finney.pet.domain.game.Session
 import ru.finney.pet.domain.model.PeriodFacts
 import ru.finney.pet.domain.model.Plan
 import ru.finney.pet.domain.model.GameContent
+import ru.finney.pet.domain.model.ItemArt
 import ru.finney.pet.domain.model.SavedGame
+import ru.finney.pet.ui.tasks.games.taskIcon
 
 sealed interface PeriodResultUiState {
     data object Loading : PeriodResultUiState
@@ -53,6 +55,10 @@ sealed interface PeriodResultUiState {
         val balance: Int,
         /** Название игры уровня; null — в этом периоде её не было. */
         val levelGame: String? = null,
+        /** Картинка игры уровня — та же, что в её сцене. */
+        val levelGameIcon: ItemArt? = null,
+        /** Картинки к [harderGames], по порядку. */
+        val harderGameIcons: List<ItemArt?> = emptyList(),
         /** Игра уровня пройдена. */
         val gamePassed: Boolean = true,
         /** Игра уровня обязательна; в демо-режиме — нет. */
@@ -90,6 +96,9 @@ class PeriodResultViewModel(
 
         val before = game.levelAfter(state, period.number - 1)
         val after = game.levelAfter(state, period.number)
+        // Одна строка на игру: у трёх вариантов «Кассы» название одно.
+        val harder = game.tasksUnlockedBetween(before, after).distinctBy { it.title }
+        val levelTask = period.levelTaskId?.let { content.task(it) }
         return PeriodResultUiState.Ready(
             periodNumber = period.number,
             playedLevel = before,
@@ -102,9 +111,11 @@ class PeriodResultViewModel(
             passed = game.isPassed(period) == true,
             level = after,
             leveledUp = after > before,
-            harderGames = game.tasksUnlockedBetween(before, after).map { it.title }.distinct(),
+            harderGames = harder.map { it.title },
             balance = state.balance,
-            levelGame = period.levelTaskId?.let { content.task(it)?.title },
+            levelGame = levelTask?.title,
+            levelGameIcon = levelTask?.let(::taskIcon),
+            harderGameIcons = harder.map(::taskIcon),
             gamePassed = result.gamePassed,
             gameRequired = game.levelCheck(state).gameRequired,
         )

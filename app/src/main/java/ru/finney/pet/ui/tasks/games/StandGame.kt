@@ -10,10 +10,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -49,6 +52,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import ru.finney.pet.domain.model.PetCharacter
+import ru.finney.pet.domain.model.StandIngredient
 import ru.finney.pet.domain.model.StandTask
 import ru.finney.pet.domain.tasks.TaskInput
 import ru.finney.pet.domain.tasks.TaskInputError
@@ -61,6 +65,7 @@ import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneyPeach
 import ru.finney.pet.ui.theme.FinneyPink
 import ru.finney.pet.ui.theme.FinneyYellow
+import ru.finney.pet.ui.theme.StrokeRegular
 import ru.finney.pet.ui.sound.LocalSounds
 import ru.finney.pet.ui.sound.Sfx
 
@@ -106,6 +111,24 @@ private fun Morning(
         SceneBody(bottom = { FinneyButton(text = "Открыть лавку", onClick = onOpen, enabled = count > 0) }) {
             ScenePanel(title = "Закупка", modifier = Modifier.fillMaxWidth()) {
                 Text(task.forecast, style = MaterialTheme.typography.titleMedium, color = FinneyInk)
+                // Сначала рецепт — сколько стаканов из одного лимона и почём лимон, —
+                // потом выбор. Плейтест: объяснение «лимоны → стаканы» стояло под кнопками,
+                // и выбирали раньше, чем его видели.
+                Equation(
+                    "Из одной штуки: ${i.label.lowercase()} — ${cupCount(i.yields)}. Штука стоит ${i.price}",
+                    Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(FinneyYellow)
+                        .border(StrokeRegular, FinneyInk, RoundedCornerShape(12.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                ) {
+                    ItemPicture(i, i.label, 32.dp)
+                    EqText("→")
+                    repeat(i.yields) { CupIcon(24.dp, full = true) }
+                    Spacer(Modifier.weight(1f))
+                    EqText("= ${i.price}")
+                    Coin(size = 22.dp)
+                }
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -127,28 +150,16 @@ private fun Morning(
                         what = i.label,
                     )
                 }
-                // Три строки картинками вместо слов: сколько стаканов выходит, сколько
-                // стоит закупка и почём стакан. Словами — только для TalkBack.
-                Equation("1 ${i.label.lowercase()} — ${cupCount(i.yields)}, закуплено на ${cupCount(count * i.yields)}") {
+                // Что куплено — картинками: у каждого лимона его стаканы. Итог «= 8»
+                // числом не пишем: сколько выйдет на всех гостей, ребёнок считает сам —
+                // иначе он жал «+», пока два числа не совпадут, и не думал.
+                Stock(i, count)
+                Equation("Закупка: ${i.label.lowercase()} × $count, всего ${count * i.price}") {
                     ItemPicture(i, i.label, 28.dp)
-                    EqText("= ${i.yields}")
-                    CupIcon(24.dp)
-                    Spacer(Modifier.weight(1f))
-                    EqText("× $count = ${count * i.yields}")
-                    CupIcon(24.dp)
-                }
-                Equation("${i.label} стоит ${i.price}, всего ${count * i.price}") {
-                    ItemPicture(i, i.label, 28.dp)
-                    EqText("= ${i.price}")
-                    Coin(size = 22.dp)
-                    Spacer(Modifier.weight(1f))
                     EqText("× $count = ${count * i.price}")
                     Coin(size = 22.dp)
                 }
-                Equation(
-                    "стакан продаём за ${task.cupPrice}",
-                    Modifier.clip(RoundedCornerShape(8.dp)).background(FinneyYellow).padding(horizontal = 6.dp),
-                ) {
+                Equation("стакан продаём за ${task.cupPrice}") {
                     CupIcon(24.dp, full = true)
                     EqText("→ ${task.cupPrice}")
                     Coin(size = 22.dp)
@@ -156,7 +167,7 @@ private fun Morning(
                 if (inputError != null) Note(inputErrorText(inputError), color = FinneyPeach)
             }
             Spacer(Modifier.weight(1f))
-            PetSays(character, "Сколько взять, чтобы хватило всем гостям?", petSize = 130.dp)
+            PetSays(character, "Сколько взять, чтобы хватило всем гостям?", petSize = 120.dp)
         }
     }
 }
@@ -306,6 +317,34 @@ private fun PourButton(onPour: () -> Unit) {
             .clickable(role = Role.Button, onClickLabel = "Налить лимонад", onClick = onPour),
         contentAlignment = Alignment.Center,
     ) { CupIcon(44.dp, full = true) }
+}
+
+/**
+ * Закупка картинками: каждая купленная штука и стаканы, которые из неё выйдут.
+ * Сколько всего стаканов — пересчитать глазами, а не прочитать готовое число.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun Stock(ingredient: StandIngredient, count: Int) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = 44.dp)
+            .clearAndSetSemantics {
+                contentDescription = "Куплено: ${ingredient.label.lowercase()} × $count, это ${cupCount(count * ingredient.yields)}"
+            },
+    ) {
+        repeat(count) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                ItemPicture(ingredient, ingredient.label, 26.dp)
+                Row(horizontalArrangement = Arrangement.spacedBy(1.dp)) {
+                    repeat(ingredient.yields) { CupIcon(14.dp, full = true) }
+                }
+            }
+        }
+    }
 }
 
 /** Строка-пример из картинок; [description] — то же словами для TalkBack. */
