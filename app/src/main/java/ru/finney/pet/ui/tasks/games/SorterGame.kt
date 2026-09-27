@@ -1,9 +1,14 @@
 package ru.finney.pet.ui.tasks.games
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VectorConverter
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -20,6 +25,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -43,6 +49,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -137,7 +144,8 @@ internal fun SorterGame(
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 val wrong = mistake
                 if (wrong == null) {
-                    if (item != null) PetSays(character, "«${item.label}» — это что?", petSize = 140.dp)
+                    // Вопрос «"Яблоко" — это что?» убран: вещь на ленте и две корзины понятны без слов.
+                    if (item != null) ScenePet(character, 140.dp, Modifier.width(140.dp))
                 } else {
                     MistakePanel(wrong, onMove = ::moveOver)
                 }
@@ -162,11 +170,18 @@ internal fun SorterGame(
     }
 }
 
-/** Полоски прогресса: зелёная — верно с первого раза, персиковая — с подсказкой. И то же числом. */
+/**
+ * Полоски прогресса: зелёная — верно с первого раза, персиковая и перечёркнутая —
+ * с подсказкой. Штрих — чтобы ошибку было видно не только цветом (ТЗ п. 3.6).
+ * Строка «3 из 8 · верно 2» убрана: полоски говорят то же; число — для TalkBack.
+ */
 @Composable
 private fun Progress(items: List<SortItem>, done: Int, answers: Map<String, Category>) {
     val right = items.take(done).count { answers[it.id] == it.category }
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = "$done из ${items.size}, верно $right" },
+    ) {
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
             items.forEachIndexed { i, it ->
                 val color = when {
@@ -174,25 +189,20 @@ private fun Progress(items: List<SortItem>, done: Int, answers: Map<String, Cate
                     answers[it.id] == it.category -> FinneyGreen
                     else -> FinneyPeach
                 }
+                val wrong = i < done && answers[it.id] != it.category
                 Box(
                     Modifier
                         .weight(1f)
                         .height(14.dp)
                         .clip(RoundedCornerShape(7.dp))
                         .background(color)
+                        .drawBehind {
+                            if (wrong) drawLine(FinneyInk, Offset(0f, size.height), Offset(size.width, 0f), strokeWidth = 2.dp.toPx())
+                        }
                         .border(2.dp, FinneyInk, RoundedCornerShape(7.dp)),
                 )
             }
         }
-        Text(
-            "$done из ${items.size} · верно $right",
-            style = MaterialTheme.typography.labelLarge,
-            color = FinneyInk,
-            modifier = Modifier
-                .clip(RoundedCornerShape(10.dp))
-                .background(FinneyCream)
-                .padding(horizontal = 8.dp),
-        )
     }
 }
 
@@ -243,7 +253,8 @@ private fun Belt(
             }
             upcoming.forEach { ItemPicture(it, it.label, 52.dp) }
         }
-        if (showHint) GestureHint("смахни вниз ↓", Modifier.align(Alignment.BottomStart).offset(x = SceneEdge + 4.dp, y = 22.dp))
+        // Подсказка жестом, а не словами: прыгающая стрелка вниз, к корзинам.
+        if (showHint) BouncingArrow(Modifier.align(Alignment.BottomStart).offset(x = SceneEdge + 20.dp, y = 30.dp))
     }
 }
 

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -41,14 +42,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import ru.finney.pet.domain.model.PetCharacter
 import ru.finney.pet.domain.model.StandTask
 import ru.finney.pet.domain.tasks.TaskInput
 import ru.finney.pet.domain.tasks.TaskInputError
+import ru.finney.pet.ui.components.Coin
 import ru.finney.pet.ui.components.FinneyButton
 import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.theme.FinneyCream
@@ -112,8 +116,8 @@ private fun Morning(
                         .border(3.dp, FinneyInk, RoundedCornerShape(14.dp))
                         .padding(8.dp),
                 ) {
-                    ItemPicture(i, i.label, 36.dp)
-                    Text(i.label, style = MaterialTheme.typography.titleMedium, color = FinneyInk, modifier = Modifier.weight(1f))
+                    ItemPicture(i, i.label, 44.dp)
+                    Spacer(Modifier.weight(1f))
                     Stepper(
                         value = count.toString(),
                         onMinus = { onChange(count - 1) },
@@ -123,11 +127,32 @@ private fun Morning(
                         what = i.label,
                     )
                 }
-                SumRow("1 ${i.label.lowercase()} = ${cupCount(i.yields)}", cupCount(count * i.yields))
-                SumRow("${i.label} стоит ${i.price}", "${i.price} × $count = ${count * i.price}")
-                Row(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(FinneyYellow).padding(horizontal = 6.dp),
-                ) { SumRow("стакан продаём за", task.cupPrice.toString()) }
+                // Три строки картинками вместо слов: сколько стаканов выходит, сколько
+                // стоит закупка и почём стакан. Словами — только для TalkBack.
+                Equation("1 ${i.label.lowercase()} — ${cupCount(i.yields)}, закуплено на ${cupCount(count * i.yields)}") {
+                    ItemPicture(i, i.label, 28.dp)
+                    EqText("= ${i.yields}")
+                    CupIcon(24.dp)
+                    Spacer(Modifier.weight(1f))
+                    EqText("× $count = ${count * i.yields}")
+                    CupIcon(24.dp)
+                }
+                Equation("${i.label} стоит ${i.price}, всего ${count * i.price}") {
+                    ItemPicture(i, i.label, 28.dp)
+                    EqText("= ${i.price}")
+                    Coin(size = 22.dp)
+                    Spacer(Modifier.weight(1f))
+                    EqText("× $count = ${count * i.price}")
+                    Coin(size = 22.dp)
+                }
+                Equation(
+                    "стакан продаём за ${task.cupPrice}",
+                    Modifier.clip(RoundedCornerShape(8.dp)).background(FinneyYellow).padding(horizontal = 6.dp),
+                ) {
+                    CupIcon(24.dp, full = true)
+                    EqText("→ ${task.cupPrice}")
+                    Coin(size = 22.dp)
+                }
                 if (inputError != null) Note(inputErrorText(inputError), color = FinneyPeach)
             }
             Spacer(Modifier.weight(1f))
@@ -161,10 +186,16 @@ private fun Day(task: StandTask, character: PetCharacter, count: Int, money: Int
             }
 
             Row(verticalAlignment = Alignment.Bottom) {
-                Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy((-18).dp)) {
+                // Сколько гостей ждёт — числом над очередью, а не строкой «Гостей ждёт: 8».
+                Box(Modifier.weight(1f).semantics(mergeDescendants = true) { contentDescription = "Гостей ждёт: $waiting" }) {
+                    if (waiting > 0) {
+                        OutlinedText("$waiting", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.align(Alignment.TopStart))
+                    }
+                Row(Modifier.padding(top = 28.dp), horizontalArrangement = Arrangement.spacedBy((-18).dp)) {
                     // Больше четырёх гостей не рисуем — очередь видна и числом.
                     val others = PetCharacter.entries.filter { it != character }
                     repeat(minOf(waiting, 4)) { n -> Guest(others[n % others.size], 72.dp, Modifier.width(72.dp)) }
+                }
                 }
                 if (done) {
                     FinneyButton(text = "Закрыть лавку", onClick = onDone, fillWidth = false)
@@ -175,7 +206,6 @@ private fun Day(task: StandTask, character: PetCharacter, count: Int, money: Int
                     }
                 }
             }
-            Text("Гостей ждёт: $waiting", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
         }
     }
 }
@@ -264,7 +294,7 @@ private fun PourPop(served: Int, cupPrice: Int, modifier: Modifier) {
     }
 }
 
-/** Большая круглая кнопка «Налить» — одно нажатие, один стакан. */
+/** Большая круглая кнопка со стаканом — одно нажатие, один стакан. Слово «Налить» — для TalkBack. */
 @Composable
 private fun PourButton(onPour: () -> Unit) {
     Box(
@@ -275,5 +305,34 @@ private fun PourButton(onPour: () -> Unit) {
             .border(4.dp, FinneyInk, CircleShape)
             .clickable(role = Role.Button, onClickLabel = "Налить лимонад", onClick = onPour),
         contentAlignment = Alignment.Center,
-    ) { OutlinedText("Налить", style = MaterialTheme.typography.titleLarge, fill = FinneyInk, outline = FinneyCream) }
+    ) { CupIcon(44.dp, full = true) }
+}
+
+/** Строка-пример из картинок; [description] — то же словами для TalkBack. */
+@Composable
+private fun Equation(description: String, modifier: Modifier = Modifier, content: @Composable RowScope.() -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = modifier.fillMaxWidth().clearAndSetSemantics { contentDescription = description },
+        content = content,
+    )
+}
+
+@Composable
+private fun EqText(text: String) {
+    Text(text, style = MaterialTheme.typography.titleMedium, color = FinneyInk)
+}
+
+/** Стакан, как в полосе стаканов дня: [full] — с лимонадом. */
+@Composable
+private fun CupIcon(size: Dp, full: Boolean = false) {
+    Canvas(Modifier.width(size * 20f / 26f).height(size)) {
+        val cup = Path().apply {
+            moveTo(0f, 0f); lineTo(this@Canvas.size.width, 0f); lineTo(this@Canvas.size.width * 0.85f, this@Canvas.size.height)
+            lineTo(this@Canvas.size.width * 0.15f, this@Canvas.size.height); close()
+        }
+        drawPath(cup, if (full) Color(0xFFF9E27A) else Color.White)
+        drawPath(cup, FinneyInk, style = Stroke(2.5.dp.toPx()))
+    }
 }
