@@ -23,11 +23,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import ru.finney.pet.domain.model.BasketTask
 import ru.finney.pet.domain.model.ChangeTask
+import ru.finney.pet.domain.model.ChoresTask
 import ru.finney.pet.domain.model.DistributorTask
 import ru.finney.pet.domain.model.GoalRaceTask
 import ru.finney.pet.domain.model.GoalSliderTask
 import ru.finney.pet.domain.model.ItemArt
 import ru.finney.pet.domain.model.PetCharacter
+import ru.finney.pet.domain.model.ReceiptTask
 import ru.finney.pet.domain.model.ReserveTask
 import ru.finney.pet.domain.model.SorterTask
 import ru.finney.pet.domain.model.StandTask
@@ -70,6 +72,8 @@ fun TaskGame(
         // Учебные движки без своей сцены: в контенте их сейчас нет, экран — запасной.
         is DistributorTask -> EnvelopesGame(task, inputError, onInputSeen, onSubmit)
         is GoalSliderTask -> DepositGame(task, onSubmit)
+        // Сцены чека и подработки ждут стиля «меньше слов» из fix/ui-common; в tasks.json их пока нет.
+        is ReceiptTask, is ChoresTask -> Unit
     }
 }
 
@@ -80,8 +84,8 @@ fun backdropFor(task: TaskDefinition, finished: Boolean = false): Backdrop = whe
     is GoalRaceTask -> Backdrop.FIELD
     is ReserveTask -> if (finished) Backdrop.ROOM_RAIN else Backdrop.ROOM
     is StandTask -> if (finished) Backdrop.SUNSET else Backdrop.SKY
-    is ChangeTask -> Backdrop.STORE
-    is DistributorTask, is GoalSliderTask -> Backdrop.ROOM
+    is ChangeTask, is ReceiptTask -> Backdrop.STORE
+    is ChoresTask, is DistributorTask, is GoalSliderTask -> Backdrop.ROOM
 }
 
 /** Значок задания в списке — берётся из самого контента, отдельной картинки не нужно. */
@@ -92,6 +96,8 @@ fun taskIcon(task: TaskDefinition): ItemArt? = when (task) {
     is ReserveTask -> task.surprise
     is StandTask -> task.ingredient
     is ChangeTask -> task.rounds.firstOrNull()
+    is ReceiptTask -> task.cart.firstOrNull()
+    is ChoresTask -> task.goal
     is DistributorTask, is GoalSliderTask -> null
 }
 
@@ -180,6 +186,28 @@ fun ColumnScope.ResultBody(task: TaskDefinition, details: TaskDetails, input: Ta
                 )
             }
             Summary("Верно с первого раза: ${details.correct} из ${details.total}")
+        }
+
+        is TaskDetails.Receipt -> {
+            if (details.found > 0) ResultRow(null, "Нашли ошибок: ${details.found}", ok = true)
+            if (details.missed > 0) ResultRow(null, "Не заметили: ${details.missed}", ok = false)
+            if (details.extra > 0) ResultRow(null, "Верное приняли за ошибку: ${details.extra}", ok = false)
+            Summary(if (details.lost > 0) "Вернули ${details.refund}, могли ещё ${details.lost}" else "Вернули ${details.refund}")
+        }
+
+        is TaskDetails.Chores -> {
+            val chores = task as? ChoresTask
+            chores?.let {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    ItemPicture(it.goal, it.goal.label, 64.dp)
+                    Column(Modifier.weight(1f)) {
+                        SumRow("Заработал", "${details.earned} из ${it.goal.price}", strong = true)
+                        Meter(details.earned.toFloat() / it.goal.price, Modifier.height(14.dp))
+                    }
+                }
+                ResultRow(null, "Дней отдыха: ${details.restDays} из ${it.minRestDays}", ok = details.restDays >= it.minRestDays)
+            }
+            if (details.shortfall > 0) Summary("Не хватило ${details.shortfall}")
         }
 
         is TaskDetails.Distribution -> details.goalSavedAfter?.let { Summary("В копилке станет $it, осталось ${details.goalRemaining}") }

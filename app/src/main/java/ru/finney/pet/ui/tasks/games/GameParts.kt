@@ -291,5 +291,7 @@ internal fun inputErrorText(error: TaskInputError): String = when (error) {
     is TaskInputError.SurpriseNotCovered -> "Пока не хватает ${error.shortage}. Перенеси ещё что-нибудь."
     is TaskInputError.NeedsLocked, is TaskInputError.NeedsNotPlanned -> "Нужное переносить нельзя — без него питомцу будет плохо."
     is TaskInputError.CoinsNotInWallet -> "В кошельке нет таких монет."
+    is TaskInputError.DayOverloaded -> "В этот день столько не успеть."
+    is TaskInputError.ChoreTooOften -> "Это дело дают только ${error.max} раза в неделю."
     else -> "Так не получится. Попробуй по-другому."
 }

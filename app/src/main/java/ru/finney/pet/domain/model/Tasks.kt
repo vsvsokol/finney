@@ -376,3 +376,79 @@ data class ChangeRound(
     /** Сколько монет нужно положить на кассу. */
     val target: Int get() = if (mode == ChangeMode.GIVE) (paid ?: 0) - price else price
 }
+
+/**
+ * «Проверь чек»: сверить чек с пакетом и сдачу, найти ошибки кассира.
+ * [paid] — сколько Финни дал на кассе, [change] — сколько сдачи вернул кассир.
+ */
+@Serializable
+@SerialName("receipt")
+data class ReceiptTask(
+    override val id: String,
+    override val theme: TaskTheme,
+    override val title: String,
+    override val intro: String,
+    override val explainOk: String,
+    override val explainFail: String,
+    override val reward: TaskReward? = null,
+    override val unlockPeriod: Int = 1,
+    override val unlockLevel: Int = 1,
+    override val series: String? = null,
+    /** Что на самом деле в пакете. Цена — как на ценнике в магазине. */
+    val cart: List<ReceiptItem>,
+    /** Что пробито в чеке, по строке на штуку. */
+    val lines: List<ReceiptLine>,
+    val paid: Int,
+    val change: Int,
+) : TaskDefinition()
+
+/** Товар в пакете: [qty] штук по [price] за штуку. */
+@Serializable
+data class ReceiptItem(
+    val id: String,
+    val label: String,
+    val price: Int,
+    val qty: Int = 1,
+    override val art: String? = null,
+    override val emoji: String? = null,
+) : ItemArt
+
+/** Строка чека: одна штука товара [item] по цене [price]. */
+@Serializable
+data class ReceiptLine(val id: String, val item: String, val price: Int)
+
+/**
+ * «Подработка»: разложить дела по неделе, набрать на цель и оставить дни отдыха.
+ * В каждом из [days] дней — [hoursPerDay] часиков; пустых дней нужно не меньше [minRestDays].
+ */
+@Serializable
+@SerialName("chores")
+data class ChoresTask(
+    override val id: String,
+    override val theme: TaskTheme,
+    override val title: String,
+    override val intro: String,
+    override val explainOk: String,
+    override val explainFail: String,
+    override val reward: TaskReward? = null,
+    override val unlockPeriod: Int = 1,
+    override val unlockLevel: Int = 1,
+    override val series: String? = null,
+    val goal: RaceGoal,
+    val days: Int,
+    val hoursPerDay: Int,
+    val minRestDays: Int = 1,
+    val chores: List<Chore>,
+) : TaskDefinition()
+
+/** Дело: занимает [hours] часиков, приносит [reward]. [maxTimes] — сколько раз за неделю его дают. */
+@Serializable
+data class Chore(
+    val id: String,
+    val label: String,
+    val hours: Int,
+    val reward: Int,
+    val maxTimes: Int? = null,
+    override val art: String? = null,
+    override val emoji: String? = null,
+) : ItemArt
