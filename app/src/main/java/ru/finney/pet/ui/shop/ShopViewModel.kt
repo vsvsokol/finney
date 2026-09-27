@@ -38,6 +38,8 @@ sealed interface ShopUiState {
         val canBuy: Boolean,
         val needs: List<PurchasePreview>,
         val wants: List<PurchasePreview>,
+        /** Игрушки — тоже «хочется», но покупаются один раз и остаются в зале. */
+        val toys: List<PurchasePreview>,
         val selectedId: String?,
         /** Сколько по плану осталось на нужное и на желаемое. null — плана ещё нет. */
         val needsLeft: Int?,
@@ -103,7 +105,8 @@ class ShopViewModel(
             Category.WANTS -> "Это «хочется»: радует, но можно и без него."
         } + if (overPlan) " Это уже сверх плана." else ""
         val next = when {
-            item.kind == ItemKind.ACCESSORY -> "Уже надето! Переодеть — в гардеробе в зале."
+            item.kind == ItemKind.ACCESSORY -> "Уже надето! Переодеть — в гардеробе в меню."
+            item.kind == ItemKind.TOY -> "Игрушка уже в зале: возьми её пальцем и потряси рядом с питомцем."
             overPlan -> "В следующий раз заложи больше или купи меньше."
             item.category == Category.WANTS -> "Хватит ли на нужное?"
             else -> "Что ещё нужно питомцу?"
@@ -119,14 +122,15 @@ class ShopViewModel(
     private fun toUiState(saved: SavedGame, selection: ShopSelection): ShopUiState.Ready {
         val state = saved.state
         val report = game.planReport(state)
-        fun previews(category: Category) = content.forSale
-            .filter { it.category == category && it.isOnSale(state) }
+        fun previews(fits: (ShopItem) -> Boolean) = content.forSale
+            .filter { fits(it) && it.isOnSale(state) }
             .mapNotNull { game.previewPurchase(state, it.id) }
         return ShopUiState.Ready(
             balance = state.balance,
             canBuy = state.currentPeriod.phase == PeriodPhase.ACTIVE,
-            needs = previews(Category.NEEDS),
-            wants = previews(Category.WANTS),
+            needs = previews { it.category == Category.NEEDS },
+            wants = previews { it.category == Category.WANTS && it.kind != ItemKind.TOY },
+            toys = previews { it.kind == ItemKind.TOY },
             selectedId = selection.selectedId,
             needsLeft = report?.let { (it.plan.needs - it.facts.needs).coerceAtLeast(0) },
             wantsLeft = report?.let { (it.plan.wants - it.facts.wants).coerceAtLeast(0) },
@@ -135,9 +139,9 @@ class ShopViewModel(
         )
     }
 
-    /** Аксессуар покупается один раз: купленный из магазина уходит. */
+    /** Аксессуар и игрушка покупаются один раз: купленные из магазина уходят. */
     private fun ShopItem.isOnSale(state: GameState): Boolean =
-        kind != ItemKind.ACCESSORY || !state.owns(id)
+        kind == ItemKind.CONSUMABLE || !state.owns(id)
 
     companion object {
         val Factory = viewModelFactory {

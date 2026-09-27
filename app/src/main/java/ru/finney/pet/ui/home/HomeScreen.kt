@@ -87,6 +87,11 @@ import androidx.compose.animation.core.animateFloatAsState
 import ru.finney.pet.ui.components.OutlinedText
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.platform.LocalDensity
+import kotlin.random.Random
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
@@ -193,6 +198,7 @@ fun HomeScreen(
             onBuy = viewModel::buy,
             onSleep = viewModel::sleep,
             onWake = viewModel::wake,
+            onPlay = viewModel::play,
         )
     }
 
@@ -222,6 +228,24 @@ fun HomeScreen(
 
 private const val PurchaseFeedbackMillis = 5_000L
 
+/** Сколько пути пальца с игрушкой рядом с питомцем — одно потряхивание. */
+private val ShakeTravel = 40.dp
+
+/** Раз в сколько потряхивания уходят в игру, пока игрушку не отпустили. */
+private const val PlayFlushMillis = 800L
+
+/** Не чаще раза в столько питомец смеётся вслух и подпрыгивает от игры. */
+private const val HappySoundGapMillis = 1_500L
+
+/** Паузы между вздохами грустного питомца. */
+private val SighPauseMs = 4_000L..8_000L
+
+/** Шкала настроения при нехватке радости покачивается с такой паузой. */
+private const val BarWobblePauseMillis = 3_000L
+
+/** Подсказка к шкале настроения закрывается сама через столько. */
+private const val MoodHintMillis = 5_000L
+
 /** Настроения, на которые питомец вздыхает. */
 private val SadEmotions = setOf(Emotion.HUNGRY, Emotion.DIRTY, Emotion.TIRED, Emotion.SAD)
 
@@ -232,11 +256,15 @@ private const val NightDim = 0.45f
  * Почему питомцу так — ТЗ п. 2.5.10: краткое объяснение причины эмоции и что сделать.
  * Спокойное состояние не комментируем: всё в порядке, лишний текст ни к чему.
  */
-private fun emotionReason(name: String, emotion: Emotion): String? = when (emotion) {
+private fun emotionReason(name: String, emotion: Emotion, hasToys: Boolean): String? = when (emotion) {
     Emotion.HUNGRY -> "$name голоден: сытость низкая. Покорми на кухне"
     Emotion.DIRTY -> "$name испачкался. Помой в ванной"
     Emotion.TIRED -> "$name устал и хочет спать. Уложи его в капсулу в зале"
-    Emotion.SAD -> "$name грустит: мало радости. Загляни в магазин за «хочется»"
+    Emotion.SAD -> if (hasToys) {
+        "$name грустит: мало радости. Поиграй с ним игрушкой — возьми её с пола"
+    } else {
+        "$name грустит: мало радости. Загляни в магазин за «хочется»"
+    }
     Emotion.HAPPY -> "$name доволен: о нём хорошо заботятся"
     Emotion.CALM -> null
 }
@@ -257,6 +285,7 @@ private fun HomeContent(
     onBuy: (itemId: String) -> Unit,
     onSleep: () -> Unit = {},
     onWake: () -> Unit = {},
+    onPlay: (toyId: String, shakes: Int) -> Unit = { _, _ -> },
 ) {
     // Питомец спит — это ночь: он в капсуле, свет выключен, можно только ждать
     // или разбудить. Глаза закрываются, когда он уже внутри, и открываются,
@@ -347,6 +376,80 @@ private fun HomeContent(
     // Где питомец на экране — игры целятся в него и в его рот.
     var petBounds by remember { mutableStateOf(Rect.Zero) }
 
+    // Игра с игрушкой: ребёнок водит игрушкой рядом с питомцем. Каждые ShakeTravel
+    // пути пальца рядом с ним — одно потряхивание. Потряхивания копятся и уходят
+    // в игру пачкой раз в PlayFlushMillis и когда игрушку отпустили.
+    val hearts = rememberHeartBurst()
+    val shakeTravelPx = with(LocalDensity.current) { ShakeTravel.toPx() }
+    var travel by remember { mutableFloatStateOf(0f) }
+    var pendingShakes by remember { mutableIntStateOf(0) }
+    var heldToy by remember { mutableStateOf<String?>(null) }
+    var lastHappySound by remember { mutableLongStateOf(0L) }
+    val currentState by rememberUpdatedState(state)
+    fun flushPlay() {
+        val toy = heldToy ?: return
+        if (pendingShakes > 0) onPlay(toy, pendingShakes)
+        pendingShakes = 0
+    }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(PlayFlushMillis)
+            flushPlay()
+        }
+    }
+    fun onToyDrag(toyId: String, centre: Offset, delta: Offset) {
+        heldToy = toyId
+        val pet = petBounds
+        if (pet == Rect.Zero) return
+        // Тянется к игрушке, где бы она ни была: следит за ней.
+        animation.lookAt((centre.x - pet.center.x) / pet.width)
+        if (!pet.inflate(pet.width * 0.1f).contains(centre)) return
+        travel += delta.getDistance()
+        while (travel >= shakeTravelPx) {
+            travel -= shakeTravelPx
+            val s = currentState
+            val gain = pendingShakes * s.moodPerShake
+            val joyful = s.playLeft - gain > 0 && s.stats.mood + gain < 100
+            pendingShakes++
+            hearts.emit(Offset(pet.center.x, pet.top + pet.height * 0.2f), filled = joyful)
+            if (joyful) {
+                animation.playGiggle()
+                val now = System.currentTimeMillis()
+                if (now - lastHappySound > HappySoundGapMillis) {
+                    lastHappySound = now
+                    sounds.play(Sfx.PetHappy)
+                    animation.playJoy()
+                }
+            }
+        }
+    }
+    fun onToyDrop(toyId: String) {
+        heldToy = toyId
+        flushPlay()
+        heldToy = null
+        travel = 0f
+        animation.lookAt(0f)
+    }
+
+    // Мало радости — питомец время от времени вздыхает и оседает: грусть видна
+    // и без слов. Шкала при этом покачивается, зовёт на неё нажать.
+    LaunchedEffect(state.moodLow, sleeping) {
+        if (!state.moodLow || sleeping) return@LaunchedEffect
+        while (true) {
+            delay(Random.nextLong(SighPauseMs.first, SighPauseMs.last))
+            animation.playSigh()
+        }
+    }
+
+    // Подсказка к шкале настроения: что её поднимает. Открывается нажатием на шкалу.
+    var moodHint by remember { mutableStateOf(false) }
+    LaunchedEffect(moodHint) {
+        if (moodHint) {
+            delay(MoodHintMillis)
+            moodHint = false
+        }
+    }
+
     // Во время игры плашки и кнопки комнат гаснут: на их месте подсказка и
     // «Не сейчас». Гаснут, а не убираются — иначе шкала настроения, которая
     // тянется по свободной высоте, прыгала бы. Деньги остаются: ребёнок видит,
@@ -383,9 +486,13 @@ private fun HomeContent(
                 }
             },
             asleep = sleeping,
-            // Сам гуляет по залу, пока с ним ничего не делают.
-            wander = playing == null && care == null,
+            // Сам гуляет по залу, пока с ним ничего не делают — и не играют игрушкой.
+            wander = playing == null && care == null && heldToy == null,
             onHop = animation::playJoy,
+            toys = state.toys,
+            toysEnabled = !sleeping && playing == null && care == null,
+            onToyDrag = ::onToyDrag,
+            onToyDrop = ::onToyDrop,
         ) {
             // Нажатие — питомец подпрыгивает: это игра, а не меню.
             //
@@ -540,7 +647,7 @@ private fun HomeContent(
             }
         }
 
-        emotionReason(state.petName, state.emotion)?.takeIf { !sleeping }?.let { reason ->
+        emotionReason(state.petName, state.emotion, hasToys = state.toys.isNotEmpty())?.takeIf { !sleeping }?.let { reason ->
             Text(
                 text = reason,
                 style = MaterialTheme.typography.bodyMedium,
@@ -576,13 +683,44 @@ private fun HomeContent(
             contentAlignment = Alignment.TopStart,
         ) {
             val barWidth = 36.dp
+            val barHeight = maxHeight * 0.55f - barWidth
+            // Мало радости — шкала покачивается: на неё стоит нажать.
+            val wobble = remember { Animatable(0f) }
+            LaunchedEffect(state.moodLow, sleeping) {
+                if (!state.moodLow || sleeping) {
+                    wobble.snapTo(0f)
+                    return@LaunchedEffect
+                }
+                while (true) {
+                    delay(BarWobblePauseMillis)
+                    for (target in floatArrayOf(1f, -1f, 0.6f, -0.4f, 0f)) wobble.animateTo(target, tween(90))
+                }
+            }
             HappinessBar(
                 value = state.stats.mood,
                 // Кружок-лицо выступает под капсулой на ширину шкалы — вычитаем.
-                height = maxHeight * 0.55f - barWidth,
+                height = barHeight,
                 width = barWidth,
-                modifier = Modifier.offset(x = -HappinessEdgeShift),
+                modifier = Modifier
+                    .offset(x = -HappinessEdgeShift)
+                    .graphicsLayer {
+                        rotationZ = wobble.value * 4f
+                        alpha = if (sleeping) NightDim else hudAlpha
+                    }
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClickLabel = "Что поднимает настроение",
+                        onClick = { if (!sleeping) moodHint = !moodHint },
+                    ),
             )
+            if (moodHint) {
+                MoodHint(
+                    modifier = Modifier
+                        .offset(x = barWidth + 4.dp, y = barHeight * 0.55f)
+                        .clickable(onClickLabel = "Скрыть") { moodHint = false },
+                )
+            }
 
             // Конец уровня — главный шаг игрового цикла: без него не растёт
             // уровень и не приходит новый доход. Кнопка, а не автозакрытие:
@@ -653,6 +791,8 @@ private fun HomeContent(
         }
 
         }
+
+        HeartBurstLayer(hearts)
 
         // Панель ухода поверх всего: пока выбирают, комната остаётся видна,
         // и понятно, к чему относится выбор.
@@ -871,11 +1011,15 @@ private fun LevelPanel(
             FinneyButton(text = "Составить план", onClick = onOpenBudget)
         } else {
             if (levelGame != null && check.levelTaskId != null) {
-                Text("Обязательно пройди игру уровня:", style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
+                Text(
+                    if (check.gameRequired) "Обязательно пройди игру уровня:" else "Игра уровня — по желанию (демо):",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = FinneyInk,
+                )
                 CheckRow("«$levelGame»", check.gamePassed)
             }
             Text(
-                if (check.levelTaskId != null) {
+                if (check.levelTaskId != null && check.gameRequired) {
                     "И выполни ${check.toPass} из $LEVEL_CONDITIONS:"
                 } else {
                     "Чтобы пройти уровень, выполни ${check.toPass} из $LEVEL_CONDITIONS:"

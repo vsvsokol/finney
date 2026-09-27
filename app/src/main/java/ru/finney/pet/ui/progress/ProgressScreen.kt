@@ -25,7 +25,15 @@ import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.theme.FinneyGreen
 import ru.finney.pet.ui.theme.FinneyInk
 
-private val StageNames = mapOf(1 to "малыш", 2 to "подросток", 3 to "взрослый")
+/** Стадия роста = уровень: у каждого из шести уровней своё имя. */
+private val StageNames = mapOf(
+    1 to "малыш",
+    2 to "карапуз",
+    3 to "непоседа",
+    4 to "школьник",
+    5 to "подросток",
+    6 to "взрослый",
+)
 
 @Composable
 fun ProgressScreen(

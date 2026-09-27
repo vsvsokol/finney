@@ -54,6 +54,13 @@ class GameStore(
     }
 
     /**
+     * Демо-режим для проверки экспертами: короткий сон и напоминания, облегчённый переход
+     * уровня, все игры открыты. Хранится в профиле, как и при создании тестового профиля;
+     * уже пройденные уровни при выключении не пересчитываются ([ru.finney.pet.domain.model.PeriodResult.passed]).
+     */
+    suspend fun setDemo(profileId: Long, isDemo: Boolean) = mutex.withLock { storage.setDemo(profileId, isDemo) }
+
+    /**
      * Выполняет команду [Game] и сохраняет результат, если она прошла.
      * `store.execute(id) { buy(it, "food_apple") }`
      */

@@ -1,5 +1,5 @@
 {
-  "incomeByStage": [50, 60, 70],
+  "incomeByStage": [50, 55, 60, 65, 70, 70],
   "taskReward": { "success": 15, "fail": 5 },
   "parentBonus": { "step": 5, "maxPerPeriod": 20 },
   "planTolerance": 5,
@@ -12,13 +12,18 @@
     "taskSuccessMaxPerPeriod": 2
   },
   "conditionsToPass": 2,
-  "maxLevel": 9,
-  "stageStartLevels": [1, 3, 5],
+  "demoConditionsToPass": 1,
+  "demoLevelGameRequired": false,
+  "maxLevel": 6,
+  "stageStartLevels": [1, 2, 3, 4, 5, 6],
   "pet": {
     "start": { "satiety": 70, "hygiene": 70, "mood": 70, "energy": 90 },
     "decayByStage": [
       { "satiety": 40, "hygiene": 30, "mood": 20, "energy": 60 },
+      { "satiety": 45, "hygiene": 32, "mood": 22, "energy": 62 },
       { "satiety": 50, "hygiene": 35, "mood": 25, "energy": 65 },
+      { "satiety": 55, "hygiene": 37, "mood": 27, "energy": 67 },
+      { "satiety": 60, "hygiene": 40, "mood": 30, "energy": 70 },
       { "satiety": 60, "hygiene": 40, "mood": 30, "energy": 70 }
     ],
     "needsThreshold": 50,
@@ -26,5 +31,19 @@
     "emotionHappy": 60,
     "sleepMinutes": 60,
     "demoSleepSeconds": 10
+  },
+  "reminders": {
+    "everyHours": 24,
+    "demoReminderMinutes": 2,
+    "quietFromHour": 21,
+    "quietToHour": 9,
+    "skipIfOpenedHours": 6,
+    "demoSkipIfOpenedMinutes": 1
+  },
+  "play": {
+    "moodPerShake": 2,
+    "sessionMoodCap": 20,
+    "sessionMinutes": 60,
+    "demoSessionSeconds": 30
   }
 }

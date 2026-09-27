@@ -11,7 +11,7 @@
 | Навигация | Navigation Compose | один граф экранов, маршруты — `@Serializable`-объекты |
 | Зависимости | ручной контейнер `AppContainer` | десяток синглтонов не окупает Hilt: минус кодогенерация и время сборки |
 | Хранилище | Room (поверх SQLite) | ТЗ п. 3.2 прямо допускает; проверка SQL при компиляции, миграции, тесты |
-| Настройки | DataStore Preferences | флаги: звук, анимации, демо-режим |
+| Настройки | DataStore Preferences | флаги: звук, музыка; демо-режим — у профиля в Room (`profiles.isDemo`) |
 | Учебный контент | JSON в `assets/content/` + kotlinx.serialization | ТЗ п. 2.5.14: задание добавляется без переработки логики |
 | Асинхронность | Coroutines + Flow | реактивное обновление экранов |
 | Тесты | JUnit, kotlinx-coroutines-test | ТЗ п. 3.4 требует тесты на экономику |
@@ -61,9 +61,28 @@ ru.finney.pet
 │   ├── repository/  RoomGameStorage — реализация domain/game/GameStorage
 │   └── prefs/       DataStore — открытый профиль, звук и музыка; анимации (ещё не сделано)
 │
-└── content/         ЗАГРУЗКА УЧЕБНОГО КОНТЕНТА     — [@lemonke68]
-                     ContentParser, ContentValidator, AssetContentLoader
+├── content/         ЗАГРУЗКА УЧЕБНОГО КОНТЕНТА     — [@lemonke68]
+│                    ContentParser, ContentValidator, AssetContentLoader
+│
+└── notifications/   ЛОКАЛЬНЫЕ УВЕДОМЛЕНИЯ          — [@lemonke68]
+                     ReminderTexts, ReminderPolicy — чистые правила (текст по состоянию, тихие часы);
+                     NotificationScheduler — расписание по сохранённой игре; ReminderWorker,
+                     WakeWorker — задачи WorkManager; Notifier — канал и показ; AskNotificationsOnce
 ```
+
+### Уведомления
+
+Локальные, без сервера, через WorkManager. **«Проснулся»:** `NotificationScheduler` следит
+за сохранённой игрой открытого профиля — уснул, и на `Game.sleepEndsAt` ставится `WakeWorker`;
+разбудили раньше — задача снимается. **Напоминания:** цепочка разовых `ReminderWorker` —
+раз в сутки, в демо-режиме раз в `reminders.demoReminderMinutes` (периодическая задача
+WorkManager не бывает чаще 15 минут). Каждое открытие приложения начинает отсчёт заново.
+Текст — по сохранённому состоянию: голоден / грязный / устал / скучает / всё хорошо
+(`ReminderTexts`). Ночью (21–9) не пишем, напоминание переносится на утро; открывали
+приложение меньше 6 часов назад — пропускаем; приложение на экране — не пишем (`ReminderPolicy`,
+числа — `reminders` в `economy.json`). Разрешение `POST_NOTIFICATIONS` (Android 13+)
+спрашивается один раз на главном, когда питомец уже создан; отказ игру не ломает.
+Нажатие на уведомление открывает приложение — на главном, если профиль есть.
 
 Правило: `ui` не знает про `data`, обращается только к `domain`. Зависимости экраны получают из `AppContainer` через фабрики ViewModel и сами ничего не создают. Экономика не зависит от Compose — поэтому её можно покрыть обычными unit-тестами без устройства.
 
@@ -272,8 +291,8 @@ content/
     "taskSuccessMaxPerPeriod": 2
   },
   "conditionsToPass": 2,
-  "maxLevel": 9,
-  "stageStartLevels": [1, 3, 5],
+  "maxLevel": 6,
+  "stageStartLevels": [1, 2, 3, 4, 5, 6],
   "pet": {
     "start": { "satiety": 70, "hygiene": 70, "mood": 70 },
     "decayByStage": [

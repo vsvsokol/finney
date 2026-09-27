@@ -30,6 +30,9 @@ interface GameStorage {
 
     suspend fun updateProfile(profileId: Long, petName: String, appearance: PetAppearance)
 
+    /** Включить или выключить демо-режим профиля. Прогресс не меняется. */
+    suspend fun setDemo(profileId: Long, isDemo: Boolean)
+
     suspend fun delete(profileId: Long)
 
     suspend fun deleteAll()
