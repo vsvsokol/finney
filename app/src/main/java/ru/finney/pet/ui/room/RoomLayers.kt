@@ -17,6 +17,7 @@ data class RelRect(val left: Float, val top: Float, val right: Float, val bottom
     val height: Float get() = bottom - top
 
     fun shiftedX(dx: Float) = RelRect(left + dx, top, right + dx, bottom)
+    fun shiftedY(dy: Float) = RelRect(left, top + dy, right, bottom + dy)
 
     /** Промежуточный прямоугольник: [t] = 0 — этот, 1 — [to]. */
     fun lerp(to: RelRect, t: Float) = RelRect(

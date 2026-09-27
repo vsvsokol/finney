@@ -34,7 +34,7 @@ sealed interface Rejection {
     /** Шкала сна и так полная — спать не хочется. */
     data object NotSleepy : Rejection
 
-    /** Питомец спит: можно только ждать или разбудить. */
+    /** Питомец спит: не кормят, не моют, не играют и уровень не завершают. Открыты финансы и меню. */
     data object Asleep : Rejection
     data object NotAsleep : Rejection
     data class UnknownItem(val id: String) : Rejection

@@ -85,7 +85,7 @@ fun rejectionMessage(rejection: Rejection): RejectionMessage = when (rejection) 
     )
     Rejection.Asleep -> RejectionMessage(
         "Питомец спит.",
-        "Подожди или разбуди его.",
+        "Подожди, пока проснётся, или разбуди его.",
     )
     Rejection.NotSleepy -> RejectionMessage(
         "Спать пока не хочется.",

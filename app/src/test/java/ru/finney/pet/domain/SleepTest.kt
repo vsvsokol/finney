@@ -7,6 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import ru.finney.pet.domain.game.Game
 import ru.finney.pet.domain.game.Rejection
+import ru.finney.pet.domain.game.TaskResult
 import ru.finney.pet.domain.pet.PetRules
 
 /**
@@ -82,14 +83,41 @@ class SleepTest {
     }
 
     @Test
-    fun `пока спит — только ждать или будить`() {
+    fun `пока спит — не кормят, не моют, не играют и уровень не завершают`() {
         val asleep = game.sleep(game.confirmPlan(tired(), 0, 0, 0).state()).state()
 
         assertEquals(Rejection.Asleep, game.buy(asleep, "apple").reason())
+        assertEquals(Rejection.Asleep, game.buy(asleep, "soap").reason())
         assertEquals(Rejection.Asleep, game.closePeriod(asleep).reason())
-        assertEquals(Rejection.Asleep, game.deposit(asleep, 5).reason())
+        assertEquals(
+            Rejection.Asleep,
+            (game.submitTask(asleep, "t1", Fixtures.success) as TaskResult.Rejected).reason,
+        )
         assertEquals(Rejection.Asleep, game.sleep(asleep).reason())
         assertEquals(Rejection.NotAsleep, game.wake(game.wake(asleep).state()).reason())
+    }
+
+    @Test
+    fun `во сне работают финансы и меню — план, магазин, копилка, гардероб`() {
+        val asleep = game.sleep(tired()).state()
+
+        // План — из меню и из панели уровня.
+        val planned = game.confirmPlan(asleep, needs = 0, wants = 0, savings = 0).state()
+        assertEquals(asleep.sleepingSince, planned.sleepingSince)
+
+        // Магазин — кнопка с деньгами: «хочется» и шляпы, но не еда.
+        val candy = game.buy(planned, "candy").state()
+        val hat = game.buy(candy, "hat").state()
+        assertEquals("hat", hat.wornItemId)
+        assertEquals("hat", game.wear(game.takeOff(hat).state(), "hat").state().wornItemId)
+
+        // Копилка — из плана расходов.
+        val saving = game.selectGoal(hat, "bike").state()
+        val deposited = game.deposit(saving, 5).state()
+        assertEquals(5, deposited.goalSaved("bike"))
+        assertEquals(0, game.withdraw(deposited, 5).state().goalSaved("bike"))
+
+        assertEquals(asleep.sleepingSince, deposited.sleepingSince)
     }
 
     @Test
