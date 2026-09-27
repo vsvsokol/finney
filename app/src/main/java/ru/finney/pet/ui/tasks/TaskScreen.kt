@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -30,7 +31,9 @@ import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.tasks.games.GameScene
 import ru.finney.pet.ui.tasks.games.LocalPlayerAccessory
 import ru.finney.pet.ui.tasks.games.LocalPlayerBodyColor
+import ru.finney.pet.ui.tasks.games.PetOffers
 import ru.finney.pet.ui.tasks.games.PetSays
+import ru.finney.pet.ui.tasks.games.ScenePet
 import ru.finney.pet.ui.tasks.games.ResultBody
 import ru.finney.pet.ui.tasks.games.SceneBody
 import ru.finney.pet.ui.tasks.games.SceneStage
@@ -62,9 +65,8 @@ fun TaskScreen(
             CircularProgressIndicator(color = FinneyInk)
         }
 
-        TaskUiState.NotFound -> FinneyScreen {
+        TaskUiState.NotFound -> FinneyScreen(onClose = onBack) {
             OutlinedText("Такой игры нет", style = MaterialTheme.typography.headlineMedium)
-            FinneyButton(text = "Назад", onClick = onBack)
         }
 
         is TaskUiState.Ready -> CompositionLocalProvider(
@@ -114,19 +116,16 @@ private fun TaskIntro(state: TaskUiState.Ready, onStart: () -> Unit, onBack: () 
         ) {
             OutlinedText(state.task.title, style = MaterialTheme.typography.headlineLarge, textAlign = TextAlign.Center)
             ScenePanel(title = "Что делать", modifier = Modifier.fillMaxWidth()) {
+                // Тема ребёнку ничего не говорит — она у взрослого, в «Пройденных темах».
                 Text(state.task.intro, style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
-                Text(state.task.theme.label(), style = MaterialTheme.typography.labelLarge, color = FinneyInk.copy(alpha = 0.75f))
             }
             Spacer(Modifier.weight(1f))
-            PetSays(
-                state.character,
-                if (state.completed) {
-                    "Уже получалось! Сыграем ещё — просто так?"
-                } else {
-                    "Получится — дам ${state.reward.success} монет. А за первую попытку — ${state.reward.fail}."
-                },
-                petSize = 160.dp,
-            )
+            // Сколько дадут — монеткой в пузыре, а не фразой. Уже пройдено — просто «ещё?».
+            if (state.completed) {
+                PetSays(state.character, "Сыграем ещё?", petSize = 160.dp)
+            } else {
+                PetOffers(state.character, state.reward.success, petSize = 160.dp)
+            }
             if (state.available && state.needsPlan) {
                 ScenePanel(title = null, modifier = Modifier.fillMaxWidth()) {
                     Text(
@@ -194,16 +193,20 @@ private fun TaskResultScene(state: TaskUiState.Ready, onReplay: () -> Unit, onDo
                     horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
                 ) {
                     if (result.reward > 0) {
-                        Text("награда", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
-                        Coin(size = 26.dp)
-                        OutlinedText("+${result.reward}", style = MaterialTheme.typography.titleLarge)
+                        Coin(size = 30.dp)
+                        OutlinedText("+${result.reward}", style = MaterialTheme.typography.headlineMedium)
                     } else {
-                        Text("награда за эту игру уже получена", style = MaterialTheme.typography.bodyMedium, color = FinneyInk)
+                        Text("награда уже получена", style = MaterialTheme.typography.bodyMedium, color = FinneyInk)
                     }
                 }
             }
             Spacer(Modifier.weight(1f))
-            PetSays(state.character, if (success) "Получилось! Ура!" else "Ничего страшного — попробуем ещё раз?", petSize = 120.dp)
+            // «Получилось! Ура!» повторял заголовок «Готово!» — при успехе питомец просто радуется.
+            if (success) {
+                ScenePet(state.character, 120.dp, Modifier.width(120.dp))
+            } else {
+                PetSays(state.character, "Ничего страшного — попробуем ещё раз?", petSize = 120.dp)
+            }
         }
     }
 }

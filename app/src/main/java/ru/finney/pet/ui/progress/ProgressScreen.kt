@@ -44,7 +44,7 @@ fun ProgressScreen(
         is ProgressUiState.Ready -> FinneyScreen(
             scrollable = true,
             verticalArrangement = Arrangement.spacedBy(16.dp),
-            bottom = { FinneyButton(text = "Назад", onClick = onBack) },
+            onClose = onBack,
         ) {
             OutlinedText("Итоги и история", style = MaterialTheme.typography.headlineLarge)
 

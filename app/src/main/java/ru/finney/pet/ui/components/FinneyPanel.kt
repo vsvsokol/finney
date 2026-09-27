@@ -3,6 +3,7 @@ package ru.finney.pet.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import ru.finney.pet.ui.theme.FinneyCream
@@ -41,8 +43,9 @@ import ru.finney.pet.ui.theme.StrokeBold
 /**
  * Карточка с заголовком над рамкой.
  *
- * [onClose] — если задан, внизу появится кнопка «Закрыть»: во всех четырёх
- * панелях эталона она есть, и без неё диалог не закрыть с сенсорного экрана.
+ * [onClose] — если задан, справа от заголовка встаёт круглый «✕», как на
+ * экранах. Раньше внизу была кнопка «Закрыть» — лишняя длинная надпись.
+ * [closeText] — что скажет TalkBack.
  */
 @Composable
 fun FinneyPanel(
@@ -58,7 +61,16 @@ fun FinneyPanel(
         // часть строки и есть зазор до рамки — около 13 dp, и он растёт вместе
         // с кеглем, если в системе включён крупный шрифт. Постоянный отступ
         // в dp при крупном шрифте снова посадил бы буквы на линию.
-        OutlinedText(title, style = MaterialTheme.typography.headlineMedium)
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            // Заголовок по центру не сдвигается крестиком: поля под «✕» с обеих сторон.
+            OutlinedText(
+                title,
+                style = MaterialTheme.typography.headlineMedium,
+                textAlign = TextAlign.Center,
+                modifier = if (onClose != null) Modifier.padding(horizontal = 52.dp) else Modifier,
+            )
+            onClose?.let { CloseButton(it, Modifier.align(Alignment.CenterEnd), description = closeText) }
+        }
 
         Column(
             modifier = Modifier
@@ -70,15 +82,6 @@ fun FinneyPanel(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             content()
-
-            onClose?.let {
-                FinneyButton(
-                    text = closeText,
-                    onClick = it,
-                    fillWidth = false,
-                    modifier = Modifier.align(Alignment.CenterHorizontally),
-                )
-            }
         }
     }
 }

@@ -83,7 +83,7 @@ private fun GateContent(gate: AdultGate, onAnswer: (String) -> Unit, onBack: () 
     var answer by rememberSaveable(gate) { mutableStateOf("") }
     FinneyScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
-        bottom = { FinneyButton(text = "Назад", onClick = onBack) },
+        onClose = onBack,
     ) {
         OutlinedText("Для взрослых", style = MaterialTheme.typography.headlineLarge)
         Text(
@@ -119,7 +119,7 @@ private fun AdultContent(
     FinneyScreen(
         scrollable = true,
         verticalArrangement = Arrangement.spacedBy(16.dp),
-        bottom = { FinneyButton(text = "Назад", onClick = onBack) },
+        onClose = onBack,
     ) {
         OutlinedText("Для взрослых", style = MaterialTheme.typography.headlineLarge)
         if (state.isDemo) Body("Открыт тестовый профиль демо-режима: все мини-игры доступны сразу.")

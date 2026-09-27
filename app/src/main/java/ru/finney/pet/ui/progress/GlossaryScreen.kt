@@ -34,7 +34,7 @@ fun GlossaryScreen(
     FinneyScreen(
         scrollable = true,
         verticalArrangement = Arrangement.spacedBy(12.dp),
-        bottom = { FinneyButton(text = "Назад", onClick = onBack) },
+        onClose = onBack,
     ) {
         OutlinedText("Справочник", style = MaterialTheme.typography.headlineLarge)
         Text(

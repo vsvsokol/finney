@@ -4,6 +4,7 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -25,6 +26,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import ru.finney.pet.ui.theme.FinneyCream
+import ru.finney.pet.ui.sound.Sfx
 
 // Подложка экрана: кремовый фон и одинаковые поля по краям. Отдельный компонент,
 // чтобы отступы не разъезжались от экрана к экрану и их не приходилось помнить.
@@ -50,9 +52,15 @@ fun FinneyScreen(
     verticalArrangement: Arrangement.Vertical = Arrangement.spacedBy(16.dp),
     horizontalAlignment: Alignment.Horizontal = Alignment.CenterHorizontally,
     bottom: (@Composable ColumnScope.() -> Unit)? = null,
+    /**
+     * Выход с экрана — круглый «✕» в правом верхнем углу, один на все экраны:
+     * ТЗ п. 3.6 требует, чтобы кнопка возврата стояла единообразно. Раньше на
+     * каждом экране внизу была длинная кнопка «Назад».
+     */
+    onClose: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    if (bottom == null) {
+    if (bottom == null && onClose == null) {
         val scroll = if (scrollable) Modifier.verticalScroll(rememberScrollState()) else Modifier
         Column(
             modifier = modifier
@@ -78,6 +86,7 @@ fun FinneyScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
         horizontalAlignment = horizontalAlignment,
     ) {
+        onClose?.let { CloseButton(it, Modifier.align(Alignment.End)) }
         val scroll = if (scrollable) Modifier.fadingScroll(rememberScrollState()) else Modifier
         Column(
             modifier = Modifier.weight(1f).fillMaxWidth().then(scroll),
@@ -85,7 +94,18 @@ fun FinneyScreen(
             horizontalAlignment = horizontalAlignment,
             content = content,
         )
-        bottom()
+        bottom?.invoke(this)
+    }
+}
+
+/**
+ * Круглый «✕»: выход с экрана или из панели. 48 dp — меньше палец ребёнка не
+ * попадает (ТЗ п. 3.6); для TalkBack — [description].
+ */
+@Composable
+fun CloseButton(onClick: () -> Unit, modifier: Modifier = Modifier, description: String = "Назад") {
+    FinneyIconButton(onClick = onClick, contentDescription = description, size = 48.dp, sound = Sfx.Back, modifier = modifier) {
+        OutlinedText("✕", style = MaterialTheme.typography.titleLarge)
     }
 }
 
