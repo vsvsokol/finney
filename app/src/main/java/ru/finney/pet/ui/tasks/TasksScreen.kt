@@ -11,7 +11,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -23,6 +25,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -52,6 +56,7 @@ import ru.finney.pet.ui.tasks.games.taskIcon
 import ru.finney.pet.ui.theme.FinneyCream
 import ru.finney.pet.ui.theme.FinneyGreen
 import ru.finney.pet.ui.theme.FinneyInk
+import ru.finney.pet.ui.theme.FinneyPeach
 import ru.finney.pet.ui.theme.FinneyYellow
 
 /**
@@ -148,15 +153,29 @@ fun TasksScreen(
     }
 }
 
-/** Карточка: картинка из самой игры, название, тема. Пройденное — жёлтая заливка и «✓ пройдено» (ТЗ п. 3.6). */
+/**
+ * Карточка: картинка из самой игры и название. Сложность — точками, пройденное —
+ * жёлтая заливка и круглый «✓» (ТЗ п. 3.6: не только цветом). Тема и «новая» с
+ * карточки убраны — ребёнку они ничего не говорят; тема видна взрослому в
+ * «Пройденных темах» и звучит в описании для TalkBack.
+ */
 @Composable
 private fun GameCard(row: TaskRow, modifier: Modifier, onClick: () -> Unit) {
     val shape = RoundedCornerShape(22.dp)
+    val status = when {
+        row.lockedUntilLevel != null -> "откроется на уровне ${row.lockedUntilLevel}"
+        !row.available -> "откроется позже"
+        row.done -> "пройдено"
+        else -> "ещё не пройдено"
+    }
     Column(
         modifier = modifier
             .clip(shape)
             .background(if (row.done) FinneyYellow else Color.White)
             .border(4.dp, FinneyInk, shape)
+            .semantics(mergeDescendants = true) {
+                contentDescription = "${row.task.title}, ${row.task.theme.label()}, сложность ${row.difficulty} из ${row.difficulties}, $status"
+            }
             .clickable(role = Role.Button, onClickLabel = "Играть: ${row.task.title}", onClick = onClick)
             .padding(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -167,30 +186,38 @@ private fun GameCard(row: TaskRow, modifier: Modifier, onClick: () -> Unit) {
             contentAlignment = Alignment.Center,
         ) {
             taskIcon(row.task)?.let { ItemPicture(it, row.task.title, 72.dp) }
+            if (row.done) {
+                Box(
+                    Modifier.align(Alignment.TopEnd).size(28.dp).clip(CircleShape).background(FinneyGreen).border(2.dp, FinneyInk, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) { Text("✓", style = MaterialTheme.typography.labelLarge, color = FinneyInk) }
+            }
         }
         OutlinedText(row.task.title, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
-        Text(row.task.theme.label(), style = MaterialTheme.typography.labelMedium, color = FinneyInk, textAlign = TextAlign.Center)
-        if (row.difficulties > 1) {
+        if (row.difficulties > 1) DifficultyDots(row.difficulty, row.difficulties)
+        // Закрытая игра — единственное, что без слов не понять: когда откроется.
+        if (row.lockedUntilLevel != null || !row.available) {
             Text(
-                "сложность ${row.difficulty} из ${row.difficulties}",
-                style = MaterialTheme.typography.labelMedium,
+                text = row.lockedUntilLevel?.let { "с уровня $it" } ?: "позже",
+                style = MaterialTheme.typography.labelLarge,
                 color = FinneyInk,
-                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(FinneyCream)
+                    .padding(horizontal = 8.dp, vertical = 2.dp),
             )
         }
-        Text(
-            text = when {
-                row.lockedUntilLevel != null -> "откроется на уровне ${row.lockedUntilLevel}"
-                !row.available -> "откроется позже"
-                row.done -> "✓ пройдено"
-                else -> "новая"
-            },
-            style = MaterialTheme.typography.labelLarge,
-            color = FinneyInk,
-            modifier = Modifier
-                .clip(RoundedCornerShape(10.dp))
-                .background(if (row.done) FinneyGreen else FinneyCream)
-                .padding(horizontal = 8.dp, vertical = 2.dp),
-        )
+    }
+}
+
+/** Сложность точками: закрашено [level] из [of]. */
+@Composable
+private fun DifficultyDots(level: Int, of: Int) {
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        repeat(of) { i ->
+            Box(
+                Modifier.size(12.dp).clip(CircleShape).background(if (i < level) FinneyPeach else FinneyCream).border(2.dp, FinneyInk, CircleShape),
+            )
+        }
     }
 }

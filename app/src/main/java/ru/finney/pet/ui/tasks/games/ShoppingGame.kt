@@ -30,6 +30,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
@@ -40,8 +42,13 @@ import ru.finney.pet.domain.model.ShelfItem
 import ru.finney.pet.domain.tasks.TaskEngines
 import ru.finney.pet.domain.tasks.TaskInput
 import ru.finney.pet.domain.tasks.TaskInputError
+import ru.finney.pet.ui.components.Coin
 import ru.finney.pet.ui.components.FinneyButton
+import ru.finney.pet.ui.components.FinneyIcon
+import ru.finney.pet.ui.components.FinneyIconButton
+import ru.finney.pet.ui.components.FinneyIcons
 import ru.finney.pet.ui.components.OutlinedText
+import ru.finney.pet.ui.sound.Sfx
 import ru.finney.pet.ui.theme.FinneyCream
 import ru.finney.pet.ui.theme.FinneyGreen
 import ru.finney.pet.ui.theme.FinneyGreenDark
@@ -246,18 +253,25 @@ private fun CartBar(total: Int, limit: Int, enabled: Boolean, onCheckout: () -> 
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row {
-                Text("В корзине $total", style = MaterialTheme.typography.titleMedium, color = FinneyInk, modifier = Modifier.weight(1f))
-                Text(
-                    if (total <= limit) "осталось ${limit - total}" else "не хватит ${total - limit}",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = FinneyInk,
-                )
+        // Кошелёк-полоска: сколько в тележке из скольких — числами и шкалой, без слов.
+        // Перебор — «!» и минус, не только цветом (ТЗ п. 3.6).
+        Column(
+            Modifier.weight(1f).semantics(mergeDescendants = true) {
+                contentDescription = if (total <= limit) "В корзине $total из $limit" else "В корзине $total, не хватит ${total - limit}"
+            },
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Coin(size = 24.dp)
+                OutlinedText("$total / $limit", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                if (total > limit) OutlinedText("! −${total - limit}", style = MaterialTheme.typography.titleLarge, fill = FinneyPeach)
             }
             Meter(total.toFloat() / limit, Modifier.height(14.dp), color = if (total <= limit) FinneyGreen else FinneyPeach)
         }
-        FinneyButton(text = "На кассу", onClick = onCheckout, enabled = enabled, fillWidth = false)
+        // «На кассу» — значком тележки.
+        FinneyIconButton(onClick = onCheckout, contentDescription = "На кассу", size = 64.dp, enabled = enabled) {
+            FinneyIcon(FinneyIcons.Cart, size = 32.dp)
+        }
     }
 }
 
@@ -275,8 +289,13 @@ private fun Checkout(
 ) {
     SceneBody(
         bottom = {
-            FinneyButton(text = "Оплатить", onClick = onPay, enabled = cart.isNotEmpty())
-            FinneyButton(text = "Вернуться к полкам", onClick = onBack)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                // Назад к полкам — стрелкой: слова «Вернуться к полкам» были длиннее кнопки оплаты.
+                FinneyIconButton(onClick = onBack, contentDescription = "Вернуться к полкам", size = 64.dp, sound = Sfx.Back) {
+                    OutlinedText("←", style = MaterialTheme.typography.headlineMedium)
+                }
+                FinneyButton(text = "Оплатить", onClick = onPay, enabled = cart.isNotEmpty(), modifier = Modifier.weight(1f))
+            }
         },
     ) {
         ScenePanel(title = "Касса", modifier = Modifier.fillMaxWidth()) {
@@ -300,8 +319,9 @@ private fun Checkout(
             }
             task.shelf.filter { it.id in cart }.forEach { item ->
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ItemPicture(item, item.label, 32.dp)
-                    Text(item.label, style = MaterialTheme.typography.bodyLarge, color = FinneyInk, modifier = Modifier.weight(1f))
+                    // Товар — картинкой; название осталось для TalkBack.
+                    ItemPicture(item, item.label, 40.dp)
+                    Spacer(Modifier.weight(1f))
                     OutlinedText(item.price.toString(), style = MaterialTheme.typography.titleLarge)
                     // 48 dp — минимум ТЗ п. 3.6 для всего, на что нажимают.
                     Box(
@@ -315,12 +335,17 @@ private fun Checkout(
                     ) { Text("−", style = MaterialTheme.typography.titleLarge, color = FinneyInk) }
                 }
             }
-            Row {
-                Text("Итого $total", style = MaterialTheme.typography.titleMedium, color = FinneyInk, modifier = Modifier.weight(1f))
-                Text("в кошельке ${task.limit}", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = "Итого $total, в кошельке ${task.limit}" },
+            ) {
+                Coin(size = 24.dp)
+                OutlinedText("$total / ${task.limit}", style = MaterialTheme.typography.titleLarge)
             }
         }
         Spacer(Modifier.weight(1f))
-        PetSays(character, if (shortage != null) "Что-то подождёт — убери лишнее" else "Всё по списку? Платим!", petSize = 100.dp)
+        // Реплика «Что-то подождёт… / Всё по списку? Платим!» повторяла «Не хватает N» и кнопку «Оплатить».
+        ScenePet(character, 100.dp, Modifier.width(100.dp))
     }
 }
