@@ -22,6 +22,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -113,21 +115,11 @@ private fun PlanningContent(
     ) {
         OutlinedText("План", style = MaterialTheme.typography.headlineLarge)
 
-        Text(
-            text = "Уровень ${state.level}. Разложи деньги на три части — в каждую хоть немного.",
-            style = MaterialTheme.typography.bodyLarge,
-            color = FinneyInk,
-            textAlign = TextAlign.Center,
-        )
-
         // Сколько можно распределить — крупно и сверху: это главное число экрана.
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text("Есть:", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
-            CoinAmount(amount = state.budget)
-        }
+        // Подпись «Есть:» и подсказка «Разложи на три части…» убраны: монетка с
+        // числом понятна сама, а правило «в каждую хоть немного» написано внизу,
+        // когда кнопка ещё погашена.
+        CoinAmount(amount = state.budget)
 
         // Шаг помещается в остаток — значит, добавлять ещё можно.
         val canAdd = state.remainder >= STEP
@@ -279,27 +271,26 @@ private fun ActiveContent(state: BudgetUiState.Active, onBack: () -> Unit) {
             FactRow("Копилка", report.facts.savings, report.plan.savings)
         }
 
+        CoinAmount(amount = state.balance)
+
+        // По плану или нет — знаком ✓ / ↺ и коротким словом: одного знака мало,
+        // ребёнок должен понять, про что он (ТЗ п. 2.5.9, 3.6).
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text("Осталось:", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
-            CoinAmount(amount = state.balance)
-        }
-
-        // «По плану» подкреплено словами, значок здесь не нужен: текст и есть признак.
-        Text(
-            text = if (report.onTrack) "Ты идёшь по плану!" else "Пока не по плану",
-            style = MaterialTheme.typography.titleLarge,
-            color = FinneyInk,
+            horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(RadiusCard))
                 .background(if (report.onTrack) FinneyGreen else FinneyYellow)
                 .border(StrokeRegular, FinneyInk, RoundedCornerShape(RadiusCard))
-                .padding(14.dp),
-            textAlign = TextAlign.Center,
-        )
+                .padding(14.dp)
+                .semantics(mergeDescendants = true) {
+                    contentDescription = if (report.onTrack) "Ты идёшь по плану" else "Пока не по плану"
+                },
+        ) {
+            OutlinedText(if (report.onTrack) "✓" else "↺", style = MaterialTheme.typography.headlineMedium)
+            OutlinedText("План", style = MaterialTheme.typography.titleLarge)
+        }
     }
 }
 
