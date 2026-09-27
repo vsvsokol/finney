@@ -10,8 +10,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -26,6 +28,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -35,13 +40,18 @@ import ru.finney.pet.domain.game.GoalProgress
 import ru.finney.pet.domain.model.Goal
 import ru.finney.pet.ui.components.AMOUNT_STEP
 import ru.finney.pet.ui.components.AmountStepper
+import ru.finney.pet.ui.components.Coin
 import ru.finney.pet.ui.components.CoinAmount
 import ru.finney.pet.ui.components.FeedbackDialog
 import ru.finney.pet.ui.components.FinneyButton
+import ru.finney.pet.ui.components.FinneyIcon
+import ru.finney.pet.ui.components.FinneyIcons
 import ru.finney.pet.ui.components.FinneyPanel
 import ru.finney.pet.ui.components.FinneyScreen
 import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.pet.accessoryArt
+import ru.finney.pet.ui.theme.FinneyCream
+import ru.finney.pet.ui.theme.FinneyGreen
 import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneySand
 import ru.finney.pet.ui.theme.FinneyTheme
@@ -141,7 +151,7 @@ private fun GoalsContent(
     FinneyScreen(
         scrollable = true,
         verticalArrangement = Arrangement.spacedBy(16.dp),
-        bottom = { FinneyButton(text = "Назад", onClick = onBack) },
+        onClose = onBack,
     ) {
         OutlinedText("Копилка", style = MaterialTheme.typography.headlineLarge)
 
@@ -153,7 +163,9 @@ private fun GoalsContent(
 
         state.progress?.let { progress ->
             FinneyPanel(title = progress.goal.label) {
-                InfoRow("Накоплено", "${progress.saved} из ${progress.goal.price}")
+                // Накоплено — полоской и числом «30 / 100» с монеткой; остаток и срок —
+                // числами со словом: цена, накопленное и остаток должны быть видны (ТЗ п. 2.5.7).
+                SavedBar(saved = progress.saved, price = progress.goal.price)
                 InfoRow("Осталось собрать", progress.remaining.toString())
                 if (progress.remaining > 0) {
                     InfoRow(
@@ -164,13 +176,8 @@ private fun GoalsContent(
             }
         }
 
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text("На балансе:", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
-            CoinAmount(amount = state.balance)
-        }
+        // Сколько денег можно отложить — монеткой с числом, без подписи «На балансе:».
+        CoinAmount(amount = state.balance)
 
         val progress = state.progress
         if (progress != null && state.canComplete) {
@@ -216,7 +223,10 @@ private fun GoalsContent(
     }
 }
 
-/** Выбор показан подписью «копим сюда», а не только рамкой (ТЗ п. 3.6). */
+/**
+ * Выбор показан значком копилки и толстой рамкой, достигнутая цель — круглым «✓»,
+ * а не только цветом (ТЗ п. 3.6). Сколько накоплено — полоской и числом.
+ */
 @Composable
 private fun GoalCard(row: GoalRow, onSelect: () -> Unit) {
     Column(
@@ -234,23 +244,60 @@ private fun GoalCard(row: GoalRow, onSelect: () -> Unit) {
             row.goal.reward?.let(::accessoryArt)?.let {
                 Image(painter = painterResource(it.res), contentDescription = null, modifier = Modifier.size(56.dp))
             }
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(
+                Modifier.weight(1f).semantics(mergeDescendants = true) {
+                    stateDescription = when {
+                        row.isCompleted -> "уже твоя"
+                        row.isActive -> "копим сюда, ${row.saved} из ${row.goal.price}"
+                        else -> "${row.saved} из ${row.goal.price}"
+                    }
+                },
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
                 Text(
                     text = row.goal.label,
                     style = MaterialTheme.typography.titleMedium,
                     color = FinneyInk,
                 )
-                Text(
-                    text = when {
-                        row.isCompleted -> "✓ уже твоя"
-                        row.isActive -> "копим сюда · ${row.saved} из ${row.goal.price}"
-                        else -> "${row.saved} из ${row.goal.price}"
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = FinneyInk,
-                )
+                if (!row.isCompleted) SavedBar(saved = row.saved, price = row.goal.price)
+            }
+            when {
+                row.isCompleted -> Box(
+                    Modifier.size(32.dp).clip(CircleShape).background(FinneyGreen).border(2.dp, FinneyInk, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) { Text("✓", style = MaterialTheme.typography.titleMedium, color = FinneyInk) }
+                row.isActive -> FinneyIcon(FinneyIcons.Piggy, size = 32.dp)
             }
         }
+    }
+}
+
+/** Накоплено: полоска и «30 / 100» с монеткой. */
+@Composable
+private fun SavedBar(saved: Int, price: Int) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) { contentDescription = "Накоплено $saved из $price" },
+    ) {
+        Box(
+            Modifier
+                .weight(1f)
+                .height(14.dp)
+                .clip(RoundedCornerShape(7.dp))
+                .background(FinneyCream)
+                .border(2.dp, FinneyInk, RoundedCornerShape(7.dp)),
+        ) {
+            Box(
+                Modifier
+                    .fillMaxWidth((saved.toFloat() / price).coerceIn(0f, 1f))
+                    .height(14.dp)
+                    .clip(RoundedCornerShape(7.dp))
+                    .background(FinneyGreen),
+            )
+        }
+        OutlinedText("$saved / $price", style = MaterialTheme.typography.titleMedium)
+        Coin(size = 20.dp)
     }
 }
 

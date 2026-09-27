@@ -46,6 +46,8 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
@@ -53,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import ru.finney.pet.domain.model.BodyColor
 import ru.finney.pet.domain.model.PetCharacter
+import ru.finney.pet.ui.components.Coin
 import ru.finney.pet.ui.components.CoinAmount
 import ru.finney.pet.ui.components.FinneyIconButton
 import ru.finney.pet.ui.components.OutlinedText
@@ -351,6 +354,31 @@ internal fun PetSays(character: PetCharacter, text: String, modifier: Modifier =
     }
 }
 
+/**
+ * Питомец обещает награду: в пузыре монетка и «+15» вместо фразы «Получится — дам
+ * 15 монет». Число и монетка читаются быстрее слов.
+ */
+@Composable
+internal fun PetOffers(character: PetCharacter, amount: Int, modifier: Modifier = Modifier, petSize: Dp = 120.dp) {
+    val tailSize = 12.dp
+    val shape = remember { BubbleShape(Tail.LEFT, 16.dp, tailSize) }
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        ScenePet(character, petSize, Modifier.width(petSize))
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier
+                .background(Color.White, shape)
+                .border(StrokeRegular, FinneyInk, shape)
+                .padding(start = 12.dp + tailSize, end = 14.dp, top = 8.dp, bottom = 8.dp)
+                .semantics(mergeDescendants = true) { contentDescription = "Получится — дам $amount монет" },
+        ) {
+            OutlinedText("+$amount", style = MaterialTheme.typography.headlineMedium)
+            Coin(size = 30.dp)
+        }
+    }
+}
+
 /** Куда смотрит хвостик реплики — в сторону того, кто говорит. */
 enum class Tail { LEFT, RIGHT, DOWN_LEFT, DOWN_RIGHT }
 
@@ -432,21 +460,6 @@ internal fun ScenePanel(
             )
         }
     }
-}
-
-/** Полоса-подсказка жеста — розовая плашка, как «смахни вниз» в концептах. */
-@Composable
-internal fun GestureHint(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelLarge,
-        color = Color.White,
-        modifier = modifier
-            .clip(RoundedCornerShape(10.dp))
-            .background(FinneyPink)
-            .border(StrokeRegular, FinneyInk, RoundedCornerShape(10.dp))
-            .padding(horizontal = 10.dp, vertical = 3.dp),
-    )
 }
 
 /** Шкала «сколько из скольки»: копилка, тележка. [extra] — сегодняшняя добавка штриховкой. */

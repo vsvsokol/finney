@@ -34,6 +34,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import ru.finney.pet.domain.model.Category
@@ -44,6 +46,8 @@ import ru.finney.pet.domain.tasks.TaskEngines
 import ru.finney.pet.domain.tasks.TaskInput
 import ru.finney.pet.domain.tasks.TaskInputError
 import ru.finney.pet.ui.components.FinneyButton
+import ru.finney.pet.ui.components.FinneyIcon
+import ru.finney.pet.ui.components.FinneyIcons
 import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.theme.FinneyBlue
 import ru.finney.pet.ui.theme.FinneyCream
@@ -93,14 +97,19 @@ internal fun ReserveGame(
                     }
                     ReserveJar(maxOf(0, reserve))
                     val spent = task.amount - reserve
-                    Row {
-                        Text(
-                            if (reserve >= 0) "разложено $spent из ${task.amount}" else "не хватает ${-reserve}",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = FinneyInk,
+                    // Числом, без слова «разложено»: полоска ниже показывает то же. Перебор — «!» и минус.
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.semantics(mergeDescendants = true) {
+                            contentDescription = if (reserve >= 0) "разложено $spent из ${task.amount}" else "не хватает ${-reserve}"
+                        },
+                    ) {
+                        OutlinedText(
+                            if (reserve >= 0) "$spent / ${task.amount}" else "−${-reserve}",
+                            style = MaterialTheme.typography.titleLarge,
                             modifier = Modifier.weight(1f),
                         )
-                        Text(if (reserve >= 0) "✓" else "!", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
+                        Text(if (reserve >= 0) "✓" else "!", style = MaterialTheme.typography.titleLarge, color = FinneyInk)
                     }
                     TwoPartMeter(spent = spent, total = task.amount)
                 }
@@ -141,23 +150,22 @@ internal fun ReserveGame(
                     FinneyButton(text = "Взять из запаса · ${surprise.price}", onClick = { onSubmit(TaskInput.Reserve(planned, dropped)) })
                 } else {
                     OutlinedText("Нужно ${surprise.price}: ${surprise.label.lowercase().trimEnd('!')}", style = MaterialTheme.typography.titleLarge)
-                    Text(
-                        if (reserve > 0) "В запасе $reserve, не хватает $shortage. Что перенесём на следующую неделю?"
-                        else "Запаса нет. Что перенесём на следующую неделю?",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = FinneyInk,
-                    )
+                    // Сколько не хватает — числом, вопрос — коротко: что делать, без слов не понять.
+                    Text("Не хватает $shortage. Что перенесём?", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
                     task.spendings.filter { it.id in planned }.forEach { s ->
                         PostponeRow(s, checked = s.id in dropped) {
                             dropped = if (it) dropped + s.id else dropped - s.id
                             onInputSeen()
                         }
                     }
-                    Text(
-                        "Нашлось $freed из $shortage" + if (freed >= shortage) " ✓" else "",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = FinneyInk,
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = "Нашлось $freed из $shortage" },
+                    ) {
+                        Meter(freed.toFloat() / shortage, Modifier.weight(1f).height(14.dp))
+                        OutlinedText("$freed / $shortage" + if (freed >= shortage) " ✓" else "", style = MaterialTheme.typography.titleLarge)
+                    }
                     if (inputError != null) Note(inputErrorText(inputError), color = FinneyPeach)
                     FinneyButton(text = "Готово", onClick = { onSubmit(TaskInput.Reserve(planned, dropped)) }, enabled = freed >= shortage)
                 }
@@ -189,15 +197,17 @@ private fun Envelope(spending: Spending, checked: Boolean, modifier: Modifier, o
         ItemPicture(spending, spending.label, 36.dp)
         Text(spending.label, style = MaterialTheme.typography.labelMedium, color = FinneyInk, textAlign = TextAlign.Center)
         OutlinedText(spending.price.toString(), style = MaterialTheme.typography.titleLarge)
-        Text(
+        // Состояние — значком, не словом: тетрадь — нужное (заперто), ✓ — берём,
+        // пусто — в запас. Слова остались для TalkBack.
+        Box(
+            Modifier.size(22.dp).semantics { contentDescription = if (locked) "нужное" else if (checked) "купить" else "в запас" },
+            contentAlignment = Alignment.Center,
+        ) {
             when {
-                locked -> "нужное"
-                checked -> "✓ купить"
-                else -> "в запас"
-            },
-            style = MaterialTheme.typography.labelMedium,
-            color = FinneyInk,
-        )
+                locked -> FinneyIcon(FinneyIcons.Plan, size = 20.dp)
+                checked -> Text("✓", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
+            }
+        }
     }
 }
 
