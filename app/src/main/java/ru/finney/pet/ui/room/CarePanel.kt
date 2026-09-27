@@ -1,6 +1,7 @@
 package ru.finney.pet.ui.room
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import ru.finney.pet.domain.game.PurchasePreview
@@ -28,6 +30,8 @@ import ru.finney.pet.ui.components.FinneyCard
 import ru.finney.pet.ui.components.FinneyIcon
 import ru.finney.pet.ui.components.FinneyIcons
 import ru.finney.pet.ui.components.FinneyPanel
+import ru.finney.pet.ui.components.MoodFace
+import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.theme.FinneyGreen
 import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneyPeach
@@ -133,15 +137,19 @@ fun CarePanel(
 }
 
 /**
- * Строка предмета.
+ * Строка предмета — картинкой, а не словами: рисунок, что он даёт (значок шкалы
+ * и «+20») и цена с монеткой. Название — только для TalkBack.
  *
- * Категория и нехватка показаны значком и словом, а не одним цветом: ТЗ п. 3.6
- * запрещает цвет как единственный способ что-то сообщить.
+ * Категория — значком в углу рисунка (тетрадь — нужное, звезда — желаемое),
+ * нехватка — рамкой и строкой «не хватает»: ТЗ п. 3.6 запрещает цвет как
+ * единственный способ что-то сообщить, а п. 2.5.6 требует, чтобы цена,
+ * категория и влияние были видны до покупки.
  */
 @Composable
 private fun CareRow(option: CareOption, onPick: () -> Unit) {
     val preview = option.preview
     val notEnough = preview.shortage > 0
+    val needed = option.item.category == Category.NEEDS
 
     val accent = when {
         notEnough -> FinneyPink
@@ -152,41 +160,28 @@ private fun CareRow(option: CareOption, onPick: () -> Unit) {
     FinneyCard(
         modifier = Modifier
             .fillMaxWidth()
+            .semantics(mergeDescendants = true) {
+                contentDescription = "${option.item.label}, ${if (needed) "нужное" else "желаемое"}"
+            }
             .clickable(onClickLabel = "Выбрать: ${option.item.label}", onClick = onPick),
         accent = accent,
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = option.item.label,
-                style = MaterialTheme.typography.titleMedium,
-                color = FinneyInk,
-            )
+            Box(contentAlignment = Alignment.TopStart) {
+                ItemPicture(option.item.id, itemFallback(option.item.id), size = 64.dp)
+                FinneyIcon(icon = if (needed) FinneyIcons.Plan else FinneyIcons.Star, size = 20.dp)
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                EffectLine(FinneyIcons.Food, "сытость", preview.statsBefore.satiety, preview.statsAfter.satiety)
+                EffectLine(FinneyIcons.Bath, "чистота", preview.statsBefore.hygiene, preview.statsAfter.hygiene)
+                EffectLine(null, "радость", preview.statsBefore.mood, preview.statsAfter.mood)
+            }
             CoinAmount(amount = option.item.price)
         }
-
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            val needed = option.item.category == Category.NEEDS
-            FinneyIcon(
-                icon = if (needed) FinneyIcons.Plan else FinneyIcons.Star,
-                size = 20.dp,
-            )
-            Text(
-                text = if (needed) "нужное" else "желаемое",
-                style = MaterialTheme.typography.bodyMedium,
-                color = FinneyInk,
-            )
-        }
-
-        EffectLine("сытость", preview.statsBefore.satiety, preview.statsAfter.satiety)
-        EffectLine("чистота", preview.statsBefore.hygiene, preview.statsAfter.hygiene)
-        EffectLine("радость", preview.statsBefore.mood, preview.statsAfter.mood)
 
         if (notEnough) {
             Text(
@@ -198,9 +193,12 @@ private fun CareRow(option: CareOption, onPick: () -> Unit) {
     }
 }
 
-/** Шкала до и после. Строка молчит, если предмет её не трогает. */
+/**
+ * Что станет со шкалой: её значок и «+20». Строка молчит, если предмет шкалу не трогает.
+ * [icon] null — радость, её знак — лицо, как под шкалой на главном.
+ */
 @Composable
-private fun EffectLine(label: String, before: Int, after: Int) {
+private fun EffectLine(icon: FinneyIcons?, label: String, before: Int, after: Int) {
     if (before == after) return
     val delta = after - before
     Row(
@@ -210,15 +208,11 @@ private fun EffectLine(label: String, before: Int, after: Int) {
             contentDescription = "$label: было $before, станет $after"
         },
     ) {
-        Text(
-            text = "$label $before → $after",
-            style = MaterialTheme.typography.bodyMedium,
-            color = FinneyInk,
-        )
-        Text(
+        if (icon != null) FinneyIcon(icon, size = 24.dp) else MoodFace(size = 24.dp)
+        OutlinedText(
             text = if (delta > 0) "+$delta" else "$delta",
-            style = MaterialTheme.typography.bodyMedium,
-            color = if (delta > 0) FinneyInk else FinneyPeach,
+            style = MaterialTheme.typography.titleLarge,
+            fill = if (delta > 0) FinneyGreen else FinneyPeach,
         )
     }
 }
