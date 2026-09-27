@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,10 +29,14 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import ru.finney.pet.domain.model.ItemArt
 import ru.finney.pet.domain.model.PeriodFacts
 import ru.finney.pet.domain.model.Plan
 import ru.finney.pet.ui.components.CoinAmount
+import ru.finney.pet.ui.components.FillBar
 import ru.finney.pet.ui.components.FinneyButton
+import ru.finney.pet.ui.components.SpendBar
+import ru.finney.pet.ui.tasks.games.ItemPicture
 import ru.finney.pet.ui.components.FinneyPanel
 import ru.finney.pet.ui.components.FinneyScreen
 import ru.finney.pet.ui.components.LevelBadge
@@ -111,11 +116,16 @@ private fun PeriodResultContent(state: PeriodResultUiState.Ready, onBack: () -> 
         }
 
         FinneyPanel(title = "Как вышло") {
+            // Траты — полосой «из плана» без зелёного: потратить больше — не успех.
+            // Копилка — полосой прогресса: отложить сколько задумал — хорошо.
             FactRow("Нужное", state.facts.needs, state.plan.needs)
             FactRow("Желаемое", state.facts.wants, state.plan.wants)
-            FactRow("Копилка", state.facts.savings, state.plan.savings)
+            FactRow("Копилка", state.facts.savings, state.plan.savings, progress = true)
             if (state.facts.unplannedIncome > 0) {
-                FactRow("Пришло сверх плана", state.facts.unplannedIncome, state.facts.unplannedIncome)
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Пришло сверх плана", style = MaterialTheme.typography.bodyLarge, color = FinneyInk, modifier = Modifier.weight(1f))
+                    CoinAmount(amount = state.facts.unplannedIncome, coinSize = 22.dp)
+                }
             }
         }
 
@@ -124,19 +134,23 @@ private fun PeriodResultContent(state: PeriodResultUiState.Ready, onBack: () -> 
             // Коротко: знак и одно слово — про что условие. Полная фраза — для TalkBack.
             state.levelGame?.let {
                 val need = if (state.gameRequired) "обязательно" else "по желанию"
-                ScoreRow("Игра «$it»", state.gamePassed, "Игра уровня «$it» — $need")
+                ScoreRow("Игра «$it»", state.gamePassed, "Игра уровня «$it» — $need", icon = state.levelGameIcon)
             }
             ScoreRow("Нужное", state.needsCovered, "Питомец сыт, чист и выспался")
             ScoreRow("План", state.planMatched, "Траты по плану")
             ScoreRow("Копилка", state.savingsAdded, "Отложено в копилку")
         }
 
+        // Какие игры усложнились — картинками игр, как в их сценах, а не списком названий.
         if (state.harderGames.isNotEmpty()) {
-            Text(
-                text = "Новые задания в мини-играх: ${state.harderGames.joinToString { "«$it»" }}",
-                style = MaterialTheme.typography.bodyLarge,
-                color = FinneyInk,
-            )
+            FinneyPanel(title = "Новое в мини-играх") {
+                state.harderGames.forEachIndexed { i, title ->
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        state.harderGameIcons.getOrNull(i)?.let { ItemPicture(it, title, 40.dp) }
+                        Text(title, style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
+                    }
+                }
+            }
         }
 
         CoinAmount(amount = state.balance)
@@ -157,23 +171,32 @@ private fun PeriodResultContent(state: PeriodResultUiState.Ready, onBack: () -> 
     }
 }
 
-/** Строка «потрачено из запланированного». */
+/**
+ * Строка «потрачено из запланированного» и полоса под ней. [progress] — это
+ * накопление, а не трата: полоса идёт от розового к зелёному и отмечает «✓».
+ */
 @Composable
-private fun FactRow(label: String, fact: Int, planned: Int) {
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyLarge,
-            color = FinneyInk,
-            modifier = Modifier.weight(1f),
-        )
-        Text(text = "$fact из $planned", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
+private fun FactRow(label: String, fact: Int, planned: Int, progress: Boolean = false) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyLarge,
+                color = FinneyInk,
+                modifier = Modifier.weight(1f),
+            )
+            Text(text = "$fact из $planned", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
+        }
+        if (progress) FillBar(fact, planned, Modifier.fillMaxWidth()) else SpendBar(fact, planned, Modifier.fillMaxWidth())
     }
 }
 
-/** Условие уровня: ✓ или ↺ и одно слово — про что оно; цвет здесь ничего не решает. */
+/**
+ * Условие уровня: ✓ или ↺ и одно слово — про что оно; цвет здесь ничего не решает.
+ * [icon] — у игры уровня её картинка: игру узнают по ней, как в сцене.
+ */
 @Composable
-private fun ScoreRow(label: String, earned: Boolean, description: String) {
+private fun ScoreRow(label: String, earned: Boolean, description: String, icon: ItemArt? = null) {
     Row(
         modifier = Modifier.fillMaxWidth().clearAndSetSemantics {
             contentDescription = "$description: ${if (earned) "выполнено" else "не выполнено"}"
@@ -186,6 +209,7 @@ private fun ScoreRow(label: String, earned: Boolean, description: String) {
             color = FinneyInk,
             modifier = Modifier.padding(end = 12.dp),
         )
+        icon?.let { ItemPicture(it, label, 36.dp, Modifier.padding(end = 8.dp)) }
         Text(text = label, style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
     }
 }

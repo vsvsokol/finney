@@ -26,6 +26,7 @@ import ru.finney.pet.ui.components.FinneyIcon
 import ru.finney.pet.ui.components.FinneyIcons
 import ru.finney.pet.ui.components.FinneyScreen
 import ru.finney.pet.ui.components.OutlinedText
+import ru.finney.pet.ui.components.StepDots
 import ru.finney.pet.ui.pet.PetMood
 import ru.finney.pet.ui.pet.PetView
 import ru.finney.pet.ui.pet.rememberPetAnimation
@@ -76,11 +77,8 @@ fun OnboardingScreen(
             }
         },
     ) {
-        Text(
-            text = "${page + 1} из $PAGES",
-            style = MaterialTheme.typography.bodyLarge,
-            color = FinneyInk,
-        )
+        // Где ты — точками, а не «2 из 3»: число здесь ничего не значит.
+        StepDots(done = page, total = PAGES, current = page)
         when (page) {
             0 -> MeetPage()
             1 -> DecisionsPage()

@@ -29,6 +29,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -38,7 +39,10 @@ import ru.finney.pet.domain.model.ChoresTask
 import ru.finney.pet.domain.model.PetCharacter
 import ru.finney.pet.domain.tasks.TaskEngines
 import ru.finney.pet.domain.tasks.TaskInput
+import ru.finney.pet.ui.components.AlertBadge
+import ru.finney.pet.ui.components.CheckBadge
 import ru.finney.pet.ui.components.Coin
+import ru.finney.pet.ui.components.FillBar
 import ru.finney.pet.ui.components.FinneyButton
 import ru.finney.pet.ui.components.FinneyIcon
 import ru.finney.pet.ui.components.FinneyIcons
@@ -74,7 +78,7 @@ internal fun ChoresGame(task: ChoresTask, character: PetCharacter, onClose: () -
                 FinneyButton(text = "Готово", onClick = { onSubmit(TaskInput.Schedule(week)) })
             },
         ) {
-            GoalCard(task, earned)
+            GoalCard(task, earned, rest)
             PetSays(character, petLine(task, earned, rest), petSize = 72.dp)
 
             // По четыре дня в ряд; неполный ряд добит пустым местом, чтобы дни были одной ширины.
@@ -121,22 +125,28 @@ internal fun ChoresGame(task: ChoresTask, character: PetCharacter, onClose: () -
     }
 }
 
-/** Реплика: сколько не хватает, а когда хватает — про отдых. */
+/**
+ * Реплика. Про отдых — сразу, как только свободных дней стало мало, а не когда
+ * деньги уже набраны: иначе ребёнок узнаёт правило только в итоге.
+ */
 private fun petLine(task: ChoresTask, earned: Int, rest: Int): String {
     val left = task.goal.price - earned
     return when {
+        rest < task.minRestDays -> "Мне нужен отдых — освободи день"
         left > 0 -> "Нужно ещё $left"
-        rest < task.minRestDays -> "Хватает! Но мне нужен отдых"
         else -> "Хватает, и есть отдых!"
     }
 }
 
-/** Цель: рисунок, «заработано из цены» числом и полоской. */
+/**
+ * Два условия недели, оба видны с начала: цель — числом и полосой, отдых — строкой
+ * с лампой. Плейтест: ребёнок пропустил вступление, поставил собаку во все дни и
+ * только в итоге узнал, что отдых обязателен.
+ */
 @Composable
-private fun GoalCard(task: ChoresTask, earned: Int) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+private fun GoalCard(task: ChoresTask, earned: Int, rest: Int) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(6.dp),
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
@@ -144,16 +154,38 @@ private fun GoalCard(task: ChoresTask, earned: Int) {
             .border(3.dp, FinneyInk, RoundedCornerShape(14.dp))
             .padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
-        ItemPicture(task.goal, task.goal.label, 44.dp)
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            ItemPicture(task.goal, task.goal.label, 44.dp)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 OutlinedText("$earned / ${task.goal.price}", style = MaterialTheme.typography.titleLarge)
+                FillBar(earned, task.goal.price, Modifier.fillMaxWidth(), description = "Заработано $earned из ${task.goal.price}")
             }
-            Meter(
-                fraction = earned.toFloat() / task.goal.price,
-                modifier = Modifier.height(14.dp).semantics { contentDescription = "Заработано $earned из ${task.goal.price}" },
-            )
         }
+        RestLine(rest, task.minRestDays)
+    }
+}
+
+/**
+ * Условие «хотя бы N дней отдыха». Пока свободных дней хватает — тихо, с «✓»; не
+ * хватает — розовая строка с «!»: цвет не единственный знак (ТЗ п. 3.6).
+ */
+@Composable
+private fun RestLine(rest: Int, need: Int) {
+    val ok = rest >= need
+    val rule = "Отдых — хотя бы ${plural(need, "день", "дня", "дней")}"
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (ok) Color.Transparent else FinneyPink.copy(alpha = 0.28f))
+            .clearAndSetSemantics { contentDescription = if (ok) "$rule. Есть" else "$rule. Освободи день" }
+            .padding(horizontal = 4.dp, vertical = 2.dp),
+    ) {
+        FinneyIcon(FinneyIcons.Lamp, size = 28.dp)
+        Text(rule, style = MaterialTheme.typography.bodyLarge, color = FinneyInk, modifier = Modifier.weight(1f))
+        if (ok) CheckBadge(size = 24.dp) else AlertBadge(size = 26.dp)
     }
 }
 

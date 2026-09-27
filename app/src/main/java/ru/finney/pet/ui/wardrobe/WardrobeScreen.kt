@@ -8,10 +8,13 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -36,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ru.finney.pet.ui.components.FeedbackDialog
+import ru.finney.pet.ui.components.FillBar
 import ru.finney.pet.ui.components.FinneyButton
 import ru.finney.pet.ui.components.FinneyScreen
 import ru.finney.pet.ui.components.OutlinedText
@@ -129,18 +133,21 @@ private fun WardrobeContent(
             onClick = onTakeOff,
         )
         state.items.chunked(2).forEach { pair ->
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            // Плитки в ряду одной высоты: подпись «как получить» у одной не растягивает
+            // соседку, и сетка не перестраивается, когда шляпу получили.
+            Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 pair.forEach { entry ->
                     val worn = entry.item.id == state.worn
                     Tile(
                         label = entry.item.label,
                         // Слова остались только у ещё не полученной шляпы — как её получить.
                         status = entry.howToGet.takeUnless { entry.owned },
+                        progress = entry.progress,
                         art = accessoryArt(entry.item.id)?.res,
                         selected = worn,
                         enabled = entry.owned,
                         onClick = { if (worn) onTakeOff() else onWear(entry.item.id) },
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
                     )
                 }
                 if (pair.size == 1) Spacer(Modifier.weight(1f))
@@ -162,6 +169,7 @@ private fun WardrobeContent(
 /**
  * Плитка вещи. Надетое отмечено и заливкой, и словом «надето» (ТЗ п. 3.6).
  * Чужая вещь бледная и не нажимается, но подписана, как её получить.
+ * [progress] — сколько накоплено на цель из скольких: полосой под подписью.
  */
 @Composable
 private fun Tile(
@@ -172,41 +180,53 @@ private fun Tile(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     art: Int? = null,
+    progress: Pair<Int, Int>? = null,
 ) {
     val shape = RoundedCornerShape(22.dp)
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .background(if (selected) FinneyGreen else if (enabled) FinneyYellow else FinneySand)
-            .border(if (selected) 3.dp else 2.dp, FinneyInk, shape)
-            // Название и «надето» — для TalkBack; на плитке — картинка и «✓».
-            .semantics(mergeDescendants = true) {
-                contentDescription = label
-                stateDescription = if (selected) "надето" else if (enabled) "не надето" else "ещё нет"
+    // «✓» — значком поверх угла, а не строкой внутри: надели шляпу — плитка
+    // не вырастает, и всё ниже не съезжает.
+    Box(modifier = modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(shape)
+                .background(if (selected) FinneyGreen else if (enabled) FinneyYellow else FinneySand)
+                .border(if (selected) 3.dp else 2.dp, FinneyInk, shape)
+                // Название и «надето» — для TalkBack; на плитке — картинка и «✓».
+                .semantics(mergeDescendants = true) {
+                    contentDescription = label
+                    stateDescription = if (selected) "надето" else if (enabled) "не надето" else "ещё нет"
+                }
+                .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+                .padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            if (art != null) {
+                Image(
+                    painter = painterResource(art),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(72.dp)
+                        .alpha(if (enabled) 1f else 0.45f),
+                )
             }
-            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
-            .padding(12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        if (art != null) {
-            Image(
-                painter = painterResource(art),
-                contentDescription = null,
-                modifier = Modifier
-                    .size(72.dp)
-                    .alpha(if (enabled) 1f else 0.45f),
-            )
+            // Без рисунка («Без шляпы») без подписи не понять — она остаётся.
+            if (art == null) Text(label, style = MaterialTheme.typography.titleMedium, color = FinneyInk, textAlign = TextAlign.Center)
+            status?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = FinneyInk, textAlign = TextAlign.Center) }
+            progress?.let { (saved, price) -> FillBar(saved, price, Modifier.fillMaxWidth(), height = 10.dp) }
         }
-        // Без рисунка («Без шляпы») без подписи не понять — она остаётся.
-        if (art == null) Text(label, style = MaterialTheme.typography.titleMedium, color = FinneyInk, textAlign = TextAlign.Center)
         if (selected) {
             Box(
-                Modifier.size(28.dp).clip(CircleShape).background(FinneyCream).border(2.dp, FinneyInk, CircleShape),
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(FinneyCream)
+                    .border(2.dp, FinneyInk, CircleShape),
                 contentAlignment = Alignment.Center,
             ) { Text("✓", style = MaterialTheme.typography.titleMedium, color = FinneyInk) }
         }
-        status?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = FinneyInk, textAlign = TextAlign.Center) }
     }
 }

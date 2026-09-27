@@ -1,12 +1,15 @@
 package ru.finney.pet.ui.tasks
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -17,6 +20,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -28,19 +34,24 @@ import ru.finney.pet.ui.components.Coin
 import ru.finney.pet.ui.components.FinneyButton
 import ru.finney.pet.ui.components.FinneyScreen
 import ru.finney.pet.ui.components.OutlinedText
+import ru.finney.pet.ui.tasks.games.Bubble
 import ru.finney.pet.ui.tasks.games.GameScene
 import ru.finney.pet.ui.tasks.games.LocalPlayerAccessory
 import ru.finney.pet.ui.tasks.games.LocalPlayerBodyColor
+import ru.finney.pet.ui.tasks.games.PetAtRight
 import ru.finney.pet.ui.tasks.games.PetOffers
 import ru.finney.pet.ui.tasks.games.PetSays
-import ru.finney.pet.ui.tasks.games.ScenePet
 import ru.finney.pet.ui.tasks.games.ResultBody
 import ru.finney.pet.ui.tasks.games.SceneBody
 import ru.finney.pet.ui.tasks.games.SceneStage
 import ru.finney.pet.ui.tasks.games.ScenePanel
+import ru.finney.pet.ui.tasks.games.Tail
 import ru.finney.pet.ui.tasks.games.TaskGame
 import ru.finney.pet.ui.tasks.games.backdropFor
+import ru.finney.pet.ui.theme.FinneyCream
 import ru.finney.pet.ui.theme.FinneyInk
+import ru.finney.pet.ui.theme.FinneyYellow
+import ru.finney.pet.ui.theme.StrokeRegular
 import ru.finney.pet.ui.sound.LocalSounds
 import ru.finney.pet.ui.sound.Sfx
 
@@ -155,6 +166,10 @@ private fun TaskIntro(state: TaskUiState.Ready, onStart: () -> Unit, onBack: () 
 /**
  * Итог в сцене игры: что получилось по пунктам, объяснение при любом исходе и
  * награда (ТЗ п. 2.5.8, 2.5.9). Без стыда: «почти», а не «проиграл».
+ *
+ * Три отдельных блока, а не одна панель: плейтест назвал итог «стеной текста».
+ * В панели — только пункты, и удачные в ней тихие, а неудачные подсвечены
+ * ([ResultBody]); награда — своей плашкой; объяснение говорит питомец.
  */
 @Composable
 private fun TaskResultScene(state: TaskUiState.Ready, onReplay: () -> Unit, onDone: () -> Unit) {
@@ -182,31 +197,42 @@ private fun TaskResultScene(state: TaskUiState.Ready, onReplay: () -> Unit, onDo
         ) {
             ScenePanel(title = if (success) "Готово!" else "Почти!", modifier = Modifier.fillMaxWidth()) {
                 ResultBody(state.task, result.details, result.input)
-                Text(
-                    if (success) state.task.explainOk else state.task.explainFail,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = FinneyInk,
-                )
-                Row(
-                    Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
-                ) {
-                    if (result.reward > 0) {
-                        Coin(size = 30.dp)
-                        OutlinedText("+${result.reward}", style = MaterialTheme.typography.headlineMedium)
-                    } else {
-                        Text("награда уже получена", style = MaterialTheme.typography.bodyMedium, color = FinneyInk)
-                    }
-                }
             }
+            RewardChip(result.reward, Modifier.align(Alignment.CenterHorizontally))
             Spacer(Modifier.weight(1f))
-            // «Получилось! Ура!» повторял заголовок «Готово!» — при успехе питомец просто радуется.
-            if (success) {
-                ScenePet(state.character, 120.dp, Modifier.width(120.dp))
-            } else {
-                PetSays(state.character, "Ничего страшного — попробуем ещё раз?", petSize = 120.dp)
-            }
+            // Объяснение — репликой питомца во всю ширину, хвостиком к нему: так оно
+            // отделено от пунктов и читается как совет, а не как ещё один абзац.
+            Bubble(
+                if (success) state.task.explainOk else state.task.explainFail,
+                Tail.DOWN_RIGHT,
+                Modifier.fillMaxWidth(),
+                maxWidth = 600.dp,
+            )
+            PetAtRight(state.character, 110.dp, Modifier.padding(end = 8.dp))
+        }
+    }
+}
+
+/** Награда плашкой: монетка и «+15». Уже получена — так и сказано, без монетки. */
+@Composable
+private fun RewardChip(reward: Int, modifier: Modifier = Modifier) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = modifier
+            .clip(RoundedCornerShape(50))
+            .background(if (reward > 0) FinneyYellow else FinneyCream)
+            .border(StrokeRegular, FinneyInk, RoundedCornerShape(50))
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .semantics(mergeDescendants = true) {
+                contentDescription = if (reward > 0) "Награда: $reward монет" else "Награда уже получена"
+            },
+    ) {
+        if (reward > 0) {
+            OutlinedText("+$reward", style = MaterialTheme.typography.headlineMedium)
+            Coin(size = 30.dp)
+        } else {
+            Text("награда уже получена", style = MaterialTheme.typography.bodyMedium, color = FinneyInk)
         }
     }
 }

@@ -34,7 +34,6 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ru.finney.pet.domain.model.PetCharacter
@@ -50,7 +49,7 @@ import ru.finney.pet.ui.sound.LocalSounds
 import ru.finney.pet.ui.sound.Sfx
 import ru.finney.pet.ui.theme.FinneyGreen
 import ru.finney.pet.ui.theme.FinneyInk
-import ru.finney.pet.ui.theme.FinneyPeach
+import ru.finney.pet.ui.theme.FinneyPink
 import ru.finney.pet.ui.theme.FinneyYellow
 
 // «Проверь чек»: кассир отдал пакет, чек и сдачу. Сверяешь строки чека с ценниками
@@ -127,7 +126,7 @@ internal fun ReceiptGame(task: ReceiptTask, character: PetCharacter, onClose: ()
 
 /** Кассир вежливый: ошибся случайно, после проверки подсказывает, а не ругает. */
 private fun cashierLine(checked: Boolean, solved: Boolean, details: TaskDetails.Receipt?): String = when {
-    !checked || details == null -> "Вот чек и сдача. Проверишь?"
+    !checked || details == null -> "Вот чек и сдача. Где я ошибся — нажми на строку"
     solved && details.refund > 0 -> "Ой, я ошибся! Возвращаю ${details.refund}"
     solved -> "Всё верно, спасибо!"
     details.missed > 0 && details.extra > 0 -> "Где «?» — ошибка, где «✓» — всё верно"
@@ -188,15 +187,15 @@ private fun ReceiptPaper(
                 onToggle = { onLine(line.id) },
             ) {
                 ItemPicture(item, item.label, 30.dp)
-                Text(item.label, style = MaterialTheme.typography.titleMedium, color = FinneyInk, modifier = Modifier.weight(1f), textDecoration = strike(markOf(line.id)))
-                Text(line.price.toString(), style = Mono, color = FinneyInk, textDecoration = strike(markOf(line.id)))
+                Text(item.label, style = MaterialTheme.typography.titleMedium, color = FinneyInk, modifier = Modifier.weight(1f))
+                Text(line.price.toString(), style = Mono, color = FinneyInk)
             }
         }
         Dashes()
         PlainRow("Итого", total)
         PlainRow("Дали", task.paid)
         CheckRow(mark = changeMark, description = "Сдача, ${task.change}", onToggle = onChange) {
-            Text("Сдача", style = Mono, color = FinneyInk, textDecoration = strike(changeMark))
+            Text("Сдача", style = Mono, color = FinneyInk)
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -204,12 +203,16 @@ private fun ReceiptPaper(
             ) {
                 coinsFor(task.change).forEach { DenominationCoin(it, size = 30.dp) }
             }
-            Text(task.change.toString(), style = Mono, color = FinneyInk, textDecoration = strike(changeMark))
+            Text(task.change.toString(), style = Mono, color = FinneyInk)
         }
     }
 }
 
-/** Строка, которую можно отметить: 48 dp по высоте, отметка — значком и словом для TalkBack. */
+/**
+ * Строка, которую можно отметить: 48 dp по высоте, отметка — значком и словом для TalkBack.
+ * Без зачёркивания: на плейтесте его читали и как «ошибка», и как «проверено». Отмеченная
+ * ошибка — розовая строка с «✗» (розовый в игре — всегда ошибка), пропущенная — жёлтая с «?».
+ */
 @Composable
 private fun CheckRow(mark: Mark, description: String, onToggle: () -> Unit, content: @Composable () -> Unit) {
     val flagged = mark == Mark.FLAGGED || mark == Mark.FINE
@@ -220,7 +223,13 @@ private fun CheckRow(mark: Mark, description: String, onToggle: () -> Unit, cont
             .fillMaxWidth()
             .defaultMinSize(minHeight = 48.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(if (mark == Mark.MISSED) FinneyYellow.copy(alpha = 0.5f) else Color.Transparent)
+            .background(
+                when (mark) {
+                    Mark.FLAGGED -> FinneyPink.copy(alpha = 0.28f)
+                    Mark.MISSED -> FinneyYellow.copy(alpha = 0.5f)
+                    else -> Color.Transparent
+                },
+            )
             .toggleable(value = flagged, role = Role.Checkbox, onValueChange = { onToggle() })
             .semantics {
                 contentDescription = description
@@ -243,7 +252,7 @@ private fun CheckRow(mark: Mark, description: String, onToggle: () -> Unit, cont
 private fun MarkBadge(mark: Mark) {
     val (text, fill) = when (mark) {
         Mark.NONE -> "" to Color.White
-        Mark.FLAGGED -> "✗" to FinneyPeach
+        Mark.FLAGGED -> "✗" to FinneyPink
         Mark.MISSED -> "?" to FinneyYellow
         Mark.FINE -> "✓" to FinneyGreen
     }
@@ -268,7 +277,6 @@ private fun Dashes() {
     Text("- ".repeat(40), style = Mono, color = FinneyInk, maxLines = 1, modifier = Modifier.padding(vertical = 2.dp))
 }
 
-private fun strike(mark: Mark) = if (mark == Mark.FLAGGED || mark == Mark.FINE) TextDecoration.LineThrough else null
 
 /** Сдача монетами, крупные первыми. */
 private fun coinsFor(amount: Int): List<Int> {

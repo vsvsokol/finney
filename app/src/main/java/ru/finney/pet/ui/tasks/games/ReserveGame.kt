@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -36,6 +37,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import ru.finney.pet.domain.model.Category
@@ -45,6 +47,7 @@ import ru.finney.pet.domain.model.Spending
 import ru.finney.pet.domain.tasks.TaskEngines
 import ru.finney.pet.domain.tasks.TaskInput
 import ru.finney.pet.domain.tasks.TaskInputError
+import ru.finney.pet.ui.components.CheckBadge
 import ru.finney.pet.ui.components.FinneyButton
 import ru.finney.pet.ui.components.FinneyIcon
 import ru.finney.pet.ui.components.FinneyIcons
@@ -56,6 +59,8 @@ import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneyPeach
 import ru.finney.pet.ui.theme.FinneyPink
 import ru.finney.pet.ui.theme.FinneyYellow
+import ru.finney.pet.ui.theme.StrokeBold
+import ru.finney.pet.ui.theme.StrokeRegular
 
 // «Дождливый день» — спланированный случай непредвиденной траты, который ТЗ
 // разрешает прямо (раздел 2). Сначала «Моя неделя»: траты конвертами, нужное
@@ -171,41 +176,51 @@ internal fun ReserveGame(
                 }
             }
             Spacer(Modifier.weight(1f))
-            PetSays(
-                character,
-                if (shortage == 0) "Хорошо, что был запас! План на неделю цел" else "Желаемое купим потом. В следующий раз оставим запас",
-                petSize = 100.dp,
-            )
+            // Реплика «Хорошо, что был запас! / Желаемое купим потом…» повторяла объяснение
+            // итога слово в слово — питомец просто стоит рядом.
+            PetAtRight(character, 100.dp)
         }
     }
 }
 
-/** Конверт траты: день недели не важен, важно — что это и сколько. Нужное заперто замком. */
+/**
+ * Конверт траты: день недели не важен, важно — что это и сколько.
+ *
+ * Плейтест: невыбранные конверты (бледная рамка) выглядели закрытыми, «откроются
+ * позже», а выбранные — вариантами на выбор. Теперь как у обычного выбора:
+ * выбранное — жёлтое, в толстой рамке и с «✓»; невыбранное — белое, в обычной
+ * рамке и с пустым кружком, который хочется отметить; нужное — выбрано навсегда,
+ * вместо «✓» замок. Слова «купить / в запас» — для TalkBack.
+ */
 @Composable
 private fun Envelope(spending: Spending, checked: Boolean, modifier: Modifier, onChange: (Boolean) -> Unit) {
     val locked = spending.category == Category.NEEDS
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically),
+    Box(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(if (checked) Color.White else FinneyCream)
-            .border(3.dp, if (checked) FinneyInk else FinneyInk.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
+            .background(if (checked) FinneyYellow else Color.White)
+            .border(if (checked) StrokeBold else StrokeRegular, FinneyInk, RoundedCornerShape(12.dp))
             .toggleable(value = checked, enabled = !locked, role = Role.Checkbox, onValueChange = onChange)
+            .semantics { stateDescription = if (locked) "нужное, уже в плане" else if (checked) "купить" else "в запас" }
             .padding(6.dp),
     ) {
-        ItemPicture(spending, spending.label, 36.dp)
-        Text(spending.label, style = MaterialTheme.typography.labelMedium, color = FinneyInk, textAlign = TextAlign.Center)
-        OutlinedText(spending.price.toString(), style = MaterialTheme.typography.titleLarge)
-        // Состояние — значком, не словом: тетрадь — нужное (заперто), ✓ — берём,
-        // пусто — в запас. Слова остались для TalkBack.
-        Box(
-            Modifier.size(22.dp).semantics { contentDescription = if (locked) "нужное" else if (checked) "купить" else "в запас" },
-            contentAlignment = Alignment.Center,
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically),
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
         ) {
+            ItemPicture(spending, spending.label, 36.dp)
+            Text(spending.label, style = MaterialTheme.typography.labelMedium, color = FinneyInk, textAlign = TextAlign.Center)
+            OutlinedText(spending.price.toString(), style = MaterialTheme.typography.titleLarge)
+        }
+        Box(Modifier.align(Alignment.TopEnd)) {
             when {
-                locked -> FinneyIcon(FinneyIcons.Plan, size = 20.dp)
-                checked -> Text("✓", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
+                locked -> Box(
+                    Modifier.size(24.dp).clip(CircleShape).background(FinneyCream).border(2.dp, FinneyInk, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) { FinneyIcon(FinneyIcons.Lock, size = 16.dp) }
+                checked -> CheckBadge(size = 24.dp)
+                else -> Box(Modifier.size(24.dp).clip(CircleShape).background(Color.White).border(2.dp, FinneyInk, CircleShape))
             }
         }
     }
@@ -278,6 +293,12 @@ private fun PostponeRow(spending: Spending, checked: Boolean, onChange: (Boolean
             .toggleable(value = checked, enabled = !locked, role = Role.Checkbox, onValueChange = onChange)
             .padding(horizontal = 10.dp, vertical = 6.dp),
     ) {
+        // Отметка «переносим» — тем же кружком, что у конвертов: пустой — на месте, «✓» — перенесли.
+        when {
+            locked -> FinneyIcon(FinneyIcons.Lock, size = 22.dp)
+            checked -> CheckBadge(size = 24.dp)
+            else -> Box(Modifier.size(24.dp).clip(CircleShape).background(Color.White).border(2.dp, FinneyInk, CircleShape))
+        }
         ItemPicture(spending, spending.label, 32.dp)
         Text(spending.label, style = MaterialTheme.typography.bodyLarge, color = FinneyInk, modifier = Modifier.weight(1f))
         Text(

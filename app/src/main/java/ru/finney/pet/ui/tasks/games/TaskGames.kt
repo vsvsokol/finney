@@ -6,12 +6,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -20,8 +20,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import ru.finney.pet.domain.model.BasketTask
+import ru.finney.pet.domain.model.ChangeRound
 import ru.finney.pet.domain.model.ChangeTask
 import ru.finney.pet.domain.model.ChoresTask
 import ru.finney.pet.domain.model.DistributorTask
@@ -38,11 +41,19 @@ import ru.finney.pet.domain.tasks.TaskDetails
 import ru.finney.pet.domain.tasks.TaskEngines
 import ru.finney.pet.domain.tasks.TaskInput
 import ru.finney.pet.domain.tasks.TaskInputError
+import ru.finney.pet.ui.components.StableText
+import ru.finney.pet.ui.components.AlertBadge
+import ru.finney.pet.ui.components.CheckBadge
+import ru.finney.pet.ui.components.FillBar
 import ru.finney.pet.ui.components.OutlinedText
+import ru.finney.pet.ui.components.SpendBar
 import ru.finney.pet.ui.theme.FinneyGreen
 import ru.finney.pet.ui.theme.FinneyInk
+import ru.finney.pet.ui.theme.FinneyInkFaded
 import ru.finney.pet.ui.theme.FinneyPeach
+import ru.finney.pet.ui.theme.FinneyPink
 import ru.finney.pet.ui.theme.FinneyYellow
+import ru.finney.pet.ui.theme.StrokeRegular
 
 // Единственное место, где движок задания встречается с экраном игры: какая
 // игра, в какой сцене и что показать в итоге. Новый движок — ветка в каждой из
@@ -88,22 +99,53 @@ fun backdropFor(task: TaskDefinition, finished: Boolean = false): Backdrop = whe
     is ChoresTask, is DistributorTask, is GoalSliderTask -> Backdrop.ROOM
 }
 
-/** Значок задания в списке — берётся из самого контента, отдельной картинки не нужно. */
-fun taskIcon(task: TaskDefinition): ItemArt? = when (task) {
-    is SorterTask -> task.items.firstOrNull()
-    is BasketTask -> task.shelf.firstOrNull()
-    is GoalRaceTask -> task.goal
-    is ReserveTask -> task.surprise
-    is StandTask -> task.ingredient
-    is ChangeTask -> task.rounds.firstOrNull()
-    is ReceiptTask -> task.cart.firstOrNull()
-    is ChoresTask -> task.goal
-    is DistributorTask, is GoalSliderTask -> null
+/** Значок задания — берётся из самого контента, отдельной картинки не нужно. */
+fun taskIcon(task: TaskDefinition): ItemArt? = taskIconCandidates(task).firstOrNull()
+
+/**
+ * Из чего можно взять значок задания, по порядку: первым — то, что лучше всего
+ * говорит об игре (цель, ингредиент), дальше — остальные предметы задания.
+ */
+fun taskIconCandidates(task: TaskDefinition): List<ItemArt> = when (task) {
+    is SorterTask -> task.items
+    is BasketTask -> task.shelf
+    is GoalRaceTask -> listOf(task.goal) + task.events
+    is ReserveTask -> listOf(task.surprise) + task.spendings
+    is StandTask -> listOf(task.ingredient)
+    is ChangeTask -> task.rounds
+    is ReceiptTask -> task.cart
+    is ChoresTask -> listOf(task.goal) + task.chores
+    is DistributorTask, is GoalSliderTask -> emptyList()
 }
 
 /**
+ * Значки для списка заданий — у каждой строки свой рисунок. Первый предмет у
+ * нескольких игр один и тот же (яблоко у «Конвейера» и «Списка покупок»), и
+ * одинаковые карточки в списке не различить. Каждая строка берёт первый предмет
+ * своего задания, чей рисунок ещё не заняли строки выше; если свободных нет —
+ * всё-таки первый. Контент при этом не трогаем.
+ */
+fun distinctTaskIcons(tasks: List<TaskDefinition>): List<ItemArt?> {
+    val used = mutableSetOf<String>()
+    return tasks.map { task ->
+        val candidates = taskIconCandidates(task)
+        val pick = candidates.firstOrNull { it.pictureKey() !in used } ?: candidates.firstOrNull()
+        pick?.pictureKey()?.let(used::add)
+        pick
+    }
+}
+
+/** Чем предмет нарисован. Без рисунка и эмодзи значок — буква названия, он и так свой. */
+private fun ItemArt.pictureKey(): String? = art ?: emoji
+
+/**
  * Итог игры в панели: что получилось, по пунктам, как в концептах. Пояснение
- * «что делать дальше» — в explainOk / explainFail задания, его пишет контент.
+ * «что делать дальше» — в explainOk / explainFail задания, его пишет контент,
+ * а показывает сцена итога отдельно от пунктов.
+ *
+ * Удачное здесь тихое, а неудачное заметное — см. [ResultRow]: ребёнок сразу
+ * видит, где ошибся, а не читает все строки подряд. Итоговые числа «3 из 4» —
+ * с полосой рядом ([ScoreLine]).
  */
 @Composable
 fun ColumnScope.ResultBody(task: TaskDefinition, details: TaskDetails, input: TaskInput) {
@@ -117,7 +159,7 @@ fun ColumnScope.ResultBody(task: TaskDefinition, details: TaskDetails, input: Ta
                     ResultRow(it, "${it.label} → «${categoryWord(it.category)}»", ok = false, note = it.why)
                 }
             }
-            Summary("Верно с первого раза: ${details.correct} из ${details.total}")
+            ScoreLine("С первого раза", details.correct, details.total)
         }
 
         is TaskDetails.Basket -> {
@@ -126,34 +168,47 @@ fun ColumnScope.ResultBody(task: TaskDefinition, details: TaskDetails, input: Ta
             basket?.rules?.filter { it.label != null }?.forEach { rule ->
                 ResultRow(null, rule.label!!, ok = TaskEngines.ruleMet(basket, rule, cart))
             }
-            basket?.let { Summary("Потрачено ${details.total} из ${it.limit}, осталось ${it.limit - details.total}") }
+            basket?.let {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Потрачено", style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
+                    SpendBar(details.total, it.limit, Modifier.weight(1f))
+                    StableText("${details.total} из ${it.limit}", widest = "${it.limit}0 из ${it.limit}", style = MaterialTheme.typography.titleMedium)
+                }
+            }
         }
 
         is TaskDetails.GoalRace -> {
             val race = task as? GoalRaceTask
             race?.let {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    ItemPicture(it.goal, it.goal.label, 64.dp)
-                    Column(Modifier.weight(1f)) {
+                    ItemPicture(it.goal, it.goal.label, 56.dp)
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         SumRow("Копилка", "${details.saved} из ${it.goal.price}", strong = true)
-                        Meter(details.saved.toFloat() / it.goal.price, Modifier.height(14.dp))
+                        FillBar(details.saved, it.goal.price, Modifier.fillMaxWidth())
                     }
                 }
-            }
-            race?.let {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Настроение", style = MaterialTheme.typography.titleMedium, color = FinneyInk, modifier = Modifier.weight(1f))
+                    Text("Настроение", style = MaterialTheme.typography.bodyLarge, color = FinneyInk, modifier = Modifier.weight(1f))
                     Hearts(details.mood, it.mood, size = 26.dp)
                 }
             }
-            if (details.shortfall > 0) Summary("Не хватило ${details.shortfall}")
-            if (details.mood == 0) Summary("Финни загрустил по дороге — радостей было мало.")
+            if (details.shortfall > 0) ResultRow(null, "Не хватило ${details.shortfall}", ok = false)
+            if (details.mood == 0) ResultRow(null, "Финни загрустил по дороге", ok = false, note = "Радостей было мало.")
         }
 
         is TaskDetails.Reserve -> {
             val reserve = task as? ReserveTask
-            SumRow("Запас был", details.reserve.toString(), strong = true)
-            reserve?.let { SumRow(it.surprise.label, it.surprise.price.toString()) }
+            reserve?.let {
+                // Хватило ли запаса на непредвиденное — полосой: запас против того, что понадобилось.
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ItemPicture(it.surprise, it.surprise.label, 36.dp)
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        SumRow("Запас", details.reserve.toString(), strong = true)
+                        SumRow("Понадобилось", it.surprise.price.toString())
+                        FillBar(details.reserve, it.surprise.price, Modifier.fillMaxWidth(), description = "Запас ${details.reserve}, понадобилось ${it.surprise.price}")
+                    }
+                }
+            }
             val dropped = (input as? TaskInput.Reserve)?.dropped.orEmpty()
             reserve?.spendings?.filter { it.id in dropped }?.forEach { ResultRow(it, "${it.label} — перенесли", ok = false) }
             ResultRow(null, if (details.shortage == 0) "Запаса хватило" else "Не хватило ${details.shortage}", ok = details.shortage == 0)
@@ -166,48 +221,52 @@ fun ColumnScope.ResultBody(task: TaskDefinition, details: TaskDetails, input: Ta
             LedgerRow("−", FinneyPeach, "Купил: ${stand?.ingredient?.label?.lowercase().orEmpty()} × ${details.spent / (stand?.ingredient?.price ?: 1)}", "−${details.spent}")
             LedgerRow("=", Color.White, "Заработал", details.kept.toString(), highlight = true)
             val notes = listOfNotNull(
-                details.leftover.takeIf { it > 0 }?.let { "${cupCount(it)} не купили." },
-                details.missed.takeIf { it > 0 }?.let { "${plural(it, "гостю", "гостям", "гостям")} не хватило." },
+                details.leftover.takeIf { it > 0 }?.let { "${cupCount(it)} не купили" },
+                details.missed.takeIf { it > 0 }?.let { "${plural(it, "гостю", "гостям", "гостям")} не хватило" },
             )
-            if (notes.isNotEmpty()) Summary(notes.joinToString(" ") + " На всех гостей хватило бы: ${stand?.ingredient?.label?.lowercase().orEmpty()} × ${details.best}.")
+            if (notes.isEmpty()) {
+                ResultRow(null, "Всем хватило, ничего не пропало", ok = true)
+            } else {
+                ResultRow(
+                    stand?.ingredient,
+                    notes.joinToString(", "),
+                    ok = false,
+                    note = "На всех хватило бы: ${stand?.ingredient?.label?.lowercase().orEmpty()} × ${details.best}",
+                )
+            }
         }
 
         is TaskDetails.Change -> {
             val change = task as? ChangeTask
             val answers = (input as? TaskInput.Coins)?.rounds.orEmpty()
             change?.rounds?.forEachIndexed { i, round ->
-                val coins = answers.getOrNull(i).orEmpty()
-                val diff = details.results.getOrNull(i) ?: 0
-                ResultRow(
-                    round,
-                    "${round.label}: ${if (coins.isEmpty()) "0" else coins.joinToString(" + ")}",
-                    ok = diff == 0,
-                    note = if (diff == 0) null else "нужно было ${round.target}",
-                )
+                ChangeRow(round, answers.getOrNull(i).orEmpty(), diff = details.results.getOrNull(i) ?: 0)
             }
-            Summary("Верно с первого раза: ${details.correct} из ${details.total}")
+            ScoreLine("С первого раза", details.correct, details.total)
         }
 
         is TaskDetails.Receipt -> {
             if (details.found > 0) ResultRow(null, "Нашли ошибок: ${details.found}", ok = true)
             if (details.missed > 0) ResultRow(null, "Не заметили: ${details.missed}", ok = false)
             if (details.extra > 0) ResultRow(null, "Верное приняли за ошибку: ${details.extra}", ok = false)
-            Summary(if (details.lost > 0) "Вернули ${details.refund}, могли ещё ${details.lost}" else "Вернули ${details.refund}")
+            // Сколько вернули из того, что могли, — полосой, как любое «сколько из скольки».
+            if (details.lost > 0) ScoreLine("Вернули", details.refund, details.refund + details.lost)
+            else Summary("Вернули ${details.refund}")
         }
 
         is TaskDetails.Chores -> {
             val chores = task as? ChoresTask
             chores?.let {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    ItemPicture(it.goal, it.goal.label, 64.dp)
-                    Column(Modifier.weight(1f)) {
+                    ItemPicture(it.goal, it.goal.label, 56.dp)
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         SumRow("Заработал", "${details.earned} из ${it.goal.price}", strong = true)
-                        Meter(details.earned.toFloat() / it.goal.price, Modifier.height(14.dp))
+                        FillBar(details.earned, it.goal.price, Modifier.fillMaxWidth())
                     }
                 }
                 ResultRow(null, "Дней отдыха: ${details.restDays}, нужно ${it.minRestDays}", ok = details.restDays >= it.minRestDays)
             }
-            if (details.shortfall > 0) Summary("Не хватило ${details.shortfall}")
+            if (details.shortfall > 0) ResultRow(null, "Не хватило ${details.shortfall}", ok = false)
         }
 
         is TaskDetails.Distribution -> details.goalSavedAfter?.let { Summary("В копилке станет $it, осталось ${details.goalRemaining}") }
@@ -217,21 +276,95 @@ fun ColumnScope.ResultBody(task: TaskDefinition, details: TaskDetails, input: Ta
     }
 }
 
-/** Строка итога: картинка, текст, отметка ✓ или ↺. Отметка дублирует цвет символом (ТЗ п. 3.6). */
+/**
+ * Строка итога. Удачное — тихо: без подложки, бледным текстом и маленьким «✓».
+ * Неудачное — заметно: розовая подложка в рамке, крупнее и с «!». Отметка дублирует
+ * цвет знаком (ТЗ п. 3.6).
+ */
 @Composable
 private fun ResultRow(art: ItemArt?, text: String, ok: Boolean, note: String? = null) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        art?.let { ItemPicture(it, text, 32.dp) }
+    if (ok) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(horizontal = 4.dp),
+        ) {
+            art?.let { ItemPicture(it, text, 28.dp) }
+            Text(text, style = MaterialTheme.typography.bodyLarge, color = FinneyInkFaded, modifier = Modifier.weight(1f))
+            CheckBadge(size = 24.dp)
+        }
+        return
+    }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth().problemCard().padding(8.dp),
+    ) {
+        art?.let { ItemPicture(it, text, 40.dp) }
         Column(Modifier.weight(1f)) {
             Text(text, style = MaterialTheme.typography.titleMedium, color = FinneyInk)
-            note?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = FinneyInk.copy(alpha = 0.75f)) }
+            note?.let { Text(it, style = MaterialTheme.typography.bodyLarge, color = FinneyInk) }
         }
-        Box(
-            Modifier.size(28.dp).clip(CircleShape).background(if (ok) FinneyGreen else FinneyPeach).border(2.dp, FinneyInk, CircleShape),
-            contentAlignment = Alignment.Center,
-        ) { Text(if (ok) "✓" else "↺", style = MaterialTheme.typography.labelLarge, color = FinneyInk) }
+        AlertBadge(size = 30.dp)
     }
 }
+
+/**
+ * Раунд кассы: что купили и какие монеты дали — монетами, а не «2 + 1», и сумма.
+ * Ошибка — как любая неудачная строка итога, и под ней сколько было нужно.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ChangeRow(round: ChangeRound, coins: List<Int>, diff: Int) {
+    val ok = diff == 0
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (ok) Modifier.padding(horizontal = 4.dp) else Modifier.problemCard().padding(8.dp))
+            .semantics(mergeDescendants = true) {
+                contentDescription = "${round.label}: ${coins.sum()}" + if (ok) ", верно" else ", нужно было ${round.target}"
+            },
+    ) {
+        ItemPicture(round, round.label, if (ok) 28.dp else 40.dp)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                coins.forEach { DenominationCoin(it, size = 28.dp, faded = ok) }
+                Text(
+                    "= ${coins.sum()}",
+                    style = if (ok) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.titleMedium,
+                    color = if (ok) FinneyInkFaded else FinneyInk,
+                )
+            }
+            if (!ok) Text("нужно было ${round.target}", style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
+        }
+        if (ok) CheckBadge(size = 24.dp) else AlertBadge(size = 30.dp)
+    }
+}
+
+/** Итоговое «3 из 4» — числом и полосой рядом. */
+@Composable
+private fun ScoreLine(label: String, value: Int, max: Int) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.padding(top = 4.dp),
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
+        FillBar(value, max, Modifier.weight(1f))
+        StableText("$value из $max", widest = "$max из $max", style = MaterialTheme.typography.titleMedium)
+    }
+}
+
+/** Подложка неудачной строки: светло-розовая, в рамке. */
+private fun Modifier.problemCard(): Modifier = this
+    .clip(RoundedCornerShape(14.dp))
+    .background(FinneyPink.copy(alpha = 0.28f))
+    .border(StrokeRegular, FinneyInk, RoundedCornerShape(14.dp))
 
 /** Строка «истории», как в ките: значок операции, подпись, сумма. */
 @Composable

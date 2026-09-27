@@ -71,6 +71,7 @@ import kotlinx.coroutines.delay
 import ru.finney.pet.domain.game.LevelCheck
 import ru.finney.pet.ui.components.Coin
 import ru.finney.pet.ui.components.FeedbackSound
+import ru.finney.pet.ui.components.FillRing
 import ru.finney.pet.ui.components.FinneyButton
 import ru.finney.pet.ui.components.FinneyIcon
 import ru.finney.pet.ui.components.FinneyIconButton
@@ -638,6 +639,7 @@ private fun HomeContent(
             modifier = Modifier.fillMaxWidth().graphicsLayer { alpha = hudAlpha },
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            // У цели копилка — кольцом вокруг значка: «10 из 50» видно и не читая.
             InfoChip(
                 icon = FinneyIcons.Piggy,
                 text = state.goal
@@ -646,6 +648,7 @@ private fun HomeContent(
                 action = "Копилка и цель",
                 onClick = onOpenGoals,
                 enabled = !sleeping,
+                progress = state.goal?.let { it.saved to it.goal.price },
                 modifier = Modifier.weight(1f),
             )
 
@@ -1264,6 +1267,9 @@ private val LevelBadgeSize = 66.dp
  * который сам по себе действия не называет.
  *
  * [enabled] = false — плашка полупрозрачная и не нажимается (во сне).
+ *
+ * [progress] — «сколько из скольки» (накоплено и цена цели): значок встаёт
+ * в кольцо, которое заполняется от розового к зелёному. null — просто значок.
  */
 @Composable
 private fun InfoChip(
@@ -1273,6 +1279,7 @@ private fun InfoChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    progress: Pair<Int, Int>? = null,
 ) {
     Row(
         modifier = modifier
@@ -1286,7 +1293,12 @@ private fun InfoChip(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        FinneyIcon(icon, size = 22.dp)
+        if (progress != null) {
+            // 32 dp — ровно высота плашки без полей: полоса над комнатой не растёт.
+            FillRing(progress.first, progress.second, diameter = 32.dp) { FinneyIcon(icon, size = 17.dp) }
+        } else {
+            FinneyIcon(icon, size = 22.dp)
+        }
         Text(
             text = text,
             style = MaterialTheme.typography.bodyMedium,

@@ -343,39 +343,49 @@ internal fun Guest(character: PetCharacter, size: Dp, modifier: Modifier = Modif
 private val StillPose: () -> PetPose = { PetPose() }
 
 /**
- * Питомец и его реплика. Пузырь стоит вплотную к питомцу и не шире, чем нужно
- * тексту: растянутый на всю строку, он отъезжал к краю, и хвостик смотрел в пустоту.
+ * Питомец и его реплика. Питомец справа, как в играх с полками и кассой: плейтест
+ * заметил, что на вступлении он стоял слева, а везде — справа. Пузырь вплотную
+ * к питомцу и не шире, чем нужно тексту: растянутый на всю строку, он отъезжал
+ * к краю, и хвостик смотрел в пустоту.
  */
 @Composable
 internal fun PetSays(character: PetCharacter, text: String, modifier: Modifier = Modifier, petSize: Dp = 120.dp) {
-    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.End) {
+        Bubble(text, Tail.RIGHT, Modifier.weight(1f, fill = false), maxWidth = 240.dp)
         ScenePet(character, petSize, Modifier.width(petSize))
-        Bubble(text, Tail.LEFT, Modifier.weight(1f, fill = false), maxWidth = 240.dp)
+    }
+}
+
+/** Питомец сам по себе, у правого края сцены — там же, где он говорит в [PetSays]. */
+@Composable
+internal fun PetAtRight(character: PetCharacter, petSize: Dp, modifier: Modifier = Modifier, mood: PetMood = PetMood.HAPPY) {
+    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+        ScenePet(character, petSize, Modifier.width(petSize), mood = mood)
     }
 }
 
 /**
  * Питомец обещает награду: в пузыре монетка и «+15» вместо фразы «Получится — дам
- * 15 монет». Число и монетка читаются быстрее слов.
+ * 15 монет». Число и монетка читаются быстрее слов. Питомец справа, как в [PetSays].
  */
 @Composable
 internal fun PetOffers(character: PetCharacter, amount: Int, modifier: Modifier = Modifier, petSize: Dp = 120.dp) {
     val tailSize = 12.dp
-    val shape = remember { BubbleShape(Tail.LEFT, 16.dp, tailSize) }
-    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        ScenePet(character, petSize, Modifier.width(petSize))
+    val shape = remember { BubbleShape(Tail.RIGHT, 16.dp, tailSize) }
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.End) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             modifier = Modifier
                 .background(Color.White, shape)
                 .border(StrokeRegular, FinneyInk, shape)
-                .padding(start = 12.dp + tailSize, end = 14.dp, top = 8.dp, bottom = 8.dp)
+                .padding(start = 14.dp, end = 12.dp + tailSize, top = 8.dp, bottom = 8.dp)
                 .semantics(mergeDescendants = true) { contentDescription = "Получится — дам $amount монет" },
         ) {
             OutlinedText("+$amount", style = MaterialTheme.typography.headlineMedium)
             Coin(size = 30.dp)
         }
+        ScenePet(character, petSize, Modifier.width(petSize))
     }
 }
 

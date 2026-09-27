@@ -3,6 +3,7 @@ package ru.finney.pet.ui.components
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -19,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -50,6 +52,8 @@ import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneyStrokeRatio
 import ru.finney.pet.ui.theme.FinneyPeach
 import ru.finney.pet.ui.theme.FinneyPink
+import ru.finney.pet.ui.theme.FinneySand
+import ru.finney.pet.ui.theme.StrokeRegular
 import ru.finney.pet.ui.theme.FinneyTheme
 import ru.finney.pet.ui.theme.FinneyYellow
 
@@ -157,6 +161,8 @@ private val BackLabels = setOf("Назад", "Закрыть", "Отмена", "
  *
  * [fillWidth] — растянуть по ширине родителя; иначе кнопка по размеру надписи.
  * [sound] — щелчок при нажатии; у «Назад» и «Закрыть» по умолчанию свой.
+ * [icon] — значок перед надписью: копилка на «В копилку». Надпись всё равно
+ * обязательна — значок подсказывает, а смысл несут слова.
  */
 @Composable
 fun FinneyButton(
@@ -166,6 +172,7 @@ fun FinneyButton(
     enabled: Boolean = true,
     fillWidth: Boolean = true,
     sound: Sfx = if (text in BackLabels) Sfx.Back else Sfx.Tap,
+    icon: (@Composable () -> Unit)? = null,
 ) {
     val sounds = LocalSounds.current
     val interactionSource = remember { MutableInteractionSource() }
@@ -203,7 +210,70 @@ fun FinneyButton(
                 .padding(horizontal = 24.dp, vertical = 12.dp),
             contentAlignment = Alignment.Center,
         ) {
-            OutlinedText(text, style = MaterialTheme.typography.titleLarge)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                icon?.invoke()
+                OutlinedText(text, style = MaterialTheme.typography.titleLarge)
+            }
+        }
+    }
+}
+
+/** Высота второстепенной кнопки: ниже основной, но с запасом над 48 dp из ТЗ п. 3.6. */
+private val QuietButtonHeight = 56.dp
+
+/**
+ * Второстепенная кнопка — рядом с основной, когда действие есть, но звать к нему
+ * не надо: «Взять» в копилке рядом с «В копилку».
+ *
+ * В ките такой нет — это наше решение, собранное по его правилам: «стадион»,
+ * обводка ink снаружи, заливка плоская. Спокойнее основной всем сразу: песочная
+ * заливка без нижней полосы и блика, обводка тоньше, надпись без контура.
+ * Нажатие — то же сжатие 0.96 и заливка на шаг светлее, чтобы отклик был не только цветом.
+ */
+@Composable
+fun FinneyQuietButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    sound: Sfx = Sfx.Tap,
+    icon: (@Composable () -> Unit)? = null,
+) {
+    val sounds = LocalSounds.current
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val shape = RoundedCornerShape(percent = 50)
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) PressedScale else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "press",
+    )
+
+    Surface(
+        onClick = {
+            sounds.play(sound)
+            onClick()
+        },
+        modifier = modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = QuietButtonHeight)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            },
+        enabled = enabled,
+        shape = shape,
+        color = if (pressed) FinneyCream else FinneySand,
+        border = BorderStroke(StrokeRegular, FinneyInk),
+        interactionSource = interactionSource,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+        ) {
+            icon?.invoke()
+            Text(text, style = MaterialTheme.typography.titleLarge, color = FinneyInk)
         }
     }
 }
@@ -217,6 +287,10 @@ fun FinneyButton(
  * состояние» из кита: других состояний у круглой кнопки там не нарисовано,
  * а выбранное отличать надо. Уходит и в TalkBack: цвет — не единственный
  * признак (ТЗ п. 3.6).
+ *
+ * [sound] — null, если звук играет сам вызывающий: кнопки «−/+» с удержанием
+ * щёлкают на каждом шаге своим тоном, и второй щелчок на касании задвоил бы его.
+ * [interactionSource] — свой, если вызывающему надо знать, что палец ещё на кнопке.
  */
 @Composable
 fun FinneyIconButton(
@@ -226,12 +300,13 @@ fun FinneyIconButton(
     size: Dp = 72.dp,
     enabled: Boolean = true,
     selected: Boolean = false,
-    sound: Sfx = Sfx.Tap,
+    sound: Sfx? = Sfx.Tap,
+    interactionSource: MutableInteractionSource? = null,
     content: @Composable () -> Unit,
 ) {
     val sounds = LocalSounds.current
-    val interactionSource = remember { MutableInteractionSource() }
-    val pressed by interactionSource.collectIsPressedAsState()
+    val source = interactionSource ?: remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
     val scale by animateFloatAsState(
         targetValue = if (pressed) PressedScale else 1f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
@@ -240,7 +315,7 @@ fun FinneyIconButton(
 
     Surface(
         onClick = {
-            sounds.play(sound)
+            sound?.let(sounds::play)
             onClick()
         },
         // Содержимое кнопки — рисунок без текста, поэтому подпись для TalkBack
@@ -258,7 +333,7 @@ fun FinneyIconButton(
         enabled = enabled,
         shape = CircleShape,
         color = Color.Transparent,
-        interactionSource = interactionSource,
+        interactionSource = source,
     ) {
         Box(
             modifier = Modifier.clip(CircleShape).buttonFill(pressed || selected, round = true),

@@ -37,11 +37,13 @@ import ru.finney.pet.ui.components.AMOUNT_STEP
 import ru.finney.pet.ui.components.AmountStepper
 import ru.finney.pet.ui.components.CoinAmount
 import ru.finney.pet.ui.components.FeedbackSound
+import ru.finney.pet.ui.components.FillBar
 import ru.finney.pet.ui.components.FinneyButton
 import ru.finney.pet.ui.components.FinneyCard
 import ru.finney.pet.ui.components.FinneyPanel
 import ru.finney.pet.ui.components.FinneyScreen
 import ru.finney.pet.ui.components.OutlinedText
+import ru.finney.pet.ui.components.SpendBar
 import ru.finney.pet.ui.theme.FinneyGreen
 import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneyPink
@@ -268,7 +270,7 @@ private fun ActiveContent(state: BudgetUiState.Active, onBack: () -> Unit) {
         FinneyPanel(title = "Уровень ${state.level}") {
             FactRow("Нужное", report.facts.needs, report.plan.needs)
             FactRow("Желаемое", report.facts.wants, report.plan.wants)
-            FactRow("Копилка", report.facts.savings, report.plan.savings)
+            FactRow("Копилка", report.facts.savings, report.plan.savings, progress = true)
         }
 
         CoinAmount(amount = state.balance)
@@ -294,24 +296,31 @@ private fun ActiveContent(state: BudgetUiState.Active, onBack: () -> Unit) {
     }
 }
 
-/** Строка «потрачено из запланированного». */
+/**
+ * Строка «потрачено из запланированного» и полоса под ней. Траты — полосой без
+ * зелёного (потратить больше — не успех), [progress] — копилка: там полоса
+ * прогресса от розового к зелёному.
+ */
 @Composable
-private fun FactRow(label: String, fact: Int, planned: Int) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyLarge,
-            color = FinneyInk,
-            modifier = Modifier.weight(1f),
-        )
-        Text(
-            text = "$fact из $planned",
-            style = MaterialTheme.typography.titleMedium,
-            color = FinneyInk,
-        )
+private fun FactRow(label: String, fact: Int, planned: Int, progress: Boolean = false) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyLarge,
+                color = FinneyInk,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = "$fact из $planned",
+                style = MaterialTheme.typography.titleMedium,
+                color = FinneyInk,
+            )
+        }
+        if (progress) FillBar(fact, planned, Modifier.fillMaxWidth()) else SpendBar(fact, planned, Modifier.fillMaxWidth())
     }
 }
 

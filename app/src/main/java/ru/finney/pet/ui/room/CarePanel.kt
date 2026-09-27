@@ -1,5 +1,7 @@
 package ru.finney.pet.ui.room
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
@@ -9,13 +11,17 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -24,6 +30,7 @@ import ru.finney.pet.domain.model.Category
 import ru.finney.pet.domain.model.PetStats
 import ru.finney.pet.domain.model.ShopItem
 import ru.finney.pet.domain.model.StatEffect
+import ru.finney.pet.ui.components.CheckBadge
 import ru.finney.pet.ui.components.CoinAmount
 import ru.finney.pet.ui.components.FinneyButton
 import ru.finney.pet.ui.components.FinneyCard
@@ -37,6 +44,7 @@ import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneyPeach
 import ru.finney.pet.ui.theme.FinneyPink
 import ru.finney.pet.ui.theme.FinneyTheme
+import ru.finney.pet.ui.theme.StrokeThin
 
 /**
  * Что выбирают: предмет и что с ним станет, если купить.
@@ -83,6 +91,10 @@ data class CareBlock(
  * [allowShortage] — кнопку можно нажать и при нехватке денег. Так в магазине:
  * домен откажет, и экран покажет, чего не хватает и что делать (шаг 7
  * Приложения А — «попытка покупки при нехватке средств»).
+ *
+ * [header] — что стоит в панели над товарами: в магазине это полоса категории.
+ * [withConfirm] false — кнопки в панели нет, её ставит экран: в магазине панелей
+ * три, а кнопка «Купить» одна, внизу.
  */
 @Composable
 fun CarePanel(
@@ -96,10 +108,13 @@ fun CarePanel(
     block: CareBlock? = null,
     confirmLabel: String = "Купить",
     allowShortage: Boolean = false,
+    header: (@Composable () -> Unit)? = null,
+    withConfirm: Boolean = true,
 ) {
     val selected = options.firstOrNull { it.isSelected }
 
     FinneyPanel(title = title, onClose = onDismiss, modifier = modifier) {
+        header?.invoke()
         if (options.isEmpty()) {
             Text(
                 text = "Пока нечего купить",
@@ -113,6 +128,7 @@ fun CarePanel(
             CareRow(option = option, onPick = { onPick(option.item.id) })
         }
 
+        if (!withConfirm) return@FinneyPanel
         Spacer(Modifier.padding(top = 4.dp))
 
         if (block != null) {
@@ -125,23 +141,42 @@ fun CarePanel(
             return@FinneyPanel
         }
 
+        // Кнопка — всегда действие: «Купить», а не подсказка «Выбери, что купить»
+        // внутри неё (плейтест: кнопка должна говорить, что сделает). Пока ничего
+        // не выбрано, подсказка стоит над кнопкой, а сама кнопка не нажимается.
+        if (selected == null) PickHint()
         // Купить можно только выбранное и только когда хватает денег. У строки
         // с нехваткой уже написано, сколько не достаёт и что делать, — кнопка
         // молча неактивной не остаётся.
         FinneyButton(
-            text = if (selected == null) "Выбери, что купить" else confirmLabel,
+            text = confirmLabel,
             onClick = { selected?.let { onConfirm(it.item.id) } },
             enabled = selected != null && (allowShortage || selected.preview.shortage == 0),
         )
     }
 }
 
+/** «Нажми на товар, чтобы выбрать» — со стрелкой вверх, к товарам. */
+@Composable
+fun PickHint(modifier: Modifier = Modifier) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        OutlinedText("↑", style = MaterialTheme.typography.titleLarge)
+        Text("Нажми на товар, чтобы выбрать", style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
+    }
+}
+
 /**
- * Строка предмета — картинкой, а не словами: рисунок, что он даёт (значок шкалы
- * и «+20») и цена с монеткой. Название — только для TalkBack.
+ * Строка предмета — картинкой, а не словами: рисунок, что он даёт («+20» со
+ * значком шкалы) и цена с монеткой. Название — только для TalkBack.
  *
- * Категория — значком в углу рисунка (тетрадь — нужное, звезда — желаемое),
- * нехватка — рамкой и строкой «не хватает»: ТЗ п. 3.6 запрещает цвет как
+ * Категория видна по панели, в которой стоит предмет (в магазине у неё цветная
+ * полоса со словом). Значки тетради и звезды в углу рисунка убраны: на плейтесте
+ * их не понимали, они сливались с предметом и закрывали его. Выбранное — зелёным
+ * и «✓», нехватка — розовым и строкой «не хватает»: ТЗ п. 3.6 запрещает цвет как
  * единственный способ что-то сообщить, а п. 2.5.6 требует, чтобы цена,
  * категория и влияние были видны до покупки.
  */
@@ -162,6 +197,7 @@ private fun CareRow(option: CareOption, onPick: () -> Unit) {
             .fillMaxWidth()
             .semantics(mergeDescendants = true) {
                 contentDescription = "${option.item.label}, ${if (needed) "нужное" else "желаемое"}"
+                selected = option.isSelected
             }
             .clickable(onClickLabel = "Выбрать: ${option.item.label}", onClick = onPick),
         accent = accent,
@@ -171,14 +207,14 @@ private fun CareRow(option: CareOption, onPick: () -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(contentAlignment = Alignment.TopStart) {
+            Box(contentAlignment = Alignment.TopEnd) {
                 ItemPicture(option.item.id, itemFallback(option.item.id), size = 64.dp)
-                FinneyIcon(icon = if (needed) FinneyIcons.Plan else FinneyIcons.Star, size = 20.dp)
+                if (option.isSelected) CheckBadge(size = 24.dp)
             }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                EffectLine(FinneyIcons.Food, "сытость", preview.statsBefore.satiety, preview.statsAfter.satiety)
-                EffectLine(FinneyIcons.Bath, "чистота", preview.statsBefore.hygiene, preview.statsAfter.hygiene)
-                EffectLine(null, "радость", preview.statsBefore.mood, preview.statsAfter.mood)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                EffectChip(FinneyIcons.Food, "сытость", option.item.effect.satiety, preview.statsBefore.satiety, preview.statsAfter.satiety)
+                EffectChip(FinneyIcons.Bath, "чистота", option.item.effect.hygiene, preview.statsBefore.hygiene, preview.statsAfter.hygiene)
+                EffectChip(null, "радость", option.item.effect.mood, preview.statsBefore.mood, preview.statsAfter.mood)
             }
             CoinAmount(amount = option.item.price)
         }
@@ -194,26 +230,37 @@ private fun CareRow(option: CareOption, onPick: () -> Unit) {
 }
 
 /**
- * Что станет со шкалой: её значок и «+20». Строка молчит, если предмет шкалу не трогает.
- * [icon] null — радость, её знак — лицо, как под шкалой на главном.
+ * Что станет со шкалой: «+20» и значок шкалы одной плашкой. Раньше значок стоял
+ * отдельно от числа, и их читали порознь; теперь «+20» и вилка — одно целое.
+ * Плашка молчит, только если предмет эту шкалу не трогает вовсе. Шкала уже полная —
+ * плашка остаётся со словом «полно»: раньше она пропадала, и у мыла при чистой
+ * шкале не было написано ничего, будто оно бесполезно. [icon] null — радость,
+ * её знак — лицо, как под шкалой на главном.
  */
 @Composable
-private fun EffectLine(icon: FinneyIcons?, label: String, before: Int, after: Int) {
-    if (before == after) return
+private fun EffectChip(icon: FinneyIcons?, label: String, effect: Int, before: Int, after: Int) {
+    if (effect == 0 && before == after) return
     val delta = after - before
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        modifier = Modifier.clearAndSetSemantics {
-            contentDescription = "$label: было $before, станет $after"
-        },
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(Color.White)
+            .border(StrokeThin, FinneyInk, RoundedCornerShape(50))
+            .padding(start = 10.dp, end = 8.dp)
+            .clearAndSetSemantics {
+                contentDescription = if (before == after) "$label: уже полная" else "$label: было $before, станет $after"
+            },
     ) {
-        if (icon != null) FinneyIcon(icon, size = 24.dp) else MoodFace(size = 24.dp)
-        OutlinedText(
+        if (delta == 0) {
+            Text("полно", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
+        } else OutlinedText(
             text = if (delta > 0) "+$delta" else "$delta",
             style = MaterialTheme.typography.titleLarge,
             fill = if (delta > 0) FinneyGreen else FinneyPeach,
         )
+        if (icon != null) FinneyIcon(icon, size = 22.dp) else MoodFace(size = 22.dp)
     }
 }
 
