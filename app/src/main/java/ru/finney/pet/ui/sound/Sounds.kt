@@ -46,6 +46,11 @@ interface Sounds {
     fun setSound(enabled: Boolean)
 
     fun setMusic(enabled: Boolean)
+
+    fun setHaptics(enabled: Boolean)
+
+    /** Анимации выключает MainActivity через [ru.finney.pet.ui.motion.AppMotion], экранам ничего делать не нужно. */
+    fun setAnimations(enabled: Boolean)
 }
 
 /** Тишина: в превью и тестах без приложения. */
@@ -59,6 +64,8 @@ object NoSounds : Sounds {
     override fun duckMusic(ducked: Boolean) = Unit
     override fun setSound(enabled: Boolean) = Unit
     override fun setMusic(enabled: Boolean) = Unit
+    override fun setHaptics(enabled: Boolean) = Unit
+    override fun setAnimations(enabled: Boolean) = Unit
 }
 
 val LocalSounds = staticCompositionLocalOf<Sounds> { NoSounds }
@@ -167,6 +174,14 @@ class SoundPlayer(
 
     override fun setMusic(enabled: Boolean) {
         scope.launch { storage.setMusic(enabled) }
+    }
+
+    override fun setHaptics(enabled: Boolean) {
+        scope.launch { storage.setHaptics(enabled) }
+    }
+
+    override fun setAnimations(enabled: Boolean) {
+        scope.launch { storage.setAnimations(enabled) }
     }
 
     /** Activity на экране — onStart. */

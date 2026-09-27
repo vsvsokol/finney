@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import ru.finney.pet.ui.motion.LocalAnimations
 import ru.finney.pet.ui.sound.LocalSounds
 import ru.finney.pet.ui.sound.Sfx
 import ru.finney.pet.ui.theme.FinneyInk
@@ -125,6 +126,7 @@ fun HoldRepeatButton(
     val haptics = LocalHapticFeedback.current
     val step by rememberUpdatedState(onStep)
     val canStep by rememberUpdatedState(enabled)
+    val animations by rememberUpdatedState(LocalAnimations.current)
     val interaction = remember { MutableInteractionSource() }
     val hold = remember { Hold() }
     val shake = remember { Animatable(0f) }
@@ -140,7 +142,14 @@ fun HoldRepeatButton(
                     ring?.cancel()
                     ring = launch {
                         charge.snapTo(0f)
-                        charge.animateTo(1f, tween(RepeatDelayMs.toInt(), easing = LinearEasing))
+                        if (animations) {
+                            charge.animateTo(1f, tween(RepeatDelayMs.toInt(), easing = LinearEasing))
+                        } else {
+                            // Без анимаций заполнение встало бы полным сразу, будто повтор уже идёт.
+                            // Кольцо появляется целиком ровно тогда, когда он начинается.
+                            delay(RepeatDelayMs)
+                            charge.snapTo(1f)
+                        }
                     }
                     repeat?.cancel()
                     repeat = launch {

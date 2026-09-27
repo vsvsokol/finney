@@ -16,6 +16,7 @@ class DataStoreSettingsStorage(private val dataStore: DataStore<Preferences>) : 
             sound = prefs[SOUND] ?: true,
             music = prefs[MUSIC] ?: true,
             haptics = prefs[HAPTICS] ?: true,
+            animations = prefs[ANIMATIONS] ?: true,
         )
     }
 
@@ -31,9 +32,14 @@ class DataStoreSettingsStorage(private val dataStore: DataStore<Preferences>) : 
         dataStore.edit { it[HAPTICS] = enabled }
     }
 
+    override suspend fun setAnimations(enabled: Boolean) {
+        dataStore.edit { it[ANIMATIONS] = enabled }
+    }
+
     private companion object {
         val SOUND = booleanPreferencesKey("sound")
         val MUSIC = booleanPreferencesKey("music")
         val HAPTICS = booleanPreferencesKey("haptics")
+        val ANIMATIONS = booleanPreferencesKey("animations")
     }
 }

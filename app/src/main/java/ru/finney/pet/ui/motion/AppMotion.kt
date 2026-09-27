@@ -1,0 +1,37 @@
+package ru.finney.pet.ui.motion
+
+import android.content.Context
+import android.provider.Settings
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.MotionDurationScale
+
+/**
+ * Скорость всех анимаций окна (ТЗ п. 3.6: анимации отключаются). Compose берёт её из
+ * контекста корутин рекомпозера, поэтому `animateTo`, `animate*AsState`, переходы и
+ * бесконечные анимации выключаются разом: при 0 они сразу встают в конечное значение.
+ * Экранам ничего делать не нужно. Системная «скорость анимации» учитывается, как и без нас.
+ *
+ * Покадровые циклы на `withFrameNanos` — это игра (полёт еды, пена), а не украшение,
+ * их множитель не трогает. Украшение на таком цикле проверяет [LocalAnimations].
+ */
+class AppMotion(private val context: Context) : MotionDurationScale {
+
+    @Volatile
+    var enabled: Boolean = true
+
+    @Volatile
+    private var systemScale: Float = readSystemScale()
+
+    override val scaleFactor: Float get() = if (enabled) systemScale else 0f
+
+    /** Перечитать системную скорость анимации: зовёт MainActivity при возврате на экран. */
+    fun refreshSystemScale() {
+        systemScale = readSystemScale()
+    }
+
+    private fun readSystemScale(): Float =
+        Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
+}
+
+/** Включены ли анимации — для украшений, которые идут своим циклом кадров или `delay`. */
+val LocalAnimations = staticCompositionLocalOf { true }
