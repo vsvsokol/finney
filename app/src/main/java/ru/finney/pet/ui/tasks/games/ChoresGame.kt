@@ -34,12 +34,12 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import ru.finney.pet.ui.components.WarningBadge
 import ru.finney.pet.domain.model.Chore
 import ru.finney.pet.domain.model.ChoresTask
 import ru.finney.pet.domain.model.PetCharacter
 import ru.finney.pet.domain.tasks.TaskEngines
 import ru.finney.pet.domain.tasks.TaskInput
-import ru.finney.pet.ui.components.AlertBadge
 import ru.finney.pet.ui.components.CheckBadge
 import ru.finney.pet.ui.components.Coin
 import ru.finney.pet.ui.components.FillBar
@@ -52,7 +52,6 @@ import ru.finney.pet.ui.sound.Sfx
 import ru.finney.pet.ui.theme.FinneyBlue
 import ru.finney.pet.ui.theme.FinneyCream
 import ru.finney.pet.ui.theme.FinneyInk
-import ru.finney.pet.ui.theme.FinneyPink
 import ru.finney.pet.ui.theme.FinneyYellow
 
 // «Подработка»: неделя дел. Выбираешь день, нажимаешь дела внизу — они встают в
@@ -79,13 +78,16 @@ internal fun ChoresGame(task: ChoresTask, character: PetCharacter, onClose: () -
                 FinneyButton(text = "Готово", onClick = { onSubmit(TaskInput.Schedule(week)) })
             },
         ) {
-            GoalCard(task, earned, rest)
-            PetSays(character, petLine(task, earned, rest), petSize = 72.dp)
+            // Условия, дни и дела — в один экран 360 × 740 dp без прокрутки: на плейтесте,
+            // чтобы понять задачу, пришлось листать вниз. Поэтому здесь теснее, чем в сцене
+            // обычно, дни стоят одним рядом, а питомец меньше.
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                GoalCard(task, earned, rest)
+                PetSays(character, petLine(task, earned, rest), petSize = 56.dp)
 
-            // По четыре дня в ряд; неполный ряд добит пустым местом, чтобы дни были одной ширины.
-            week.withIndex().chunked(DAYS_IN_ROW).forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-                    row.forEach { (i, ids) ->
+                // Все дни одним рядом: вторым рядом неделя не влезала в экран.
+                Row(horizontalArrangement = Arrangement.spacedBy(DayGap), modifier = Modifier.fillMaxWidth()) {
+                    week.forEachIndexed { i, ids ->
                         DayCard(
                             number = i + 1,
                             chores = ids.map { id -> task.chores.first { it.id == id } },
@@ -99,27 +101,27 @@ internal fun ChoresGame(task: ChoresTask, character: PetCharacter, onClose: () -
                             },
                         )
                     }
-                    repeat(DAYS_IN_ROW - row.size) { Spacer(Modifier.weight(1f)) }
                 }
-            }
 
-            ScenePanel(title = null, modifier = Modifier.fillMaxWidth()) {
-                task.chores.chunked(2).forEach { pair ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        pair.forEach { chore ->
-                            ChoreTile(
-                                chore = chore,
-                                fee = TaskEngines.choreFee(chore, selected),
-                                left = chore.maxTimes?.let { it - (times[chore.id] ?: 0) },
-                                enabled = canAdd(chore),
-                                modifier = Modifier.weight(1f),
-                                onAdd = {
-                                    sounds.play(Sfx.Coin)
-                                    week = week.mapIndexed { d, day -> if (d == selected) day + chore.id else day }
-                                },
-                            )
+                // Дела — без панели вокруг: её поля съедали место, а плитки и так в рамках.
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    task.chores.chunked(2).forEach { pair ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            pair.forEach { chore ->
+                                ChoreTile(
+                                    chore = chore,
+                                    fee = TaskEngines.choreFee(chore, selected),
+                                    left = chore.maxTimes?.let { it - (times[chore.id] ?: 0) },
+                                    enabled = canAdd(chore),
+                                    modifier = Modifier.weight(1f),
+                                    onAdd = {
+                                        sounds.play(Sfx.Coin)
+                                        week = week.mapIndexed { d, day -> if (d == selected) day + chore.id else day }
+                                    },
+                                )
+                            }
+                            if (pair.size == 1) Spacer(Modifier.weight(1f))
                         }
-                        if (pair.size == 1) Spacer(Modifier.weight(1f))
                     }
                 }
             }
@@ -169,7 +171,8 @@ private fun GoalCard(task: ChoresTask, earned: Int, rest: Int) {
 
 /**
  * Условие «хотя бы N дней отдыха». Пока свободных дней хватает — тихо, с «✓»; не
- * хватает — розовая строка с «!»: цвет не единственный знак (ТЗ п. 3.6).
+ * хватает — голубая строка с «!»: это предупреждение по ходу, а не итог, и цвет
+ * не единственный знак (ТЗ п. 3.6).
  */
 @Composable
 private fun RestLine(rest: Int, need: Int) {
@@ -181,20 +184,25 @@ private fun RestLine(rest: Int, need: Int) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
-            .background(if (ok) Color.Transparent else FinneyPink.copy(alpha = 0.28f))
+            .background(if (ok) Color.Transparent else FinneyBlue.copy(alpha = 0.45f))
             .clearAndSetSemantics { contentDescription = if (ok) "$rule. Есть" else "$rule. Освободи день" }
             .padding(horizontal = 4.dp, vertical = 2.dp),
     ) {
         FinneyIcon(FinneyIcons.Lamp, size = 28.dp)
         Text(rule, style = MaterialTheme.typography.bodyLarge, color = FinneyInk, modifier = Modifier.weight(1f))
-        if (ok) CheckBadge(size = 24.dp) else AlertBadge(size = 26.dp)
+        if (ok) CheckBadge(size = 24.dp) else WarningBadge(size = 26.dp)
     }
 }
 
 /** Клетка одного часика: 48 dp — дело в дне нажимается, чтобы убрать (ТЗ п. 3.6). */
 private val SlotHeight = 48.dp
 private val SlotGap = 4.dp
-private const val DAYS_IN_ROW = 4
+
+/**
+ * Дни стоят вплотную: в самой длинной неделе их шесть, и при 360 dp ширины клетке
+ * остаётся ровно на 48 dp пальца, только если зазоры и поля дня — по 2–4 dp.
+ */
+private val DayGap = 4.dp
 
 private fun slotsHeight(hours: Int) = SlotHeight * hours + SlotGap * (hours - 1)
 
@@ -220,13 +228,13 @@ private fun DayCard(
         modifier = modifier
             .clip(shape)
             .background(if (selected) FinneyYellow else FinneyCream)
-            .border(if (selected) 4.dp else 2.dp, FinneyInk, shape)
+            .border(if (selected) 3.dp else 2.dp, FinneyInk, shape)
             .clickable(role = Role.Tab, onClickLabel = "Выбрать день $number", onClick = onSelect)
             .semantics {
                 this.selected = selected
                 contentDescription = if (chores.isEmpty()) "День $number, отдых" else "День $number: " + chores.joinToString { it.label }
             }
-            .padding(4.dp),
+            .padding(horizontal = 2.dp, vertical = 3.dp),
     ) {
         OutlinedText(number.toString(), style = MaterialTheme.typography.titleMedium)
         if (chores.isEmpty()) {
@@ -284,7 +292,7 @@ private fun ChoreTile(chore: Chore, fee: Int, left: Int?, enabled: Boolean, modi
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         modifier = modifier
-            .defaultMinSize(minHeight = 56.dp)
+            .defaultMinSize(minHeight = 52.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(if (enabled) Color.White else FinneyCream)
             .border(3.dp, FinneyInk, RoundedCornerShape(12.dp))
@@ -309,7 +317,7 @@ private fun ChoreTile(chore: Chore, fee: Int, left: Int?, enabled: Boolean, modi
         }
         if (left != null) {
             Box(
-                fade.clip(RoundedCornerShape(8.dp)).background(FinneyPink).border(2.dp, FinneyInk, RoundedCornerShape(8.dp)).padding(horizontal = 4.dp),
+                fade.clip(RoundedCornerShape(8.dp)).background(FinneyCream).border(2.dp, FinneyInk, RoundedCornerShape(8.dp)).padding(horizontal = 4.dp),
             ) { Text("×$left", style = MaterialTheme.typography.labelLarge, color = FinneyInk) }
         }
     }

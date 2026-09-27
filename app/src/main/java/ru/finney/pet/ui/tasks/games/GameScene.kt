@@ -71,7 +71,6 @@ import ru.finney.pet.ui.room.RoomSpot
 import ru.finney.pet.ui.theme.FinneyCream
 import ru.finney.pet.ui.theme.FinneyGreen
 import ru.finney.pet.ui.theme.FinneyInk
-import ru.finney.pet.ui.theme.FinneyPink
 import ru.finney.pet.ui.theme.FinneyYellow
 import ru.finney.pet.ui.theme.StrokeRegular
 
@@ -450,7 +449,10 @@ internal fun ScenePanel(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Box(modifier = modifier.padding(top = if (title != null) 18.dp else 0.dp)) {
+    // Над рамкой — место под всю верхнюю половину заголовка. Было 18 dp при сдвиге
+    // заголовка на 22: верх букв с обводкой выходил за панель, и прокрутка сцены
+    // срезала его — «Готово!» в итоге игры было обрезано сверху.
+    Box(modifier = modifier.padding(top = if (title != null) PanelTitleRise else 0.dp)) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -466,15 +468,18 @@ internal fun ScenePanel(
                 title,
                 style = MaterialTheme.typography.headlineMedium,
                 // Заголовок садится на рамку: половина над ней, половина — внутри.
-                modifier = Modifier.align(Alignment.TopCenter).offset(y = (-22).dp),
+                modifier = Modifier.align(Alignment.TopCenter).offset(y = -PanelTitleRise),
             )
         }
     }
 }
 
+/** На сколько заголовок [ScenePanel] поднимается над рамкой — ровно столько места над ней и оставляем. */
+private val PanelTitleRise = 22.dp
+
 /** Шкала «сколько из скольки»: копилка, тележка. [extra] — сегодняшняя добавка штриховкой. */
 @Composable
-internal fun Meter(fraction: Float, modifier: Modifier = Modifier, extra: Float = 0f, color: Color = FinneyGreen) {
+internal fun Meter(fraction: Float, modifier: Modifier = Modifier, extra: Float = 0f, color: Color = FinneyYellow) {
     Canvas(
         modifier
             .fillMaxWidth()

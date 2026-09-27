@@ -81,7 +81,6 @@ import ru.finney.pet.ui.pet.PetMood
 import ru.finney.pet.ui.sound.LocalSounds
 import ru.finney.pet.ui.sound.Sfx
 import ru.finney.pet.ui.theme.FinneyCream
-import ru.finney.pet.ui.theme.FinneyGreen
 import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneyPeach
 import ru.finney.pet.ui.theme.FinneyYellow
@@ -235,7 +234,7 @@ private fun DayHeader(day: Int, days: Int, income: Int) {
                     scaleY = pop.value
                 }
                 .clip(RoundedCornerShape(50))
-                .background(FinneyGreen)
+                .background(FinneyYellow)
                 .border(StrokeRegular, FinneyInk, RoundedCornerShape(50))
                 .padding(horizontal = 10.dp, vertical = 2.dp)
                 .clearAndSetSemantics { contentDescription = "Сегодня пришло $income монет" },

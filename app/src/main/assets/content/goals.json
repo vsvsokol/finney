@@ -1,5 +1,5 @@
 [
-  { "id": "goal_crown", "label": "Ковбойская шляпа", "price": 50,  "moodBonus": 20, "reward": "hat_cowboy" },
-  { "id": "goal_bike",  "label": "Пиратская шляпа",  "price": 100, "moodBonus": 30, "reward": "hat_pirate" },
-  { "id": "goal_house", "label": "Шляпа волшебника", "price": 150, "moodBonus": 40, "reward": "hat_wizard" }
+  { "id": "goal_crown", "label": "Ковбойская шляпа", "price": 90,  "moodBonus": 20, "reward": "hat_cowboy" },
+  { "id": "goal_bike",  "label": "Пиратская шляпа",  "price": 150, "moodBonus": 30, "reward": "hat_pirate" },
+  { "id": "goal_house", "label": "Шляпа волшебника", "price": 220, "moodBonus": 40, "reward": "hat_wizard" }
 ]

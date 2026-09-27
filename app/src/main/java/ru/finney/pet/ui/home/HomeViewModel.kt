@@ -166,6 +166,7 @@ class HomeViewModel(
                                     lines = changesBetween(before, result.state),
                                     why = "Еда и мытьё — это нужное.",
                                     next = "Кольца у кнопок покажут, что ещё нужно.",
+                                    itemId = item.id,
                                 ),
                             ),
                         )
@@ -201,7 +202,8 @@ class HomeViewModel(
             _events.send(
                 HomeEvent.Woke(
                     ActionFeedback(
-                        title = if (full) "Выспался!" else "Проснулся раньше",
+                        // Одной строкой: на главном видна только она и значки шкал.
+                        title = if (full) "Выспался!" else "Проснулся раньше — сон не полный",
                         lines = changesBetween(before, after),
                         why = if (full) "Сон — это нужное. И он бесплатный." else "Сон набирается постепенно: чем дольше спит, тем больше.",
                         next = "К следующему уровню сон снова убудет — следи за кольцом у кнопки зала.",

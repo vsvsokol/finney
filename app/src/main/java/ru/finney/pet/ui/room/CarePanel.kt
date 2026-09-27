@@ -39,10 +39,10 @@ import ru.finney.pet.ui.components.FinneyIcons
 import ru.finney.pet.ui.components.FinneyPanel
 import ru.finney.pet.ui.components.MoodFace
 import ru.finney.pet.ui.components.OutlinedText
-import ru.finney.pet.ui.theme.FinneyGreen
+import ru.finney.pet.ui.theme.FinneyYellow
+import ru.finney.pet.ui.theme.FinneyBlue
 import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneyPeach
-import ru.finney.pet.ui.theme.FinneyPink
 import ru.finney.pet.ui.theme.FinneyTheme
 import ru.finney.pet.ui.theme.StrokeThin
 
@@ -186,9 +186,11 @@ private fun CareRow(option: CareOption, onPick: () -> Unit) {
     val notEnough = preview.shortage > 0
     val needed = option.item.category == Category.NEEDS
 
+    // Нехватка — предупреждение, а не ошибка: голубое, и словами ниже. Выбранное —
+    // жёлтое с «✓»: выбор не оценка, зелёный у нас только «получилось».
     val accent = when {
-        notEnough -> FinneyPink
-        option.isSelected -> FinneyGreen
+        notEnough -> FinneyBlue
+        option.isSelected -> FinneyYellow
         else -> null
     }
 
@@ -258,7 +260,8 @@ private fun EffectChip(icon: FinneyIcons?, label: String, effect: Int, before: I
         } else OutlinedText(
             text = if (delta > 0) "+$delta" else "$delta",
             style = MaterialTheme.typography.titleLarge,
-            fill = if (delta > 0) FinneyGreen else FinneyPeach,
+            // Направление — знаком «+» / «−», цвет один: зелёный «+» читался как похвала.
+            fill = FinneyPeach,
         )
         if (icon != null) FinneyIcon(icon, size = 22.dp) else MoodFace(size = 22.dp)
     }

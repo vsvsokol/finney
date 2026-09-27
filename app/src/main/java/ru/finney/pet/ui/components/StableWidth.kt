@@ -59,10 +59,16 @@ fun StableText(
     }
 }
 
-/** Текст с контуром, место под который отмерено по [widest]. */
+/** Текст с контуром, место под который отмерено по [widest]. [contentAlignment] — для столбца чисел по правому краю. */
 @Composable
-fun StableOutlinedText(text: String, widest: String, style: TextStyle, modifier: Modifier = Modifier) {
-    ReserveWidth(widest, sample = { OutlinedText(it, style = style) }, modifier = modifier) {
+fun StableOutlinedText(
+    text: String,
+    widest: String,
+    style: TextStyle,
+    modifier: Modifier = Modifier,
+    contentAlignment: Alignment = Alignment.Center,
+) {
+    ReserveWidth(widest, sample = { OutlinedText(it, style = style) }, modifier = modifier, contentAlignment = contentAlignment) {
         OutlinedText(text, style = style)
     }
 }

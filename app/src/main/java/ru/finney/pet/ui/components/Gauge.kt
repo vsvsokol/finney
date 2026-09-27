@@ -30,7 +30,6 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.tooling.preview.Preview
@@ -38,6 +37,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ru.finney.pet.ui.theme.FinneyCream
+import ru.finney.pet.ui.theme.FinneyBlue
 import ru.finney.pet.ui.theme.FinneyGreen
 import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneyPink
@@ -47,9 +47,13 @@ import ru.finney.pet.ui.theme.StrokeRegular
 import ru.finney.pet.ui.theme.StrokeThin
 
 // Картинка рядом с числом «10 из 50». Плейтест показал, что голые дроби дети
-// пролистывают: полоса или кольцо читаются с одного взгляда. Цвет идёт от
-// розового (мало) через жёлтый к зелёному (полно), но он только помогает глазу —
-// ТЗ п. 3.6: длина заливки понятна и без цвета, а полное отмечено «✓».
+// пролистывают: полоса или кольцо читаются с одного взгляда. Заливка жёлтая —
+// цвет денег и достижений; полное отмечено «✓» (ТЗ п. 3.6: длина понятна и без цвета).
+//
+// Раньше цвет шёл от розового к зелёному, и копилка в начале уровня была розовой,
+// как ошибка, а полная — зелёной, как «получилось»; рядом полоса нужного была жёлтой.
+// На плейтесте спросили, почему нужное жёлтое, а копилка зелёная. Розовый и зелёный
+// у нас — только итог действия, а «сколько накоплено» — не итог.
 //
 // Два вида шкал не путать. [FillBar] и [FillRing] — прогресс: копилка, уровень,
 // верные ответы, где больше — лучше. [SpendBar] — траты по плану: там больше не
@@ -58,11 +62,9 @@ import ru.finney.pet.ui.theme.StrokeThin
 /** Пустая часть шкалы — светлее кремового фона, чтобы заливка не сливалась с ним. */
 private val Track = Color(0xFFFFF7EA)
 
-/** Цвет заливки по доле: пусто — розовый, половина — жёлтый, полно — зелёный. */
-fun fillColor(fraction: Float): Color {
-    val t = fraction.coerceIn(0f, 1f)
-    return if (t < 0.5f) lerp(FinneyPink, FinneyYellow, t * 2f) else lerp(FinneyYellow, FinneyGreen, (t - 0.5f) * 2f)
-}
+/** Цвет заливки. Один при любой доле — см. комментарий в начале файла; доля оставлена для вызовов. */
+@Suppress("UNUSED_PARAMETER")
+fun fillColor(fraction: Float): Color = FinneyYellow
 
 /** Доля [value] от [max]. Когда из нуля ничего не набрано, шкала пустая, а не полная. */
 private fun fractionOf(value: Int, max: Int): Float = when {
@@ -272,6 +274,15 @@ fun CheckBadge(modifier: Modifier = Modifier, size: Dp = 24.dp) {
 @Composable
 fun AlertBadge(modifier: Modifier = Modifier, size: Dp = 24.dp) {
     Badge("!", FinneyPink, size, modifier)
+}
+
+/**
+ * Круглый «!» на голубом: предупреждение — ещё не ошибка, но так дальше нельзя
+ * (разложено больше, чем есть). Розовый [AlertBadge] — для того, что уже не вышло.
+ */
+@Composable
+fun WarningBadge(modifier: Modifier = Modifier, size: Dp = 24.dp) {
+    Badge("!", FinneyBlue, size, modifier)
 }
 
 @Composable

@@ -215,6 +215,7 @@ fun HomeScreen(
         ) {
             ActionFeedbackCard(
                 feedback = feedback,
+                compact = true,
                 modifier = Modifier.clickable(onClickLabel = "Скрыть") { purchased = null },
             )
         }
