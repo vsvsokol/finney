@@ -1,14 +1,15 @@
 name: Android CI
 
-# Запускается только когда в репозитории уже есть Gradle-проект.
-# До генерации проекта workflow просто не срабатывает и не засоряет PR красными галочками.
+# push в Main собирается, только если менялся код или сборка.
+# PR в Main проверяется всегда, без фильтра paths: проверка `build` обязательна для
+# слияния, и PR, который трогает только docs/ или JSON, без неё не получил бы
+# зелёную галочку и не слился бы никогда.
 on:
   push:
     branches: [Main]
     paths: ['app/**', 'gradle/**', '*.gradle.kts', 'gradle.properties']
   pull_request:
     branches: [Main]
-    paths: ['app/**', 'gradle/**', '*.gradle.kts', 'gradle.properties']
 
 jobs:
   build:
