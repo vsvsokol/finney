@@ -80,6 +80,8 @@ data class PeriodEntity(
     /** Игра уровня и пройдена ли она. Колонки с версии 6, см. [FinneyDatabase.MIGRATION_5_6]. */
     val levelTaskId: String? = null,
     val gamePassed: Boolean? = null,
+    /** Пройден ли уровень, как решено при закрытии. С версии 8, см. [FinneyDatabase.MIGRATION_7_8]. */
+    val passed: Boolean? = null,
 )
 
 @Entity(

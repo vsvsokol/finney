@@ -11,7 +11,7 @@
 | Навигация | Navigation Compose | один граф экранов, маршруты — `@Serializable`-объекты |
 | Зависимости | ручной контейнер `AppContainer` | десяток синглтонов не окупает Hilt: минус кодогенерация и время сборки |
 | Хранилище | Room (поверх SQLite) | ТЗ п. 3.2 прямо допускает; проверка SQL при компиляции, миграции, тесты |
-| Настройки | DataStore Preferences | флаги: звук, анимации, демо-режим |
+| Настройки | DataStore Preferences | флаги: звук, музыка; демо-режим — у профиля в Room (`profiles.isDemo`) |
 | Учебный контент | JSON в `assets/content/` + kotlinx.serialization | ТЗ п. 2.5.14: задание добавляется без переработки логики |
 | Асинхронность | Coroutines + Flow | реактивное обновление экранов |
 | Тесты | JUnit, kotlinx-coroutines-test | ТЗ п. 3.4 требует тесты на экономику |
@@ -272,8 +272,8 @@ content/
     "taskSuccessMaxPerPeriod": 2
   },
   "conditionsToPass": 2,
-  "maxLevel": 9,
-  "stageStartLevels": [1, 3, 5],
+  "maxLevel": 6,
+  "stageStartLevels": [1, 2, 3, 4, 5, 6],
   "pet": {
     "start": { "satiety": 70, "hygiene": 70, "mood": 70 },
     "decayByStage": [

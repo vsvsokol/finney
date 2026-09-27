@@ -119,7 +119,9 @@ private fun PeriodResultContent(state: PeriodResultUiState.Ready, onBack: () -> 
 
         // Каждое условие отдельной строкой: ребёнку видно, что получилось и чего не хватило.
         FinneyPanel(title = "Условия уровня: нужно ${state.toPass} из 3") {
-            state.levelGame?.let { ScoreRow("Игра уровня «$it» — обязательно", state.gamePassed) }
+            state.levelGame?.let {
+                ScoreRow(if (state.gameRequired) "Игра уровня «$it» — обязательно" else "Игра уровня «$it» — по желанию", state.gamePassed)
+            }
             ScoreRow("Питомец сыт, чист и выспался", state.needsCovered)
             ScoreRow("Траты по плану", state.planMatched)
             ScoreRow("Отложено в копилку", state.savingsAdded)

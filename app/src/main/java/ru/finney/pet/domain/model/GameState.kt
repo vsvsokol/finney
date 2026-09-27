@@ -51,6 +51,13 @@ data class PeriodResult(
     val gamePassed: Boolean,
     val successfulTasks: Int,
     val points: Int,
+    /**
+     * Пройден ли уровень — решено при закрытии по правилам, которые тогда действовали
+     * (в демо — облегчённым). Хранится, чтобы выключенный демо-режим не пересчитал
+     * прошлые уровни и уровень не упал. null — период закрыт до базы версии 8,
+     * решается по обычным правилам.
+     */
+    val passed: Boolean? = null,
 )
 
 data class Period(

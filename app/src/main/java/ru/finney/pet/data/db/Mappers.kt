@@ -83,6 +83,7 @@ private fun Period.toEntity(profileId: Long) = PeriodEntity(
     pointsEarned = result?.points,
     levelTaskId = levelTaskId,
     gamePassed = result?.gamePassed,
+    passed = result?.passed,
 )
 
 private fun PeriodEntity.toDomain() = Period(
@@ -99,6 +100,7 @@ private fun PeriodEntity.toDomain() = Period(
             gamePassed = gamePassed ?: true,
             successfulTasks = successfulTasks!!,
             points = it,
+            passed = passed,
         )
     },
     levelTaskId = levelTaskId,

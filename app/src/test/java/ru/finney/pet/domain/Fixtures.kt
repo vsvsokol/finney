@@ -16,6 +16,7 @@ import ru.finney.pet.domain.model.PetRule
 import ru.finney.pet.domain.model.PetStats
 import ru.finney.pet.domain.model.PlayRule
 import ru.finney.pet.domain.model.PointsRule
+import ru.finney.pet.domain.model.ReminderRule
 import ru.finney.pet.domain.model.ShopItem
 import ru.finney.pet.domain.model.StatEffect
 import ru.finney.pet.domain.model.TaskReward
@@ -39,6 +40,8 @@ object Fixtures {
         planDirections = 0,
         points = PointsRule(needsCovered = 2, planMatched = 2, savingsAdded = 2, taskSuccess = 1, taskSuccessMaxPerPeriod = 2),
         conditionsToPass = 2,
+        demoConditionsToPass = 1,
+        demoLevelGameRequired = false,
         maxLevel = 9,
         stageStartLevels = listOf(1, 3, 5),
         pet = PetRule(
@@ -51,6 +54,7 @@ object Fixtures {
             demoSleepSeconds = 10,
         ),
         play = PlayRule(moodPerShake = 2, sessionMoodCap = 20, sessionMinutes = 60, demoSessionSeconds = 30),
+        reminders = ReminderRule(everyHours = 24, demoReminderMinutes = 2),
     )
 
     val shop = listOf(

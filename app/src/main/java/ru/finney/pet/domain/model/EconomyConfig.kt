@@ -14,10 +14,15 @@ data class EconomyConfig(
     val points: PointsRule,
     /** Сколько из трёх условий уровня (нужное, план, копилка) нужно выполнить, чтобы его пройти. Игра уровня обязательна сверх них. */
     val conditionsToPass: Int,
+    /** То же в демо-режиме: эксперт проходит 6 уровней за несколько минут (docs/economy.md, раздел 8). */
+    val demoConditionsToPass: Int = conditionsToPass,
+    /** Обязательна ли игра уровня в демо-режиме. Сама игра выдаётся и видна в любом случае. */
+    val demoLevelGameRequired: Boolean = true,
     val maxLevel: Int,
     val stageStartLevels: List<Int>,
     val pet: PetRule,
     val play: PlayRule = PlayRule(),
+    val reminders: ReminderRule = ReminderRule(),
 ) {
     fun income(stage: Int): Int = incomeByStage[stage - 1]
     fun decay(stage: Int): StatEffect = pet.decayByStage[stage - 1]
@@ -65,4 +70,14 @@ data class PlayRule(
     val sessionMoodCap: Int = 20,
     val sessionMinutes: Int = 60,
     val demoSessionSeconds: Int = 30,
+)
+
+/**
+ * Напоминания о питомце (пакет notifications). Обычно — раз в [everyHours] часов,
+ * в демо-режиме — раз в [demoReminderMinutes] минут, чтобы эксперт их увидел.
+ */
+@Serializable
+data class ReminderRule(
+    val everyHours: Int = 24,
+    val demoReminderMinutes: Int = 2,
 )

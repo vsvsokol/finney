@@ -48,6 +48,11 @@ class FakeStorage : GameStorage {
         all.value += profileId to saved.copy(profile = saved.profile.copy(petName = petName, appearance = appearance))
     }
 
+    override suspend fun setDemo(profileId: Long, isDemo: Boolean) {
+        val saved = all.value.getValue(profileId)
+        all.value += profileId to saved.copy(profile = saved.profile.copy(isDemo = isDemo), state = saved.state.copy(isDemo = isDemo))
+    }
+
     override suspend fun delete(profileId: Long) {
         all.value -= profileId
     }

@@ -1,6 +1,7 @@
 package ru.finney.pet.domain.game
 
 import ru.finney.pet.domain.economy.SavingsRules
+import ru.finney.pet.domain.model.EconomyConfig
 import ru.finney.pet.domain.model.EntryType
 import ru.finney.pet.domain.model.GameContent
 import ru.finney.pet.domain.model.GameState
@@ -76,11 +77,13 @@ data class LevelCheck(
     val toPass: Int,
     /** Игра уровня; null — в этом периоде её нет, условие не действует. */
     val levelTaskId: String? = null,
-    /** Игра уровня пройдена в этом периоде. Обязательна сверх [toPass]. */
+    /** Игра уровня пройдена в этом периоде. Обязательна сверх [toPass], если [gameRequired]. */
     val gamePassed: Boolean = true,
+    /** Обязательна ли игра уровня. В демо-режиме — нет: эксперт проходит уровни быстро. */
+    val gameRequired: Boolean = true,
 ) {
     val met: Int get() = listOf(needsCovered, planMatched, savingsAdded).count { it }
-    val willPass: Boolean get() = gamePassed && met >= toPass
+    val willPass: Boolean get() = (gamePassed || !gameRequired) && met >= toPass
 }
 
 sealed interface TaskResult {
@@ -147,11 +150,22 @@ class Game(
             needsCovered = PetRules.needsCovered(state.pet.copy(energy = energyAt(state)), economy.pet),
             planMatched = plan != null && PeriodRules.planMatched(plan, facts, economy.planTolerance),
             savingsAdded = facts.savings > 0,
-            toPass = economy.conditionsToPass,
+            toPass = conditionsToPass(state),
             levelTaskId = period.levelTaskId,
             gamePassed = levelGamePassed(state, period),
+            gameRequired = levelGameRequired(state),
         )
     }
+
+    /** Сколько из трёх условий нужно для уровня: в демо-режиме меньше, см. [EconomyConfig.demoConditionsToPass]. */
+    fun conditionsToPass(state: GameState): Int =
+        if (state.isDemo) economy.demoConditionsToPass else economy.conditionsToPass
+
+    private fun levelGameRequired(state: GameState): Boolean = !state.isDemo || economy.demoLevelGameRequired
+
+    /** Как часто напоминать о питомце: раз в сутки, в демо-режиме — раз в несколько минут. */
+    fun reminderEveryMillis(state: GameState): Long =
+        if (state.isDemo) economy.reminders.demoReminderMinutes * 60_000L else economy.reminders.everyHours * 3_600_000L
 
     /** Игра уровня пройдена успешно именно в этом периоде. Нет игры — условие выполнено. */
     private fun levelGamePassed(state: GameState, period: Period): Boolean {
@@ -511,6 +525,11 @@ class Game(
             gamePassed = gamePassed,
             successfulTasks = successfulTasks,
             points = Progression.periodPoints(needsCovered, planMatched, savingsAdded, successfulTasks, economy.points),
+            passed = Progression.decide(
+                needsCovered, planMatched, savingsAdded, gamePassed,
+                toPass = conditionsToPass(state),
+                gameRequired = levelGameRequired(state),
+            ),
         )
         val closed = state.withCurrentPeriod(period.copy(phase = PeriodPhase.CLOSED, result = result))
         return ok(openPeriod(closed))

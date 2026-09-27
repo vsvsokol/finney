@@ -1011,11 +1011,15 @@ private fun LevelPanel(
             FinneyButton(text = "Составить план", onClick = onOpenBudget)
         } else {
             if (levelGame != null && check.levelTaskId != null) {
-                Text("Обязательно пройди игру уровня:", style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
+                Text(
+                    if (check.gameRequired) "Обязательно пройди игру уровня:" else "Игра уровня — по желанию (демо):",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = FinneyInk,
+                )
                 CheckRow("«$levelGame»", check.gamePassed)
             }
             Text(
-                if (check.levelTaskId != null) {
+                if (check.levelTaskId != null && check.gameRequired) {
                     "И выполни ${check.toPass} из $LEVEL_CONDITIONS:"
                 } else {
                     "Чтобы пройти уровень, выполни ${check.toPass} из $LEVEL_CONDITIONS:"

@@ -10,7 +10,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 /**
  * Схема каждой версии экспортируется в app/schemas и коммитится.
  *
- * С версии 3 изменения переносятся миграциями — [MIGRATION_3_4] … [MIGRATION_6_7]. Базы версий 1–2
+ * С версии 3 изменения переносятся миграциями — [MIGRATION_3_4] … [MIGRATION_7_8]. Базы версий 1–2
  * пересоздаются с нуля: версия 3 переименовала питомцев, а перенести старые значения было бы
  * возможно только храня прежние имена прямо в коде.
  */
@@ -22,7 +22,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         LedgerEntryEntity::class,
         TaskAttemptEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
 )
 abstract class FinneyDatabase : RoomDatabase() {
@@ -34,7 +34,7 @@ abstract class FinneyDatabase : RoomDatabase() {
 
         fun create(context: Context): FinneyDatabase =
             Room.databaseBuilder(context.applicationContext, FinneyDatabase::class.java, NAME)
-                .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                 .fallbackToDestructiveMigration(dropAllTables = true)
                 .build()
 
@@ -81,6 +81,17 @@ abstract class FinneyDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE pet_state ADD COLUMN playMood INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE pet_state ADD COLUMN playSince INTEGER")
+            }
+        }
+
+        /**
+         * 7 → 8: итог уровня записывается при закрытии — демо-режим облегчает переход,
+         * и выключенный демо-режим не должен пересчитывать прошлое. У закрытых раньше
+         * периодов NULL: они решаются по обычным правилам, как и решались.
+         */
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE periods ADD COLUMN passed INTEGER")
             }
         }
     }

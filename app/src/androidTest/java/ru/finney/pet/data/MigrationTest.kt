@@ -10,7 +10,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import ru.finney.pet.data.db.FinneyDatabase
 
-/** Обновление приложения не стирает прогресс: база версии 3 переносится в 4, 5, 6 и 7 с данными. */
+/** Обновление приложения не стирает прогресс: база версии 3 переносится в 4 … 8 с данными. */
 @RunWith(AndroidJUnit4::class)
 class MigrationTest {
 
@@ -117,6 +117,33 @@ class MigrationTest {
             db.query("SELECT itemId FROM ledger WHERE profileId = 1").use { c ->
                 assertTrue(c.moveToFirst())
                 assertEquals("toy_ball", c.getString(0))
+            }
+        }
+    }
+
+    @Test
+    fun migrate7To8KeepsClosedPeriodsUndecided() {
+        helper.createDatabase(dbName, 7).use { db ->
+            db.execSQL(
+                "INSERT INTO profiles (id, petName, petCharacter, bodyColor, eyes, activeGoalId, isDemo, createdAt, wornItemId) " +
+                    "VALUES (1, 'Финни', 'PUSHISTIK', 'A', 'ROUND', NULL, 1, 1, NULL)",
+            )
+            db.execSQL(
+                "INSERT INTO periods (profileId, number, stage, phase, needsCovered, planMatched, savingsAdded, " +
+                    "successfulTasks, pointsEarned, levelTaskId, gamePassed) VALUES (1, 1, 1, 'CLOSED', 1, 1, 0, 1, 5, 'game_race', 1)",
+            )
+        }
+
+        helper.runMigrationsAndValidate(dbName, 8, true, FinneyDatabase.MIGRATION_7_8).use { db ->
+            db.query("SELECT pointsEarned, gamePassed, passed FROM periods WHERE profileId = 1").use { c ->
+                assertTrue(c.moveToFirst())
+                assertEquals(5, c.getInt(0))
+                assertEquals(1, c.getInt(1))
+                assertTrue("итог старого периода решается по обычным правилам", c.isNull(2))
+            }
+            db.query("SELECT isDemo FROM profiles WHERE id = 1").use { c ->
+                assertTrue(c.moveToFirst())
+                assertEquals(1, c.getInt(0))
             }
         }
     }

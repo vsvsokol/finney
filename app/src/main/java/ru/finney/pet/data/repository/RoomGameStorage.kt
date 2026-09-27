@@ -32,6 +32,8 @@ class RoomGameStorage(private val dao: GameDao) : GameStorage {
     override suspend fun updateProfile(profileId: Long, petName: String, appearance: PetAppearance) =
         dao.updateProfile(profileId, petName, appearance.character, appearance.bodyColor, appearance.eyes)
 
+    override suspend fun setDemo(profileId: Long, isDemo: Boolean) = dao.setDemo(profileId, isDemo)
+
     override suspend fun delete(profileId: Long) = dao.deleteProfile(profileId)
 
     override suspend fun deleteAll() = dao.deleteAllProfiles()
