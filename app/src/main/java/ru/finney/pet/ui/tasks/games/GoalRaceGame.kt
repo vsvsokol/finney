@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import ru.finney.pet.domain.model.GoalRaceTask
 import ru.finney.pet.domain.model.PetCharacter
+import ru.finney.pet.domain.tasks.TaskEngines
 import ru.finney.pet.domain.tasks.TaskInput
 import ru.finney.pet.ui.components.FinneyButton
 import ru.finney.pet.ui.components.OutlinedText
@@ -57,6 +58,7 @@ import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneyPeach
 import ru.finney.pet.ui.theme.FinneyPink
 import ru.finney.pet.ui.theme.FinneyYellow
+import ru.finney.pet.ui.pet.PetMood
 import ru.finney.pet.ui.sound.LocalSounds
 import ru.finney.pet.ui.sound.Sfx
 import kotlin.math.roundToInt
@@ -65,6 +67,10 @@ import kotlin.math.roundToInt
 // кубик. Каждый день приходит доход; ребёнок делит монеты розовой чертой:
 // слева — в копилку, справа — можно потратить на соблазн дня. Прогноз
 // «успею или нет» пересчитывается сразу, пока двигаешь черту.
+//
+// Рядом с копилкой — сердечки Финни. Отказался от соблазна дня — одно гаснет,
+// позволил себе — загорается. Погасли все — Финни грустит до финиша, и цель не
+// засчитана: копить учимся понемногу, а не «никогда ничего».
 
 @Composable
 internal fun GoalRaceGame(
@@ -78,19 +84,20 @@ internal fun GoalRaceGame(
     val day = deposits.size + 1
     val saved = task.startSaved + deposits.sum()
     val event = task.events.firstOrNull { it.day == day }
+    val mood = TaskEngines.raceMood(task, deposits).lastOrNull() ?: task.mood
     val sounds = LocalSounds.current
 
     GameScene(backdrop = Backdrop.FIELD, onClose = onClose) {
         Column(Modifier.fillMaxSize().padding(top = HudHeight), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            PiggyCard(saved = saved, adding = today, task = task)
+            PiggyCard(saved = saved, adding = today, mood = mood, task = task)
 
-            Board(task = task, day = day, character = character, modifier = Modifier.weight(1f).fillMaxWidth())
+            Board(task = task, day = day, character = character, sad = mood == 0, modifier = Modifier.weight(1f).fillMaxWidth())
 
             ScenePanel(title = null, modifier = Modifier.fillMaxWidth()) {
                 OutlinedText("День $day · получил ${task.incomePerDay}", style = MaterialTheme.typography.titleLarge)
                 CoinSplit(income = task.incomePerDay, step = task.step, deposit = today, onChange = { today = it })
                 event?.let {
-                    val affordable = task.incomePerDay - today >= it.price
+                    val taken = TaskEngines.raceTaken(task, it, today)
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -102,17 +109,13 @@ internal fun GoalRaceGame(
                             .padding(8.dp),
                     ) {
                         ItemPicture(it, it.label, 36.dp)
-                        Column {
-                            Text("Событие дня: ${it.label}", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
-                            Text(
-                                if (affordable) "стоит ${it.price} — хватает" else "стоит ${it.price} — можно отказаться",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = FinneyInk,
-                            )
-                        }
+                        Text(it.label, style = MaterialTheme.typography.titleMedium, color = FinneyInk, modifier = Modifier.weight(1f))
+                        PriceTag(it.price.toString())
+                        // Что будет с настроением, если оставить черту так: взял — плюс сердечко, нет — минус.
+                        MoodChange(up = taken, enabled = mood > 0)
                     }
                 }
-                Text(forecast(task, saved + today, task.days - day), style = MaterialTheme.typography.bodyMedium, color = FinneyInk)
+                Text(if (mood == 0) "Финни загрустил: без радостей цель не засчитается." else forecast(task, saved + today, task.days - day), style = MaterialTheme.typography.bodyMedium, color = FinneyInk)
                 FinneyButton(
                     text = if (day == task.days) "Финиш" else "Готово",
                     onClick = {
@@ -129,7 +132,8 @@ internal fun GoalRaceGame(
 /** Прогноз одной фразой: сколько откладывать дальше, чтобы успеть. */
 private fun forecast(task: GoalRaceTask, savedAfterToday: Int, daysLeft: Int): String {
     val left = task.goal.price - savedAfterToday
-    if (left <= 0) return "Успеешь! ${task.goal.label} уже набран."
+    // Набрано — дальше копить незачем, а Финни радость нужна: не толкаем отложить и это.
+    if (left <= 0) return "${task.goal.label} уже набран — можно порадовать Финни."
     if (daysLeft == 0) return "Не хватит $left. Накопленное останется."
     val perDay = ((left + daysLeft - 1) / daysLeft + task.step - 1) / task.step * task.step
     return if (perDay <= task.incomePerDay) {
@@ -140,7 +144,7 @@ private fun forecast(task: GoalRaceTask, savedAfterToday: Int, daysLeft: Int): S
 }
 
 @Composable
-private fun PiggyCard(saved: Int, adding: Int, task: GoalRaceTask) {
+private fun PiggyCard(saved: Int, adding: Int, mood: Int, task: GoalRaceTask) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -152,7 +156,8 @@ private fun PiggyCard(saved: Int, adding: Int, task: GoalRaceTask) {
     ) {
         Row {
             Text("Копилка $saved", style = MaterialTheme.typography.titleMedium, color = FinneyInk, modifier = Modifier.weight(1f))
-            Text("${task.goal.label.lowercase()} ${task.goal.price}", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
+            // Цель с ценой и так стоит на финише поля — здесь настроение.
+            Hearts(mood, task.mood)
         }
         Meter(
             fraction = saved.toFloat() / task.goal.price,
@@ -167,7 +172,7 @@ private fun PiggyCard(saved: Int, adding: Int, task: GoalRaceTask) {
  * у дней с соблазном — розовая точка. Фишка — сам питомец, на финише — цель.
  */
 @Composable
-private fun Board(task: GoalRaceTask, day: Int, character: PetCharacter, modifier: Modifier) {
+private fun Board(task: GoalRaceTask, day: Int, character: PetCharacter, sad: Boolean, modifier: Modifier) {
     val eventDays = task.events.map { it.day }.toSet()
     BoxWithConstraints(modifier) {
         // Дни и финиш — в два ряда: при восьми днях по пять в ряд, иначе третий ряд
@@ -232,7 +237,7 @@ private fun Board(task: GoalRaceTask, day: Int, character: PetCharacter, modifie
         // Фишка стоит на своём кружке, а не над ним: над кружком она задевала
         // ценник цели в ряду выше. Какой сейчас день, написано в панели.
         val here = points[(day - 1).coerceIn(0, task.days - 1)]
-        ScenePet(character, 60.dp, Modifier.width(60.dp).offset(here.x - 30.dp, here.y - 50.dp))
+        ScenePet(character, 60.dp, Modifier.width(60.dp).offset(here.x - 30.dp, here.y - 50.dp), mood = if (sad) PetMood.SAD else PetMood.HAPPY)
     }
 }
 
@@ -317,5 +322,51 @@ private fun SmallButton(text: String, enabled: Boolean, onClick: () -> Unit) {
             style = MaterialTheme.typography.titleMedium,
             color = if (enabled) FinneyInk else FinneyInk.copy(alpha = 0.35f),
         )
+    }
+}
+
+/** Сердечки настроения Финни: [count] горят из [max]. */
+@Composable
+internal fun Hearts(count: Int, max: Int, size: Dp = 22.dp) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        modifier = Modifier.semantics { contentDescription = "Настроение $count из $max" },
+    ) {
+        repeat(max) { Heart(filled = it < count, size = size) }
+    }
+}
+
+@Composable
+private fun Heart(filled: Boolean, size: Dp) {
+    Canvas(Modifier.size(size)) {
+        val w = this.size.width
+        val h = this.size.height
+        val heart = Path().apply {
+            moveTo(w / 2, h * 0.92f)
+            cubicTo(w * 0.1f, h * 0.62f, -w * 0.04f, h * 0.28f, w * 0.24f, h * 0.1f)
+            cubicTo(w * 0.38f, h * 0.02f, w * 0.5f, h * 0.12f, w * 0.5f, h * 0.24f)
+            cubicTo(w * 0.5f, h * 0.12f, w * 0.62f, h * 0.02f, w * 0.76f, h * 0.1f)
+            cubicTo(w * 1.04f, h * 0.28f, w * 0.9f, h * 0.62f, w / 2, h * 0.92f)
+            close()
+        }
+        drawPath(heart, if (filled) FinneyPink else FinneyCream)
+        drawPath(heart, FinneyInk, style = Stroke(2.dp.toPx()))
+    }
+}
+
+/** «+♥» или «−♥» у соблазна дня. [enabled] false — Финни уже загрустил, сердечки не меняются. */
+@Composable
+private fun MoodChange(up: Boolean, enabled: Boolean) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(if (!enabled) FinneyCream else if (up) FinneyGreen else FinneyPeach)
+            .border(2.dp, FinneyInk, RoundedCornerShape(50))
+            .padding(horizontal = 6.dp, vertical = 2.dp)
+            .semantics { contentDescription = if (up) "настроение плюс одно" else "настроение минус одно" },
+    ) {
+        Text(if (up) "+" else "−", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
+        Heart(filled = up, size = 18.dp)
     }
 }
