@@ -1,0 +1,183 @@
+package ru.finney.pet.domain
+
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import ru.finney.pet.content.ContentException
+import ru.finney.pet.content.ContentParser
+import ru.finney.pet.domain.game.Game
+import ru.finney.pet.domain.model.ReserveTask
+import ru.finney.pet.domain.model.StandTask
+import ru.finney.pet.domain.model.TaskDefinition
+import ru.finney.pet.domain.model.TaskOutcome
+import ru.finney.pet.domain.tasks.TaskChecks
+import ru.finney.pet.domain.tasks.TaskEngines
+import ru.finney.pet.domain.tasks.TaskGenerator
+import ru.finney.pet.domain.tasks.TaskInput
+import java.io.File
+import kotlin.random.Random
+
+/** Разброс чисел в мини-играх: docs/minigames.md, «Случайные числа». */
+class TaskGeneratorTest {
+
+    private fun template(json: String): JsonObject = Json.parseToJsonElement(json).jsonObject
+
+    /** Лавка: гостей от 6 до 10 через 2, в текстах — подстановки. */
+    private val stand = template(
+        """
+        {
+          "id": "stand_x", "theme": "planning", "engine": "stand", "title": "Лавка",
+          "intro": "Придут {guests} гостей, лимон по {ingredient.price}.",
+          "explainOk": "Лимонов нужно {bestStock}: это {bestCups} стаканов.",
+          "explainFail": "Из {fewerStock} выйдет {fewerCups}.",
+          "budget": 50,
+          "ingredient": { "label": "Лимон", "price": 5, "yields": 2 },
+          "cupPrice": 5,
+          "guests": { "min": 6, "max": 10, "step": 2 },
+          "forecast": "Жарко"
+        }
+        """,
+    )
+
+    private fun guests(seed: Long) = (TaskGenerator.generate(stand, seed) as StandTask).guests
+
+    @Test
+    fun `разброс — в пределах и через шаг`() {
+        val seen = (1L..200L).map(::guests).toSet()
+        assertEquals(setOf(6, 8, 10), seen)
+    }
+
+    @Test
+    fun `одно зерно — одни и те же числа`() {
+        (1L..50L).forEach { assertEquals(TaskGenerator.generate(stand, it), TaskGenerator.generate(stand, it)) }
+    }
+
+    @Test
+    fun `вариант без случайности — минимум разброса`() {
+        assertEquals(6, (TaskGenerator.base(stand) as StandTask).guests)
+    }
+
+    @Test
+    fun `подстановки берут поле задания и числа движка`() {
+        val task = (1L..200L).map { TaskGenerator.generate(stand, it) as StandTask }.first { it.guests == 10 }
+        assertEquals("Придут 10 гостей, лимон по 5.", task.intro)
+        assertEquals("Лимонов нужно 5: это 10 стаканов.", task.explainOk)
+        assertEquals("Из 4 выйдет 8.", task.explainFail)
+    }
+
+    @Test
+    fun `oneOf и pick выбирают из списка`() {
+        val t = template(
+            """
+            {
+              "id": "r", "theme": "planning", "engine": "reserve", "title": "Р", "intro": "{surprise.label}",
+              "explainOk": "ок", "explainFail": "нет", "amount": 100,
+              "spendings": { "pick": 2, "from": [
+                { "id": "a", "label": "А", "price": 10, "category": "needs" },
+                { "id": "b", "label": "Б", "price": 10, "category": "wants" },
+                { "id": "c", "label": "В", "price": 10, "category": "wants" }
+              ] },
+              "surprise": { "oneOf": [
+                { "label": "Зонт", "text": "стоит {surprise.price}", "price": 10 },
+                { "label": "Рюкзак", "text": "стоит {surprise.price}", "price": 20 }
+              ] }
+            }
+            """,
+        )
+        val tasks = (1L..200L).map { TaskGenerator.generate(t, it) as ReserveTask }
+        assertEquals(setOf("Зонт", "Рюкзак"), tasks.map { it.intro }.toSet())
+        assertTrue(tasks.all { it.surprise.text == "стоит ${it.surprise.price}" })
+        assertTrue(tasks.all { it.spendings.size == 2 })
+        assertEquals(3, tasks.map { r -> r.spendings.map { it.id } }.toSet().size)
+        // Порядок — как в списке: «a» никогда не после «b».
+        assertTrue(tasks.all { r -> r.spendings.map { it.id }.let { it == it.sorted() } })
+    }
+
+    @Test
+    fun `нерешаемые числа отбрасываются, иначе — вариант без случайности`() {
+        // Денег хватает только на 2 гостей: из 1..1000 почти всё нерешаемо.
+        val t = template(stand.toString().replace("\"budget\":50", "\"budget\":5").replace("{\"min\":6,\"max\":10,\"step\":2}", "{\"min\":2,\"max\":1000}"))
+        (1L..30L).forEach {
+            val task = TaskGenerator.generate(t, it)
+            assertEquals(emptyList<String>(), TaskChecks.problems(task))
+            assertEquals(2, (task as StandTask).guests)
+        }
+    }
+
+    @Test
+    fun `ошибки шаблона — понятным текстом`() {
+        fun parse(tasks: String) = ContentParser.parse { name ->
+            if (name == ContentParser.TASKS) tasks else File("src/main/assets/content", name).readText()
+        }
+        fun error(tasks: String): String = try {
+            parse(tasks)
+            ""
+        } catch (e: ContentException) {
+            e.errors.single()
+        }
+        val guests = "{\"min\":6,\"max\":10,\"step\":2}"
+        assertTrue(error("[${stand.toString().replace(guests, "{\"min\":6,\"max\":9,\"step\":2}")}]").contains("целое число шагов"))
+        assertTrue(error("[${stand.toString().replace("{guests} гостей", "{visitors} гостей")}]").contains("{visitors}"))
+        assertTrue(error("[${stand.toString().replace("\"id\":\"stand_x\"", "\"id\":{\"oneOf\":[\"a\",\"b\"]}")}]").contains("поле id"))
+    }
+
+    // ---------- Настоящий контент ----------
+
+    private val content = ContentParser.parse { File("src/main/assets/content", it).readText() }
+
+    private fun texts(task: TaskDefinition): String = listOf(task.intro, task.explainOk, task.explainFail, task.toString()).joinToString()
+
+    @Test
+    fun `в контенте есть игры с разбросом`() {
+        assertTrue(content.taskTemplates.keys.containsAll(listOf("game_lemonade", "game_cashier", "game_rainy", "game_chores")))
+    }
+
+    /** Каждое зерно даёт выигрываемую игру без недоставленных подстановок, и числа правда меняются. */
+    @Test
+    fun `случайные игры из контента решаемы на любом зерне`() {
+        for ((id, template) in content.taskTemplates) {
+            val tasks = (1L..300L).map { TaskGenerator.generate(template, it) }
+            tasks.forEach { task ->
+                assertEquals(id, task.id)
+                assertEquals(emptyList<String>(), TaskChecks.problems(task))
+                assertFalse("$id: осталась подстановка в ${texts(task)}", Regex("""\{[A-Za-z]""").containsMatchIn(texts(task)))
+            }
+            assertTrue("$id: числа не меняются", tasks.toSet().size > 1)
+        }
+    }
+
+    @Test
+    fun `вариант без случайности — тот, что в списке заданий`() {
+        for ((id, template) in content.taskTemplates) assertEquals(content.task(id), TaskGenerator.base(template))
+    }
+
+    // ---------- Попытка ----------
+
+    @Test
+    fun `ответ проверяется по числам зерна, и зерно сохраняется в попытке`() {
+        val game = Game(content, Random(1))
+        val fresh = game.selectGoal(game.newGame(isDemo = true), content.goals.first().id).state()
+        val start = game.confirmPlan(fresh, 20, 10, 10).state()
+        val seeds = (1L..200L).map { it to game.task("game_lemonade_2", it) as StandTask }
+        val (seed, task) = seeds.first { it.second.guests != 7 }
+        val other = seeds.first { TaskEngines.bestStock(it.second) != TaskEngines.bestStock(task) }.first
+
+        val ok = game.submitTask(start, task.id, TaskInput.Stock(TaskEngines.bestStock(task)), seed).submitted()
+        assertEquals(TaskOutcome.SUCCESS, ok.outcome)
+        assertEquals(seed, ok.state.attempts.last().seed)
+
+        val wrong = game.submitTask(start, task.id, TaskInput.Stock(TaskEngines.bestStock(task)), other).submitted()
+        assertEquals(TaskOutcome.FAIL, wrong.outcome)
+    }
+
+    @Test
+    fun `новая попытка — новое зерно`() {
+        val game = Game(content, Random(1))
+        assertNotEquals(game.newTaskSeed(), game.newTaskSeed())
+    }
+}

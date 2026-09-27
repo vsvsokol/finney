@@ -2,6 +2,7 @@ package ru.finney.pet.domain.model
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 
 @Serializable
 enum class Category {
@@ -72,8 +73,11 @@ data class GameContent(
     val economy: EconomyConfig,
     val shop: List<ShopItem>,
     val goals: List<Goal>,
+    /** Задания без случайности: разброс — минимум (см. [ru.finney.pet.domain.tasks.TaskGenerator.base]). */
     val tasks: List<TaskDefinition>,
     val glossary: List<GlossaryTerm> = emptyList(),
+    /** Шаблоны заданий с разбросом по id; задания без разброса сюда не попадают. */
+    val taskTemplates: Map<String, JsonObject> = emptyMap(),
 ) {
     fun item(id: String): ShopItem? = shop.firstOrNull { it.id == id }
     fun goal(id: String): Goal? = goals.firstOrNull { it.id == id }

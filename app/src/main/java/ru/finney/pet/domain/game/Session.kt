@@ -56,8 +56,8 @@ class Session(
     suspend fun execute(command: Game.(GameState) -> GameResult): GameResult =
         store.execute(requireProfileId(), command)
 
-    suspend fun submitTask(taskId: String, input: TaskInput): TaskResult =
-        store.submitTask(requireProfileId(), taskId, input)
+    suspend fun submitTask(taskId: String, input: TaskInput, seed: Long? = null): TaskResult =
+        store.submitTask(requireProfileId(), taskId, input, seed)
 
     /** Включить или выключить демо-режим открытого профиля. См. [GameStore.setDemo]. */
     suspend fun setDemo(isDemo: Boolean) = store.setDemo(requireProfileId(), isDemo)

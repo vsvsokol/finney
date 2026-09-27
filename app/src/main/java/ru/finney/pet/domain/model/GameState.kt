@@ -109,6 +109,8 @@ data class TaskAttempt(
     /** 0, если награда за это задание уже выдавалась. */
     val reward: Int,
     val createdAt: Long,
+    /** Зерно чисел игры ([ru.finney.pet.domain.tasks.TaskGenerator]); null — попытка до разброса в контенте. */
+    val seed: Long? = null,
 )
 
 /** Полное состояние одного профиля. Меняется только через [ru.finney.pet.domain.game.Game]. */

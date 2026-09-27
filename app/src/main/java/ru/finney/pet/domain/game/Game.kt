@@ -26,6 +26,7 @@ import ru.finney.pet.domain.progress.Progression
 import ru.finney.pet.domain.tasks.TaskDetails
 import ru.finney.pet.domain.tasks.TaskEngines
 import ru.finney.pet.domain.tasks.TaskEvaluation
+import ru.finney.pet.domain.tasks.TaskGenerator
 import ru.finney.pet.domain.tasks.TaskInput
 import kotlin.random.Random
 
@@ -105,7 +106,7 @@ sealed interface TaskResult {
  */
 class Game(
     private val content: GameContent,
-    /** Выбор игры уровня. В тестах — с зерном. */
+    /** Выбор игры уровня и зёрна чисел мини-игр. В тестах — с зерном. */
     private val random: Random = Random.Default,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
@@ -183,6 +184,18 @@ class Game(
     /** Сколько минимально стоит закрыть нужное при текущих шкалах. */
     fun needsHint(state: GameState): Int? =
         PetRules.needsCost(state.pet, content.shop, economy.pet.needsThreshold)
+
+    /** Зерно новой попытки мини-игры: по нему [task] выбирает числа, см. [TaskGenerator]. */
+    fun newTaskSeed(): Long = random.nextLong()
+
+    /**
+     * Задание с числами попытки [seed] — его показывает экран и по нему же [submitTask]
+     * оценивает ответ. Без разброса в tasks.json или без зерна — задание как в контенте.
+     */
+    fun task(taskId: String, seed: Long?): TaskDefinition? {
+        val template = content.taskTemplates[taskId]
+        return if (template != null && seed != null) TaskGenerator.generate(template, seed) else content.task(taskId)
+    }
 
     fun isTaskAvailable(state: GameState, task: TaskDefinition): Boolean =
         state.isDemo || (task.unlockPeriod <= state.currentPeriod.number && task.unlockLevel <= level(state))
@@ -477,9 +490,10 @@ class Game(
         return ok(state.copy(ledger = state.ledger + income(state, EntryType.PARENT_BONUS, amount)))
     }
 
-    fun submitTask(state: GameState, taskId: String, input: TaskInput): TaskResult {
+    /** [seed] — зерно, с которым экран показал игру ([newTaskSeed]); сохраняется в попытке. */
+    fun submitTask(state: GameState, taskId: String, input: TaskInput, seed: Long? = null): TaskResult {
         if (state.sleepingSince != null) return TaskResult.Rejected(Rejection.Asleep)
-        val task = content.task(taskId) ?: return TaskResult.Rejected(Rejection.UnknownTask(taskId))
+        val task = task(taskId, seed) ?: return TaskResult.Rejected(Rejection.UnknownTask(taskId))
         if (!isTaskAvailable(state, task)) return TaskResult.Rejected(Rejection.TaskLocked)
         // Мини-игры — часть уровня, а уровень начинается с плана: без него игры
         // превращались в случайный перебор ради монет.
@@ -495,7 +509,7 @@ class Game(
             TaskOutcome.SUCCESS -> if (previous.none { it.outcome == TaskOutcome.SUCCESS }) rates.success else 0
             TaskOutcome.FAIL -> if (previous.isEmpty()) rates.fail else 0
         }
-        val attempt = TaskAttempt(state.currentPeriod.number, taskId, evaluation.outcome, reward, clock())
+        val attempt = TaskAttempt(state.currentPeriod.number, taskId, evaluation.outcome, reward, clock(), seed)
         val ledger = if (reward > 0) {
             state.ledger + income(state, EntryType.TASK_REWARD, reward).copy(taskId = taskId)
         } else {

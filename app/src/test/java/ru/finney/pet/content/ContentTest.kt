@@ -114,7 +114,7 @@ class ContentTest {
         "game_race" to (TaskInput.DailyDeposits(listOf(10, 10, 5, 5, 10, 10)) to TaskInput.DailyDeposits(listOf(5, 5, 5, 5, 5, 5))),
         "game_rainy" to (TaskInput.Reserve(setOf("food", "soap", "icecream"), emptySet()) to
             TaskInput.Reserve(setOf("food", "soap", "ball", "stickers", "icecream"), setOf("ball"))),
-        "game_lemonade" to (TaskInput.Stock(4) to TaskInput.Stock(6)),
+        "game_lemonade" to (TaskInput.Stock(3) to TaskInput.Stock(6)),
     )
 
     @Test

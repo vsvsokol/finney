@@ -10,7 +10,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import ru.finney.pet.data.db.FinneyDatabase
 
-/** Обновление приложения не стирает прогресс: база версии 3 переносится в 4 … 8 с данными. */
+/** Обновление приложения не стирает прогресс: база версии 3 переносится в 4 … 9 с данными. */
 @RunWith(AndroidJUnit4::class)
 class MigrationTest {
 
@@ -144,6 +144,29 @@ class MigrationTest {
             db.query("SELECT isDemo FROM profiles WHERE id = 1").use { c ->
                 assertTrue(c.moveToFirst())
                 assertEquals(1, c.getInt(0))
+            }
+        }
+    }
+
+    @Test
+    fun migrate8To9KeepsAttemptsWithoutSeed() {
+        helper.createDatabase(dbName, 8).use { db ->
+            db.execSQL(
+                "INSERT INTO profiles (id, petName, petCharacter, bodyColor, eyes, activeGoalId, isDemo, createdAt, wornItemId) " +
+                    "VALUES (1, 'Финни', 'PUSHISTIK', 'A', 'ROUND', NULL, 0, 1, NULL)",
+            )
+            db.execSQL(
+                "INSERT INTO task_attempts (profileId, periodNumber, taskId, outcome, reward, createdAt) " +
+                    "VALUES (1, 1, 'game_lemonade', 'SUCCESS', 15, 2)",
+            )
+        }
+
+        helper.runMigrationsAndValidate(dbName, 9, true, FinneyDatabase.MIGRATION_8_9).use { db ->
+            db.query("SELECT taskId, reward, seed FROM task_attempts WHERE profileId = 1").use { c ->
+                assertTrue(c.moveToFirst())
+                assertEquals("game_lemonade", c.getString(0))
+                assertEquals(15, c.getInt(1))
+                assertTrue("у старой попытки чисел без разброса зерна нет", c.isNull(2))
             }
         }
     }

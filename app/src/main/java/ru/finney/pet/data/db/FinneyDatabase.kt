@@ -10,7 +10,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 /**
  * Схема каждой версии экспортируется в app/schemas и коммитится.
  *
- * С версии 3 изменения переносятся миграциями — [MIGRATION_3_4] … [MIGRATION_7_8]. Базы версий 1–2
+ * С версии 3 изменения переносятся миграциями — [MIGRATION_3_4] … [MIGRATION_8_9]. Базы версий 1–2
  * пересоздаются с нуля: версия 3 переименовала питомцев, а перенести старые значения было бы
  * возможно только храня прежние имена прямо в коде.
  */
@@ -22,7 +22,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         LedgerEntryEntity::class,
         TaskAttemptEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
 abstract class FinneyDatabase : RoomDatabase() {
@@ -34,7 +34,7 @@ abstract class FinneyDatabase : RoomDatabase() {
 
         fun create(context: Context): FinneyDatabase =
             Room.databaseBuilder(context.applicationContext, FinneyDatabase::class.java, NAME)
-                .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+                .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
                 .fallbackToDestructiveMigration(dropAllTables = true)
                 .build()
 
@@ -92,6 +92,16 @@ abstract class FinneyDatabase : RoomDatabase() {
         val MIGRATION_7_8 = object : Migration(7, 8) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE periods ADD COLUMN passed INTEGER")
+            }
+        }
+
+        /**
+         * 8 → 9: у попытки хранится зерно чисел игры — по нему попытку можно повторить
+         * и проверить. У старых попыток NULL: их числа были без разброса.
+         */
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE task_attempts ADD COLUMN seed INTEGER")
             }
         }
     }

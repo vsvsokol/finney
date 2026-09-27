@@ -117,6 +117,7 @@ data class TaskAttemptEntity(
     val outcome: TaskOutcome,
     val reward: Int,
     val createdAt: Long,
+    val seed: Long? = null,
 )
 
 /** Профиль со всем состоянием одним запросом. Порядок в списках Room не гарантирует — сортирует маппер. */

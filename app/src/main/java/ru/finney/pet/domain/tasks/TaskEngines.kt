@@ -217,6 +217,29 @@ object TaskEngines {
     /** Сколько сырья хватит на всех гостей без лишнего: ⌈гости / стаканов из штуки⌉. */
     fun bestStock(task: StandTask): Int = (task.guests + task.ingredient.yields - 1) / task.ingredient.yields
 
+    /**
+     * Числа, которые движок считает сам, — для подстановок в тексты задания ([TaskGenerator]):
+     * когда гостей выпало случайно, «5 лимонов — это 10 стаканов» тоже должно пересчитаться.
+     * Имена — в docs/minigames.md.
+     */
+    fun facts(task: TaskDefinition): Map<String, Int> = when (task) {
+        is StandTask -> {
+            val best = standDay(task, bestStock(task))
+            val fewer = standDay(task, bestStock(task) - 1)
+            mapOf(
+                "bestStock" to bestStock(task),
+                "bestCups" to best.cups,
+                "bestSpent" to best.spent,
+                "bestEarned" to best.earned,
+                "bestLeftover" to best.leftover,
+                "fewerStock" to bestStock(task) - 1,
+                "fewerCups" to fewer.cups,
+                "fewerMissed" to fewer.missed,
+            )
+        }
+        else -> emptyMap()
+    }
+
     /** Позволил ли себе соблазн дня: после взноса на него хватает. */
     fun raceTaken(task: GoalRaceTask, event: RaceEvent, deposit: Int): Boolean = task.incomePerDay - deposit >= event.price
 

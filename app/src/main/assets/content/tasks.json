@@ -237,10 +237,11 @@
       { "id": "icecream", "label": "Мороженое", "price": 5, "category": "wants", "art": "item_treat_icecream" }
     ],
     "surprise": {
-      "label": "Сломался зонт!",
-      "text": "Новый стоит 15. Без него Финни промокнет по дороге.",
-      "price": 15,
-      "art": "item_wear_umbrella"
+      "oneOf": [
+          { "label": "Сломался зонт!", "text": "Новый стоит {surprise.price}. Без него Финни промокнет по дороге.", "price": 10, "art": "item_wear_umbrella" },
+          { "label": "Порвался рюкзак!", "text": "Новый стоит {surprise.price}. Без рюкзака не в чем носить тетради.", "price": 15, "art": "item_school_backpack" },
+          { "label": "Порвались кроссовки!", "text": "Новые стоят {surprise.price}. В рваных по лужам не походишь.", "price": 20, "art": "item_wear_sneakers" }
+      ]
     },
     "explainOk": "Хорошо, что был запас! Неожиданная трата не испортила неделю. Запас — это деньги на всякий случай.",
     "explainFail": "Запаса не хватило, и что-то пришлось перенести. Ничего страшного — в следующий раз оставь немного монет на всякий случай."
@@ -264,12 +265,13 @@
       { "id": "icecream", "label": "Мороженое", "price": 5, "category": "wants", "art": "item_treat_icecream" }
     ],
     "surprise": {
-      "label": "Порвался рюкзак!",
-      "text": "Новый стоит 20. Без рюкзака не в чем носить тетради.",
-      "price": 20,
-      "art": "item_school_backpack"
+      "oneOf": [
+          { "label": "Сломался зонт!", "text": "Новый стоит {surprise.price}. Без него Финни промокнет по дороге.", "price": 15, "art": "item_wear_umbrella" },
+          { "label": "Порвался рюкзак!", "text": "Новый стоит {surprise.price}. Без рюкзака не в чем носить тетради.", "price": 20, "art": "item_school_backpack" },
+          { "label": "Порвались кроссовки!", "text": "Новые стоят {surprise.price}. В рваных по лужам не походишь.", "price": 25, "art": "item_wear_sneakers" }
+      ]
     },
-    "explainOk": "Запаса хватило на новый рюкзак! Когда нужное оплачено, часть монет лучше не тратить сразу.",
+    "explainOk": "Запаса хватило на неожиданную трату! Когда нужное оплачено, часть монет лучше не тратить сразу.",
     "explainFail": "Запаса не хватило, и кое-что пришлось отменить. В следующий раз оставь на всякий случай побольше монет."
   },
   {
@@ -292,13 +294,14 @@
       { "id": "icecream", "label": "Мороженое", "price": 5, "category": "wants", "art": "item_treat_icecream" }
     ],
     "surprise": {
-      "label": "Порвались кроссовки!",
-      "text": "Новые стоят 25. В рваных по лужам не походишь.",
-      "price": 25,
-      "art": "item_wear_sneakers"
+      "oneOf": [
+          { "label": "Сломался зонт!", "text": "Новый стоит {surprise.price}. Без него Финни промокнет по дороге.", "price": 20, "art": "item_wear_umbrella" },
+          { "label": "Порвался рюкзак!", "text": "Новый стоит {surprise.price}. Без рюкзака не в чем носить тетради.", "price": 25, "art": "item_school_backpack" },
+          { "label": "Порвались кроссовки!", "text": "Новые стоят {surprise.price}. В рваных по лужам не походишь.", "price": 30, "art": "item_wear_sneakers" }
+      ]
     },
-    "explainOk": "Запас спас неделю: кроссовки купили и ничего не отменили. Чем больше трат, тем важнее запас.",
-    "explainFail": "Запаса не хватило. Когда трат много, откладывай на всякий случай больше — хотя бы четверть денег."
+    "explainOk": "Запас спас неделю: неожиданную трату оплатили и ничего не отменили. Чем больше трат, тем важнее запас.",
+    "explainFail": "Запаса не хватило. Когда трат много, откладывай на всякий случай больше — хотя бы треть денег."
   },
   {
     "id": "game_lemonade",
@@ -311,8 +314,8 @@
     "budget": 50,
     "ingredient": { "label": "Лимон", "price": 5, "yields": 2, "art": "item_food_lemon" },
     "cupPrice": 5,
-    "guests": 8,
-    "forecast": "Жарко — придут 8 гостей",
+    "guests": { "min": 6, "max": 10, "step": 2 },
+    "forecast": "Жарко — придут {guests} гостей",
     "explainOk": "Лимонов было ровно столько, сколько нужно: все гости с лимонадом, и ничего не пропало. Считать заранее — выгодно.",
     "explainFail": "Лимонов было не столько, сколько нужно. Посмотри итог дня: сколько гостей пришло и сколько стаканов вышло из одного лимона. Завтра получится!"
   },
@@ -327,10 +330,10 @@
     "budget": 40,
     "ingredient": { "label": "Лимон", "price": 5, "yields": 2, "art": "item_food_lemon" },
     "cupPrice": 5,
-    "guests": 9,
-    "forecast": "Тепло — придут 9 гостей",
-    "explainOk": "5 лимонов — это 10 стаканов: всем 9 гостям хватило, и остался всего один. Когда гостей нечётное число, один лишний стакан — это нормально.",
-    "explainFail": "Лимонов было не столько, сколько нужно. Посчитай: из 4 лимонов выйдет 8 стаканов — одному гостю не хватит. А сколько нужно на 9? Завтра получится!"
+    "guests": { "min": 7, "max": 11, "step": 2 },
+    "forecast": "Тепло — придут {guests} гостей",
+    "explainOk": "Лимонов нужно {bestStock}: это {bestCups} стаканов, всем {guests} гостям хватило, и остался всего один. Когда гостей нечётное число, один лишний стакан — это нормально.",
+    "explainFail": "Лимонов было не столько, сколько нужно. Посчитай: из {fewerStock} лимонов выйдет {fewerCups} стаканов — одному гостю не хватит. А сколько нужно на {guests}? Завтра получится!"
   },
   {
     "id": "game_lemonade_3",
@@ -343,10 +346,10 @@
     "budget": 60,
     "ingredient": { "label": "Большой лимон", "price": 10, "yields": 3, "art": "item_food_lemon" },
     "cupPrice": 5,
-    "guests": 13,
-    "forecast": "Жара и выходной — придут 13 гостей",
-    "explainOk": "5 больших лимонов — это 15 стаканов: всем 13 гостям хватило. Потратили 50, заработали 65 — лавка в плюсе!",
-    "explainFail": "Лимонов было не столько, сколько нужно. 4 больших лимона — это 12 стаканов, одному гостю не хватит. А сколько нужно на 13? Завтра получится!"
+    "guests": { "oneOf": [10, 11, 13, 14] },
+    "forecast": "Жара и выходной — придут {guests} гостей",
+    "explainOk": "Больших лимонов нужно {bestStock}: это {bestCups} стаканов, всем {guests} гостям хватило. Потратили {bestSpent}, заработали {bestEarned} — лавка в плюсе!",
+    "explainFail": "Лимонов было не столько, сколько нужно. {fewerStock} больших лимона — это {fewerCups} стаканов, а гостей {guests}: кому-то не хватит. А сколько нужно на {guests}? Завтра получится!"
   },
   {
     "id": "game_cashier",
@@ -359,10 +362,10 @@
     "coins": [1, 2, 5, 10],
     "minCorrect": 3,
     "rounds": [
-      { "mode": "give", "label": "Сок", "price": 17, "paid": 20, "art": "item_food_juice" },
-      { "mode": "give", "label": "Яблоко", "price": 6, "paid": 10, "art": "item_food_apple" },
+      { "mode": "give", "label": "Сок", "price": { "min": 13, "max": 18 }, "paid": 20, "art": "item_food_juice" },
+      { "mode": "give", "label": "Яблоко", "price": { "min": 3, "max": 8 }, "paid": 10, "art": "item_food_apple" },
       { "mode": "exact", "label": "Молоко", "price": 17, "wallet": [10, 5, 5, 2, 1, 1], "art": "item_food_milk" },
-      { "mode": "give", "label": "Леденец", "price": 12, "paid": 20, "art": "item_treat_candy" }
+      { "mode": "give", "label": "Леденец", "price": { "min": 11, "max": 17 }, "paid": 20, "art": "item_treat_candy" }
     ],
     "explainOk": "Все монеты сошлись! Сдача — это разница: сколько дали минус сколько стоит. Всегда проверяй сдачу.",
     "explainFail": "Кое-где монет было больше или меньше, чем нужно. Считай так: сколько дали минус сколько стоит — это и есть сдача."
@@ -379,9 +382,9 @@
     "minCorrect": 3,
     "rounds": [
       { "mode": "give", "label": "Шоколадка", "price": 14, "paid": 50, "art": "item_treat_chocolate" },
-      { "mode": "give", "label": "Книжка", "price": 23, "paid": 30, "art": "item_toy_book" },
+      { "mode": "give", "label": "Книжка", "price": { "min": 21, "max": 28 }, "paid": 30, "art": "item_toy_book" },
       { "mode": "exact", "label": "Сок", "price": 18, "wallet": [10, 5, 2, 2, 1], "art": "item_food_juice" },
-      { "mode": "give", "label": "Пончик", "price": 9, "paid": 20, "art": "item_treat_donut" }
+      { "mode": "give", "label": "Пончик", "price": { "min": 6, "max": 9 }, "paid": 20, "art": "item_treat_donut" }
     ],
     "explainOk": "Сдача сошлась! Большую сдачу проще считать по шагам: от 14 до 20 — это 6, от 20 до 50 — ещё 30, всего 36.",
     "explainFail": "Кое-где монет было больше или меньше, чем нужно. Считай по шагам: сначала до круглого числа, потом дальше."
@@ -397,11 +400,11 @@
     "coins": [1, 2, 5, 10],
     "minCorrect": 4,
     "rounds": [
-      { "mode": "give", "label": "Арбуз", "price": 37, "paid": 50, "art": "item_food_watermelon" },
+      { "mode": "give", "label": "Арбуз", "price": { "min": 33, "max": 39 }, "paid": 50, "art": "item_food_watermelon" },
       { "mode": "exact", "label": "Молоко", "price": 6, "wallet": [5, 2, 2, 2], "art": "item_food_milk" },
-      { "mode": "give", "label": "Жидкое мыло", "price": 26, "paid": 40, "art": "item_care_soap_liquid" },
+      { "mode": "give", "label": "Жидкое мыло", "price": { "min": 22, "max": 29 }, "paid": 40, "art": "item_care_soap_liquid" },
       { "mode": "exact", "label": "Шоколадка", "price": 8, "wallet": [5, 2, 2, 2, 2], "art": "item_treat_chocolate" },
-      { "mode": "give", "label": "Леденец", "price": 8, "paid": 50, "art": "item_treat_candy" }
+      { "mode": "give", "label": "Леденец", "price": { "min": 3, "max": 9 }, "paid": 50, "art": "item_treat_candy" }
     ],
     "explainOk": "Все монеты сошлись! Иногда крупная монета мешает: 6 не набрать с пятёркой, если нет единички, — зато 2, 2 и 2 как раз.",
     "explainFail": "Кое-где монеты не сошлись. Если крупная монета не подходит, попробуй набрать сумму одними мелкими."
@@ -492,7 +495,7 @@
     "series": "chores",
     "unlockLevel": 1,
     "intro": "Финни копит на мяч. Выбери день и нажми дела — они встанут в часики дня. Один день оставь на отдых.",
-    "goal": { "label": "Мяч", "price": 50, "art": "item_toy_ball" },
+    "goal": { "label": "Мяч", "price": { "min": 40, "max": 60, "step": 10 }, "art": "item_toy_ball" },
     "days": 5,
     "hoursPerDay": 2,
     "minRestDays": 1,
@@ -512,7 +515,7 @@
     "series": "chores",
     "unlockLevel": 4,
     "intro": "Собаку соседа выгулять просят только два раза, а посуду — три. Набери на конструктор и отдохни два дня.",
-    "goal": { "label": "Конструктор", "price": 80, "art": "item_toy_blocks" },
+    "goal": { "label": "Конструктор", "price": { "min": 70, "max": 80, "step": 10 }, "art": "item_toy_blocks" },
     "days": 6,
     "hoursPerDay": 2,
     "minRestDays": 2,
@@ -532,7 +535,7 @@
     "series": "chores",
     "unlockLevel": 6,
     "intro": "Большая уборка занимает весь день. Набери на самокат за три рабочих дня и отдохни два.",
-    "goal": { "label": "Самокат", "price": 100, "art": "item_toy_scooter" },
+    "goal": { "label": "Самокат", "price": { "min": 90, "max": 100, "step": 10 }, "art": "item_toy_scooter" },
     "days": 5,
     "hoursPerDay": 3,
     "minRestDays": 2,

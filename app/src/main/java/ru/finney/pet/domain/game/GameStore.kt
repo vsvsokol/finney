@@ -76,8 +76,8 @@ class GameStore(
         result
     }
 
-    suspend fun submitTask(profileId: Long, taskId: String, input: TaskInput): TaskResult = mutex.withLock {
-        val result = game.submitTask(loadState(profileId), taskId, input)
+    suspend fun submitTask(profileId: Long, taskId: String, input: TaskInput, seed: Long? = null): TaskResult = mutex.withLock {
+        val result = game.submitTask(loadState(profileId), taskId, input, seed)
         if (result is TaskResult.Submitted) storage.save(profileId, result.state)
         result
     }

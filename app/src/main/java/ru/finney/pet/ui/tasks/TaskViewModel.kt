@@ -78,9 +78,14 @@ class TaskViewModel(
         val result: TaskOutcomeUi? = null,
         val inputError: TaskInputError? = null,
         val submitting: Boolean = false,
+        /** Числа этой попытки: новая попытка — новые числа, если в игре есть разброс. */
+        val seed: Long,
     )
 
-    private val local = MutableStateFlow(Local())
+    private val local = MutableStateFlow(Local(seed = game.newTaskSeed()))
+
+    /** Сгенерированное задание последнего зерна: состояние пересчитывается часто, а числа те же. */
+    private var generated: Pair<Long, TaskDefinition?>? = null
 
     val uiState: StateFlow<TaskUiState> =
         combine(session.activeGame.filterNotNull(), local, ::toUiState)
@@ -88,15 +93,16 @@ class TaskViewModel(
 
     fun start() = local.update { it.copy(phase = TaskPhase.PLAY, inputError = null) }
 
-    fun replay() = local.update { Local(phase = TaskPhase.PLAY, attempt = it.attempt + 1) }
+    fun replay() = local.update { Local(phase = TaskPhase.PLAY, attempt = it.attempt + 1, seed = game.newTaskSeed()) }
 
     fun inputSeen() = local.update { it.copy(inputError = null) }
 
     fun submit(input: TaskInput) {
         if (local.value.submitting) return
         local.update { it.copy(submitting = true) }
+        val seed = local.value.seed
         viewModelScope.launch {
-            when (val r = session.submitTask(taskId, input)) {
+            when (val r = session.submitTask(taskId, input, seed)) {
                 is TaskResult.Submitted -> local.update {
                     it.copy(
                         phase = TaskPhase.RESULT,
@@ -114,7 +120,7 @@ class TaskViewModel(
     }
 
     private fun toUiState(saved: SavedGame, local: Local): TaskUiState {
-        val task = content.task(taskId) ?: return TaskUiState.NotFound
+        val task = task(local.seed) ?: return TaskUiState.NotFound
         val state = saved.state
         return TaskUiState.Ready(
             task = task,
@@ -133,6 +139,10 @@ class TaskViewModel(
             inputError = local.inputError,
         )
     }
+
+    private fun task(seed: Long): TaskDefinition? =
+        generated?.takeIf { it.first == seed }?.second
+            ?: game.task(taskId, seed).also { generated = seed to it }
 
     companion object {
         fun factory(taskId: String) = viewModelFactory {
