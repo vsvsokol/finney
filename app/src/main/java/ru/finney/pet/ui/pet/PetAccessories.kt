@@ -24,10 +24,10 @@ fun accessoryArt(itemId: String): AccessoryArt? = when (itemId) {
 }
 
 /** Шляпы крупнее замера по голове: по [HatFit.width] они выглядели маленькими и не налезали. */
-private const val HAT_SCALE = 1.5f
+private const val HAT_SCALE = 1.2f
 
 /** Насколько выше замера по голове лежат поля — доля высоты холста. */
-private const val HAT_LIFT = 0.07f
+private const val HAT_LIFT = 0.05f
 
 /**
  * Поставить шляпу по [HatFit]: ширина — доля стороны питомца, линия полей [artBrim]

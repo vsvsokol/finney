@@ -538,6 +538,7 @@ private fun Pet(
         footing = footing,
         visibility = visibility,
         pad = PET_PAD,
+        padTop = PET_PAD_TOP,
         modifier = Modifier
             .offset(canvasW * ground.left, canvasH * ground.top)
             .graphicsLayer { alpha = visibility() }
