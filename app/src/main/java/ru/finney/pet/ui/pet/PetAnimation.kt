@@ -125,15 +125,25 @@ class PetAnimation internal constructor(private val scope: CoroutineScope) {
         }
     }
 
+    /**
+     * Прыжок радости. Пока прыгает, новые касания его не перезапускают: раньше каждое касание
+     * обрывало прыжок и начинало с приседания, а высота оставалась прежней — при частых
+     * касаниях питомец зависал в воздухе.
+     */
     fun playJoy() {
-        job?.cancel()
+        if (job?.isActive == true) return
         job = scope.launch {
-            crouch.animateTo(1f, tween(durationMillis = 140, easing = FastOutLinearInEasing))
-            launch { crouch.animateTo(0f, tween(durationMillis = 170)) }
-            lift.animateTo(1f, tween(durationMillis = 250, easing = FastOutSlowInEasing))
-            lift.animateTo(0f, tween(durationMillis = 280, easing = FastOutSlowInEasing))
-            crouch.animateTo(0.55f, tween(durationMillis = 80))
-            crouch.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
+            try {
+                crouch.animateTo(1f, tween(durationMillis = 140, easing = FastOutLinearInEasing))
+                launch { crouch.animateTo(0f, tween(durationMillis = 170)) }
+                lift.animateTo(1f, tween(durationMillis = 250, easing = FastOutSlowInEasing))
+                lift.animateTo(0f, tween(durationMillis = 280, easing = FastOutSlowInEasing))
+                crouch.animateTo(0.55f, tween(durationMillis = 80))
+                crouch.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
+            } finally {
+                // Прыжок оборвала другая анимация (жевание берёт приседание) — приземлиться.
+                if (lift.value != 0f) scope.launch { lift.animateTo(0f, tween(durationMillis = 200)) }
+            }
         }
     }
 }

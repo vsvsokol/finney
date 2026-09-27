@@ -23,6 +23,12 @@ fun accessoryArt(itemId: String): AccessoryArt? = when (itemId) {
     else -> null
 }
 
+/** Шляпы крупнее замера по голове: по [HatFit.width] они выглядели маленькими и не налезали. */
+private const val HAT_SCALE = 1.5f
+
+/** Насколько выше замера по голове лежат поля — доля высоты холста. */
+private const val HAT_LIFT = 0.10f
+
 /**
  * Поставить шляпу по [HatFit]: ширина — доля стороны питомца, линия полей [artBrim]
  * (доля высоты рисунка) ложится на [HatFit.brim]. Слой занимает место всего холста,
@@ -30,12 +36,12 @@ fun accessoryArt(itemId: String): AccessoryArt? = when (itemId) {
  */
 internal fun Modifier.hatPlacement(fit: HatFit, artBrim: Float): Modifier = layout { measurable, constraints ->
     val side = constraints.maxWidth
-    val width = (side * fit.width).roundToInt()
+    val width = (side * fit.width * HAT_SCALE).roundToInt()
     val placeable = measurable.measure(Constraints.fixedWidth(width))
     layout(side, constraints.maxHeight) {
         placeable.place(
             x = (side * fit.centerX - width / 2f).roundToInt(),
-            y = (constraints.maxHeight * fit.brim - placeable.height * artBrim).roundToInt(),
+            y = (constraints.maxHeight * (fit.brim - HAT_LIFT) - placeable.height * artBrim).roundToInt(),
         )
     }
 }
