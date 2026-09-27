@@ -70,8 +70,8 @@ private fun SettingsContent(
 ) {
     FinneyScreen(
         scrollable = true,
+        onClose = onBack,
         bottom = {
-            FinneyButton(text = "Назад", onClick = onBack)
             Text(
                 text = version,
                 style = MaterialTheme.typography.bodyMedium,

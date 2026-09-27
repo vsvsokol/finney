@@ -61,9 +61,8 @@ fun TaskScreen(
             CircularProgressIndicator(color = FinneyInk)
         }
 
-        TaskUiState.NotFound -> FinneyScreen {
+        TaskUiState.NotFound -> FinneyScreen(onClose = onBack) {
             OutlinedText("Такой игры нет", style = MaterialTheme.typography.headlineMedium)
-            FinneyButton(text = "Назад", onClick = onBack)
         }
 
         is TaskUiState.Ready -> CompositionLocalProvider(

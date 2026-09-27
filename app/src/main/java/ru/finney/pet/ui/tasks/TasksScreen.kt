@@ -118,7 +118,7 @@ fun TasksScreen(
         return
     }
 
-    FinneyScreen(scrollable = false) {
+    FinneyScreen(scrollable = false, onClose = onBack) {
         OutlinedText("Мини-игры", style = MaterialTheme.typography.headlineLarge)
         Text(
             "Пройдено ${list.count { it.done }} из ${list.size}",
@@ -145,7 +145,6 @@ fun TasksScreen(
                 }
             }
         }
-        FinneyButton(text = "Назад", onClick = onBack)
     }
 }
 

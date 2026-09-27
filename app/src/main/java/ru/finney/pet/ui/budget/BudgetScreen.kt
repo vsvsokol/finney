@@ -109,6 +109,7 @@ private fun PlanningContent(
     FinneyScreen(
         scrollable = true,
         verticalArrangement = Arrangement.spacedBy(16.dp),
+        onClose = onBack,
     ) {
         OutlinedText("План", style = MaterialTheme.typography.headlineLarge)
 
@@ -185,7 +186,6 @@ private fun PlanningContent(
             onClick = onConfirm,
             enabled = state.canConfirm,
         )
-        FinneyButton(text = "Назад", onClick = onBack)
     }
 }
 
@@ -269,6 +269,7 @@ private fun ActiveContent(state: BudgetUiState.Active, onBack: () -> Unit) {
     FinneyScreen(
         scrollable = true,
         verticalArrangement = Arrangement.spacedBy(16.dp),
+        onClose = onBack,
     ) {
         OutlinedText("План и факт", style = MaterialTheme.typography.headlineLarge)
 
@@ -299,8 +300,6 @@ private fun ActiveContent(state: BudgetUiState.Active, onBack: () -> Unit) {
                 .padding(14.dp),
             textAlign = TextAlign.Center,
         )
-
-        FinneyButton(text = "Назад", onClick = onBack)
     }
 }
 

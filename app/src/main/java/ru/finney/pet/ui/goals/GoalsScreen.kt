@@ -141,7 +141,7 @@ private fun GoalsContent(
     FinneyScreen(
         scrollable = true,
         verticalArrangement = Arrangement.spacedBy(16.dp),
-        bottom = { FinneyButton(text = "Назад", onClick = onBack) },
+        onClose = onBack,
     ) {
         OutlinedText("Копилка", style = MaterialTheme.typography.headlineLarge)
 

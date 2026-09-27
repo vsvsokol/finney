@@ -86,7 +86,7 @@ private fun WardrobeContent(
     FinneyScreen(
         scrollable = true,
         verticalArrangement = Arrangement.spacedBy(16.dp),
-        bottom = { FinneyButton(text = "Назад", onClick = onBack) },
+        onClose = onBack,
     ) {
         OutlinedText("Гардероб", style = MaterialTheme.typography.headlineLarge)
 

@@ -72,7 +72,7 @@ private fun ShopContent(
     FinneyScreen(
         scrollable = true,
         verticalArrangement = Arrangement.spacedBy(16.dp),
-        bottom = { FinneyButton(text = "Назад", onClick = onBack) },
+        onClose = onBack,
     ) {
         OutlinedText("Магазин", style = MaterialTheme.typography.headlineLarge)
 
