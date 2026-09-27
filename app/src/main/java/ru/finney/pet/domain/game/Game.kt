@@ -278,21 +278,31 @@ class Game(
 
     // ---------- Сон ----------
 
-    /** Сколько длится полный сон: час, в демо-режиме — секунды, чтобы эксперт увидел весь цикл. */
-    fun sleepMillis(state: GameState): Long =
+    /** Сколько спать от 0 до 100: час, в демо-режиме — секунды, чтобы эксперт увидел весь цикл. */
+    fun fullSleepMillis(state: GameState): Long =
         if (state.isDemo) economy.pet.demoSleepSeconds * 1_000L else economy.pet.sleepMinutes * 60_000L
+
+    /**
+     * Сколько спать с того сна, с каким уснул, до 100: доля от [fullSleepMillis].
+     * Уснул с 37 — спит 63 % часа, с 0 — час. Округление вверх, чтобы к концу сон был ровно 100.
+     */
+    fun sleepMillis(state: GameState): Long {
+        val missing = (PetRules.STAT_MAX - state.pet.energy).coerceAtLeast(0)
+        return (fullSleepMillis(state) * missing + PetRules.STAT_MAX - 1) / PetRules.STAT_MAX
+    }
 
     /** Когда питомец проснётся сам; null — не спит. */
     fun sleepEndsAt(state: GameState): Long? = state.sleepingSince?.plus(sleepMillis(state))
 
     /**
-     * Сон сейчас. У спящего растёт ровно от того, с чем уснул, до 100 за [sleepMillis];
-     * в [GameState.pet] лежит значение на момент засыпания.
+     * Сон сейчас. У спящего растёт с одной скоростью — 100 за [fullSleepMillis] — от того,
+     * с чем уснул, до 100; в [GameState.pet] лежит значение на момент засыпания.
      */
     fun energyAt(state: GameState, now: Long = clock()): Int {
         val since = state.sleepingSince ?: return state.pet.energy
-        val slept = ((now - since).toDouble() / sleepMillis(state)).coerceIn(0.0, 1.0)
-        return state.pet.energy + ((PetRules.STAT_MAX - state.pet.energy) * slept).toInt()
+        val slept = (now - since).coerceAtLeast(0L)
+        val gained = slept * PetRules.STAT_MAX / fullSleepMillis(state)
+        return (state.pet.energy + gained).coerceAtMost(PetRules.STAT_MAX.toLong()).toInt()
     }
 
     /**
