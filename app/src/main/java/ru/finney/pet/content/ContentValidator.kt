@@ -13,7 +13,10 @@ import ru.finney.pet.domain.model.ItemKind
 import ru.finney.pet.domain.model.ReserveTask
 import ru.finney.pet.domain.model.SorterTask
 import ru.finney.pet.domain.model.StandTask
+import ru.finney.pet.domain.model.TaskOutcome
 import ru.finney.pet.domain.tasks.TaskEngines
+import ru.finney.pet.domain.tasks.TaskEvaluation
+import ru.finney.pet.domain.tasks.TaskInput
 
 /**
  * Проверка ссылок и чисел, которые JSON-схема не ловит. Запускается при загрузке и в unit-тесте,
@@ -149,6 +152,15 @@ object ContentValidator {
         }
         task.events.filter { it.day !in 1..task.days }.forEach { add("$at — событие «${it.label}» в дне ${it.day}, а дней ${task.days}") }
         task.events.filter { it.price <= 0 }.forEach { add("$at — событие «${it.label}»: цена должна быть > 0") }
+        duplicates(task.events.map { it.day.toString() }).forEach { add("$at — два соблазна в дне $it") }
+        if (task.mood <= 0) add("$at — mood должен быть > 0")
+        // Игра учит откладывать понемногу, а не «никогда ничего»: копить всё подряд не должно выигрывать.
+        val saveAll = TaskEngines.evaluate(task, TaskInput.DailyDeposits(List(task.days) { task.incomePerDay }))
+        if ((saveAll as? TaskEvaluation.Done)?.outcome == TaskOutcome.SUCCESS) {
+            add("$at — выигрывает «откладывать всё»: соблазнов меньше, чем сердечек в mood")
+        } else if (task.startSaved + task.days * task.incomePerDay >= task.goal.price && TaskEngines.raceSolution(task) == null) {
+            add("$at — цель не набрать, сохранив Финни настроение: не хватает свободных монет на радости")
+        }
     }
 
     private fun MutableList<String>.checkReserve(task: ReserveTask, at: String) {

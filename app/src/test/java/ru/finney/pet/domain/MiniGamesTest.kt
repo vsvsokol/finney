@@ -124,13 +124,62 @@ class MiniGamesTest {
     @Test
     fun `goal_race — сумма взносов против цены, соблазны считаются по потраченному`() {
         assertEquals(
-            TaskEvaluation.Done(TaskOutcome.SUCCESS, TaskDetails.GoalRace(saved = 50, shortfall = 0, eventsTaken = 1)),
+            TaskEvaluation.Done(TaskOutcome.SUCCESS, TaskDetails.GoalRace(saved = 50, shortfall = 0, eventsTaken = 1, mood = 2)),
             TaskEngines.evaluate(race, TaskInput.DailyDeposits(listOf(10, 10, 10, 5, 5, 10))),
         )
         assertEquals(
-            TaskEvaluation.Done(TaskOutcome.FAIL, TaskDetails.GoalRace(saved = 40, shortfall = 10, eventsTaken = 2)),
+            TaskEvaluation.Done(TaskOutcome.FAIL, TaskDetails.GoalRace(saved = 40, shortfall = 10, eventsTaken = 2, mood = 3)),
             TaskEngines.evaluate(race, TaskInput.DailyDeposits(listOf(10, 10, 10, 5, 0, 5))),
         )
+    }
+
+    /** Как «Самокат» в контенте: свободных монет 10, соблазнов три, сердечек три. */
+    private val moodRace = race.copy(
+        events = listOf(RaceEvent(2, "Наклейки", 5), RaceEvent(4, "Мороженое", 5), RaceEvent(5, "Кино", 10)),
+    )
+
+    private fun raceOf(task: GoalRaceTask, vararg deposits: Int) =
+        (TaskEngines.evaluate(task, TaskInput.DailyDeposits(deposits.toList())) as TaskEvaluation.Done)
+
+    @Test
+    fun `goal_race — откладывать всё больше не лучшая стратегия`() {
+        val saveAll = raceOf(moodRace, 10, 10, 10, 10, 10, 10)
+        // Копилка полнее всех, но Финни ни разу себя не порадовал — и цель не засчитана.
+        assertEquals(TaskOutcome.FAIL, saveAll.outcome)
+        assertEquals(TaskDetails.GoalRace(saved = 60, shortfall = 0, eventsTaken = 0, mood = 0), saveAll.details)
+
+        // Одна маленькая радость — и цель, и настроение.
+        val balanced = raceOf(moodRace, 10, 5, 10, 10, 10, 10)
+        assertEquals(TaskOutcome.SUCCESS, balanced.outcome)
+        assertEquals(1, (balanced.details as TaskDetails.GoalRace).mood)
+
+        // Всё на радости — Финни счастлив, но цель не набрана.
+        assertEquals(TaskOutcome.FAIL, raceOf(moodRace, 10, 5, 10, 5, 0, 10).outcome)
+    }
+
+    @Test
+    fun `goal_race — сердечко гаснет за отказ, загорается за радость, не выше старта`() {
+        // Наклейки взял (3, выше не бывает), от мороженого отказался (2), кино взял (3).
+        assertEquals(listOf(3, 3, 3, 2, 3, 3), TaskEngines.raceMood(moodRace, listOf(10, 5, 10, 10, 0, 10)))
+    }
+
+    @Test
+    fun `goal_race — погасшие сердечки поздняя радость не возвращает`() {
+        val lateOnly = race.copy(
+            mood = 2,
+            events = listOf(RaceEvent(1, "Наклейки", 5), RaceEvent(2, "Мороженое", 5), RaceEvent(6, "Кино", 5)),
+        )
+        // Два отказа подряд — ноль. Радость в последний день уже не выручает.
+        assertEquals(listOf(1, 0, 0, 0, 0, 0), TaskEngines.raceMood(lateOnly, listOf(10, 10, 10, 10, 10, 5)))
+        assertEquals(TaskOutcome.FAIL, raceOf(lateOnly, 10, 10, 10, 10, 10, 5).outcome)
+    }
+
+    @Test
+    fun `goal_race — решатель находит путь с радостями, если он есть`() {
+        val plan = TaskEngines.raceSolution(moodRace)!!
+        assertEquals(TaskOutcome.SUCCESS, raceOf(moodRace, *plan.toIntArray()).outcome)
+        // Свободных монет нет вовсе: копить можно только всё, а это грусть — выиграть нельзя.
+        assertEquals(null, TaskEngines.raceSolution(moodRace.copy(goal = RaceGoal("Самокат", 60))))
     }
 
     @Test

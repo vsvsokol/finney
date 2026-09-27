@@ -10,6 +10,7 @@ import ru.finney.pet.domain.model.DistributorRule
 import ru.finney.pet.domain.model.DistributorTask
 import ru.finney.pet.domain.model.GoalRaceTask
 import ru.finney.pet.domain.model.GoalSliderTask
+import ru.finney.pet.domain.model.RaceEvent
 import ru.finney.pet.domain.model.ReserveTask
 import ru.finney.pet.domain.model.SorterTask
 import ru.finney.pet.domain.model.StandTask
@@ -95,8 +96,11 @@ sealed interface TaskDetails {
     /** [mistakes] — id вещей, отнесённых не туда, в порядке задания. */
     data class Sorting(val correct: Int, val total: Int, val mistakes: List<String>) : TaskDetails
 
-    /** [eventsTaken] — сколько соблазнов дня ребёнок себе позволил. */
-    data class GoalRace(val saved: Int, val shortfall: Int, val eventsTaken: Int) : TaskDetails
+    /**
+     * [eventsTaken] — сколько соблазнов дня ребёнок себе позволил,
+     * [mood] — сердечки Финни на финише: 0 — загрустил по дороге.
+     */
+    data class GoalRace(val saved: Int, val shortfall: Int, val eventsTaken: Int, val mood: Int) : TaskDetails
 
     /** [reserve] — запас после плана; [shortage] — сколько не хватило запаса на непредвиденное. */
     data class Reserve(val reserve: Int, val shortage: Int) : TaskDetails
@@ -182,6 +186,41 @@ object TaskEngines {
     /** Сколько сырья хватит на всех гостей без лишнего: ⌈гости / стаканов из штуки⌉. */
     fun bestStock(task: StandTask): Int = (task.guests + task.ingredient.yields - 1) / task.ingredient.yields
 
+    /** Позволил ли себе соблазн дня: после взноса на него хватает. */
+    fun raceTaken(task: GoalRaceTask, event: RaceEvent, deposit: Int): Boolean = task.incomePerDay - deposit >= event.price
+
+    /**
+     * Сердечки Финни после каждого из [deposits] по порядку. Соблазн дня отвергнут —
+     * минус одно, позволен — плюс одно, не больше [GoalRaceTask.mood]. Ноль — насовсем:
+     * загрустившего Финни поздняя радость уже не выручает, важна регулярность.
+     */
+    fun raceMood(task: GoalRaceTask, deposits: List<Int>): List<Int> {
+        var mood = task.mood
+        return deposits.mapIndexed { i, deposit ->
+            val event = task.events.firstOrNull { it.day == i + 1 }
+            if (event != null && mood > 0) {
+                mood = if (raceTaken(task, event, deposit)) minOf(task.mood, mood + 1) else mood - 1
+            }
+            mood
+        }
+    }
+
+    /**
+     * Взносы, с которыми дорога проходится, или null, если никак. Перебор того, какие
+     * соблазны взять: в их день отложить остаток, в остальные — весь доход.
+     */
+    fun raceSolution(task: GoalRaceTask): List<Int>? {
+        val events = task.events.filter { it.day in 1..task.days && it.price <= task.incomePerDay }
+        return (0 until (1 shl events.size)).asSequence()
+            .map { mask ->
+                List(task.days) { i ->
+                    val event = events.withIndex().firstOrNull { (n, e) -> e.day == i + 1 && mask and (1 shl n) != 0 }?.value
+                    if (event == null) task.incomePerDay else (task.incomePerDay - event.price) / task.step * task.step
+                }
+            }
+            .firstOrNull { (race(task, TaskInput.DailyDeposits(it)) as? TaskEvaluation.Done)?.outcome == TaskOutcome.SUCCESS }
+    }
+
     /** Запас после плана: сумма минус всё запланированное. */
     fun reserveLeft(task: ReserveTask, planned: Set<String>): Int =
         task.amount - task.spendings.filter { it.id in planned }.sumOf { it.price }
@@ -257,11 +296,13 @@ object TaskEngines {
         val saved = task.startSaved + input.amounts.sum()
         val taken = task.events.count { event ->
             val deposit = input.amounts.getOrNull(event.day - 1) ?: return@count false
-            task.incomePerDay - deposit >= event.price
+            raceTaken(task, event, deposit)
         }
+        // Цель — не «никогда ничего не тратить»: без радостей Финни грустит, и копилка не засчитывается.
+        val mood = raceMood(task, input.amounts).last()
         return TaskEvaluation.Done(
-            outcome(saved >= task.goal.price),
-            TaskDetails.GoalRace(saved = saved, shortfall = maxOf(0, task.goal.price - saved), eventsTaken = taken),
+            outcome(saved >= task.goal.price && mood > 0),
+            TaskDetails.GoalRace(saved = saved, shortfall = maxOf(0, task.goal.price - saved), eventsTaken = taken, mood = mood),
         )
     }
 
