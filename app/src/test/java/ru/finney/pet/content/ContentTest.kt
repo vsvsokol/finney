@@ -7,9 +7,11 @@ import ru.finney.pet.domain.model.BasketTask
 import ru.finney.pet.domain.model.Category
 import ru.finney.pet.domain.model.ChangeMode
 import ru.finney.pet.domain.model.ChangeTask
+import ru.finney.pet.domain.model.ChoresTask
 import ru.finney.pet.domain.model.GoalRaceTask
 import ru.finney.pet.domain.model.ItemKind
 import ru.finney.pet.domain.model.PetStats
+import ru.finney.pet.domain.model.ReceiptTask
 import ru.finney.pet.domain.model.ReserveTask
 import ru.finney.pet.domain.model.SorterTask
 import ru.finney.pet.domain.model.StandTask
@@ -203,6 +205,15 @@ class ContentTest {
                 listOf(pool.firstOrNull { it != round.target } ?: pool.first())
             }
             TaskInput.Coins(right) to TaskInput.Coins(wrong)
+        }
+        is ReceiptTask -> {
+            // В чеке всегда есть ошибка (валидатор), поэтому «ничего не отмечено» — неудача.
+            val errors = TaskEngines.receiptErrors(task)
+            TaskInput.Flags(errors.lines, errors.changeShort > 0) to TaskInput.Flags(emptySet(), false)
+        }
+        is ChoresTask -> {
+            val best = TaskEngines.choresSolution(task) ?: throw AssertionError("${task.id}: цель не набрать")
+            TaskInput.Schedule(best) to TaskInput.Schedule(List(task.days) { emptyList() })
         }
         else -> throw AssertionError("${task.id}: движок без решателя в тесте")
     }

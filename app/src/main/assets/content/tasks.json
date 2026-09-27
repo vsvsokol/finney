@@ -405,5 +405,144 @@
     ],
     "explainOk": "Все монеты сошлись! Иногда крупная монета мешает: 6 не набрать с пятёркой, если нет единички, — зато 2, 2 и 2 как раз.",
     "explainFail": "Кое-где монеты не сошлись. Если крупная монета не подходит, попробуй набрать сумму одними мелкими."
+  },
+  {
+    "id": "game_receipt",
+    "theme": "shopping",
+    "engine": "receipt",
+    "title": "Проверь чек",
+    "series": "receipt",
+    "unlockLevel": 1,
+    "intro": "Финни купил продукты. Сверь чек с пакетом: ошибку отметь нажатием.",
+    "cart": [
+      { "id": "juice", "label": "Сок", "price": 12, "art": "item_food_juice" },
+      { "id": "bread", "label": "Хлеб", "price": 6, "art": "item_food_bread" },
+      { "id": "milk", "label": "Молоко", "price": 9, "art": "item_food_milk" }
+    ],
+    "lines": [
+      { "id": "l1", "item": "juice", "price": 12 },
+      { "id": "l2", "item": "juice", "price": 12 },
+      { "id": "l3", "item": "bread", "price": 6 },
+      { "id": "l4", "item": "milk", "price": 9 }
+    ],
+    "paid": 50,
+    "change": 11,
+    "explainOk": "Сок пробили два раза, а в пакете он один. Ты заметил, и кассир вернул 12. Проверять чек — это нормально.",
+    "explainFail": "Сок пробили два раза, а в пакете он один. В следующий раз сосчитай: сколько штук в пакете и сколько строк в чеке."
+  },
+  {
+    "id": "game_receipt_2",
+    "theme": "shopping",
+    "engine": "receipt",
+    "title": "Проверь чек",
+    "series": "receipt",
+    "unlockLevel": 3,
+    "intro": "Сверь каждую строку чека с ценником в пакете. Ошибок может быть больше одной.",
+    "cart": [
+      { "id": "milk", "label": "Молоко", "price": 9, "art": "item_food_milk" },
+      { "id": "bread", "label": "Хлеб", "price": 6, "art": "item_food_bread" },
+      { "id": "candy", "label": "Леденец", "price": 5, "art": "item_treat_candy" },
+      { "id": "water", "label": "Вода", "price": 4, "art": "item_food_water" }
+    ],
+    "lines": [
+      { "id": "l1", "item": "milk", "price": 9 },
+      { "id": "l2", "item": "bread", "price": 8 },
+      { "id": "l3", "item": "candy", "price": 5 },
+      { "id": "l4", "item": "candy", "price": 5 },
+      { "id": "l5", "item": "water", "price": 4 }
+    ],
+    "paid": 40,
+    "change": 9,
+    "explainOk": "Хлеб стоит 6, а пробили 8. Леденец пробили дважды. Ты нашёл обе ошибки и вернул 7.",
+    "explainFail": "Хлеб стоит 6, а пробили 8, и леденец пробили дважды. В следующий раз сравни цену в каждой строке с ценником."
+  },
+  {
+    "id": "game_receipt_3",
+    "theme": "shopping",
+    "engine": "receipt",
+    "title": "Проверь чек",
+    "series": "receipt",
+    "unlockLevel": 5,
+    "intro": "Финни дал кассиру 50. Проверь чек и сдачу.",
+    "cart": [
+      { "id": "apple", "label": "Яблоко", "price": 3, "qty": 2, "art": "item_food_apple" },
+      { "id": "juice", "label": "Сок", "price": 12, "art": "item_food_juice" },
+      { "id": "bread", "label": "Хлеб", "price": 6, "art": "item_food_bread" },
+      { "id": "icecream", "label": "Мороженое", "price": 7, "art": "item_treat_icecream" },
+      { "id": "milk", "label": "Молоко", "price": 9, "art": "item_food_milk" }
+    ],
+    "lines": [
+      { "id": "l1", "item": "apple", "price": 3 },
+      { "id": "l2", "item": "apple", "price": 3 },
+      { "id": "l3", "item": "juice", "price": 12 },
+      { "id": "l4", "item": "bread", "price": 6 },
+      { "id": "l5", "item": "icecream", "price": 7 },
+      { "id": "l6", "item": "milk", "price": 9 }
+    ],
+    "paid": 50,
+    "change": 5,
+    "explainOk": "Яблок в пакете два, так что две строки — верно. А сдачи нужно 50 − 40 = 10, дали 5. Ты заметил и вернул 5.",
+    "explainFail": "Яблок в пакете два, так что две строки — верно. А сдачи нужно 50 − 40 = 10, дали 5. В следующий раз вычти итог из того, что дал."
+  },
+  {
+    "id": "game_chores",
+    "theme": "planning",
+    "engine": "chores",
+    "title": "Подработка",
+    "series": "chores",
+    "unlockLevel": 1,
+    "intro": "Финни копит на мяч. Выбери день и нажми дела — они встанут в часики дня. Один день оставь на отдых.",
+    "goal": { "label": "Мяч", "price": 50, "art": "item_toy_ball" },
+    "days": 5,
+    "hoursPerDay": 2,
+    "minRestDays": 1,
+    "chores": [
+      { "id": "flowers", "label": "Полить цветы", "hours": 1, "reward": 5, "emoji": "🌱" },
+      { "id": "dishes", "label": "Помыть посуду", "hours": 1, "reward": 10, "emoji": "🍽️" },
+      { "id": "dog", "label": "Выгулять собаку", "hours": 2, "reward": 20, "emoji": "🐕" }
+    ],
+    "explainOk": "Ты заработал на мяч и оставил день отдыха. Деньги приходят за работу, а отдых тоже нужен.",
+    "explainFail": "Не хватило монет или не осталось дня отдыха. Поставь больше дел в рабочие дни, а один день оставь пустым."
+  },
+  {
+    "id": "game_chores_2",
+    "theme": "planning",
+    "engine": "chores",
+    "title": "Подработка",
+    "series": "chores",
+    "unlockLevel": 4,
+    "intro": "Собаку соседа выгулять просят только два раза, а посуду — три. Набери на конструктор и отдохни два дня.",
+    "goal": { "label": "Конструктор", "price": 80, "art": "item_toy_blocks" },
+    "days": 6,
+    "hoursPerDay": 2,
+    "minRestDays": 2,
+    "chores": [
+      { "id": "flowers", "label": "Полить цветы", "hours": 1, "reward": 5, "emoji": "🌱" },
+      { "id": "dishes", "label": "Помыть посуду", "hours": 1, "reward": 10, "maxTimes": 3, "emoji": "🍽️" },
+      { "id": "dog", "label": "Собака соседа", "hours": 2, "reward": 25, "maxTimes": 2, "emoji": "🐕" }
+    ],
+    "explainOk": "Выгодные дела дают редко, и ты их не упустил. Так и планируют: сначала самое выгодное, потом остальное.",
+    "explainFail": "Собака соседа — самое выгодное дело, но его дают дважды. Начни с него, потом добавь посуду и оставь два дня отдыха."
+  },
+  {
+    "id": "game_chores_3",
+    "theme": "planning",
+    "engine": "chores",
+    "title": "Подработка",
+    "series": "chores",
+    "unlockLevel": 6,
+    "intro": "Большая уборка занимает весь день. Набери на самокат за три рабочих дня и отдохни два.",
+    "goal": { "label": "Самокат", "price": 100, "art": "item_toy_scooter" },
+    "days": 5,
+    "hoursPerDay": 3,
+    "minRestDays": 2,
+    "chores": [
+      { "id": "flowers", "label": "Полить цветы", "hours": 1, "reward": 5, "emoji": "🌱" },
+      { "id": "dishes", "label": "Помыть посуду", "hours": 1, "reward": 10, "maxTimes": 4, "emoji": "🍽️" },
+      { "id": "dog", "label": "Собака соседа", "hours": 2, "reward": 25, "maxTimes": 2, "emoji": "🐕" },
+      { "id": "cleaning", "label": "Большая уборка", "hours": 3, "reward": 30, "emoji": "🧹" }
+    ],
+    "explainOk": "Ты сравнил, что даёт один день: уборка — 30, собака и посуда вместе — 35. Так и решают, на что тратить время.",
+    "explainFail": "Посчитай, что даёт один день: уборка — 30, собака и посуда вместе — 35. Поставь самые выгодные дни и оставь два дня отдыха."
   }
 ]

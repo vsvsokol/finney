@@ -38,6 +38,18 @@ class LevelGameTest {
     }
 
     @Test
+    fun `пока не выпали все игры, игра уровня не повторяется`() {
+        repeat(20) { seed ->
+            val game = Game(Fixtures.content, Random(seed)) { 0L }
+            var s = game.newGame()
+            // t10 открывается с 3-го периода, так что за 10 периодов выпадают все десять.
+            repeat(9) { s = game.closePeriod(game.confirmPlan(s, 0, 0, 0).state()).state() }
+            val picked = s.periods.map { it.levelTaskId }
+            assertEquals("зерно $seed: $picked", Fixtures.tasks.map { it.id }.toSet(), picked.toSet())
+        }
+    }
+
+    @Test
     fun `выбор случайный — разные зёрна дают разные игры`() {
         val first = (0 until 20).map { Game(Fixtures.content, Random(it)) { 0L }.newGame().currentPeriod.levelTaskId }
         assertTrue(first.toSet().size > 1)

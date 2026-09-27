@@ -32,6 +32,8 @@ data class RelRect(val left: Float, val top: Float, val right: Float, val bottom
 @Immutable
 data class RoomLayer(@DrawableRes val image: Int, val rect: RelRect) {
     fun shiftedX(dx: Float) = copy(rect = rect.shiftedX(dx))
+
+    fun shiftedY(dy: Float) = copy(rect = rect.shiftedY(dy))
 }
 
 /**
@@ -117,18 +119,25 @@ object Room {
      * иначе тень осталась бы на старом месте.
      *
      * Числа слоёв ниже — как их печатает pack_room.py, сдвиг добавляется
-     * к ним отдельно: после нового экспорта не забыть `.shiftedX(BATH_SHIFT)`.
+     * к ним отдельно: после нового экспорта не забыть `.shiftedX(BATH_SHIFT)` и `.shiftedY(-BATH_LIFT)`.
      */
     const val BATH_SHIFT = 0.024f
+
+    /**
+     * Насколько ванна с пеной выше, чем в экспорте, — доля высоты холста.
+     * Верхний борт ванны (0.6192) встаёт вровень с кромкой стола (0.5975): при
+     * переходе кухня — ванная верх мебели и питомец остаются на одной высоте.
+     */
+    const val BATH_LIFT = 0.6192f - 0.5975f
 
     val Back = RoomLayer(R.drawable.room_back, RelRect(0.0000f, 0.0000f, 1.0000f, 1.0000f))
     val WindowUfo = RoomLayer(R.drawable.room_window_ufo, RelRect(0.4924f, 0.2525f, 0.5979f, 0.3017f))
     val WindowFrame = RoomLayer(R.drawable.room_window_frame, RelRect(0.3500f, 0.0312f, 0.9792f, 0.3675f))
     val Lamp = RoomLayer(R.drawable.room_lamp, RelRect(0.0326f, 0.0408f, 0.2729f, 0.5262f))
     val Table = RoomLayer(R.drawable.room_table, RelRect(0.0965f, 0.5975f, 0.7757f, 0.8087f))
-    val Bath = RoomLayer(R.drawable.room_bath, RelRect(0.0611f, 0.6192f, 0.7715f, 0.8433f)).shiftedX(BATH_SHIFT)
-    val BathFoamBack = RoomLayer(R.drawable.room_bath_foam_back, RelRect(0.0972f, 0.5271f, 0.7069f, 0.6671f)).shiftedX(BATH_SHIFT)
-    val BathFoamFront = RoomLayer(R.drawable.room_bath_foam_front, RelRect(0.4049f, 0.5754f, 0.7868f, 0.6587f)).shiftedX(BATH_SHIFT)
+    val Bath = RoomLayer(R.drawable.room_bath, RelRect(0.0611f, 0.6192f, 0.7715f, 0.8433f)).shiftedX(BATH_SHIFT).shiftedY(-BATH_LIFT)
+    val BathFoamBack = RoomLayer(R.drawable.room_bath_foam_back, RelRect(0.0972f, 0.5271f, 0.7069f, 0.6671f)).shiftedX(BATH_SHIFT).shiftedY(-BATH_LIFT)
+    val BathFoamFront = RoomLayer(R.drawable.room_bath_foam_front, RelRect(0.4049f, 0.5754f, 0.7868f, 0.6587f)).shiftedX(BATH_SHIFT).shiftedY(-BATH_LIFT)
 
     /** Полоса неба, стыкуется сама с собой; здесь — где она стоит, пока не сдвинулась. */
     val WindowSky = RoomLayer(R.drawable.room_window_sky, RelRect(0.4583f, 0.0854f, 0.8611f, 0.3542f))
@@ -217,9 +226,10 @@ object Room {
         // ровно настолько, чтобы столешница пришлась под морду, а не по глаза.
         RoomSpot.KITCHEN -> 0.320f
 
-        // Чаша перекрывает всё ниже 0.664 (борт 0.619 плюс кромка), поэтому
-        // над водой остаётся примерно три четверти силуэта.
-        RoomSpot.BATH -> 0.403f
+        // Как на кухне: борт ванны поднят вровень с кромкой стола ([BATH_LIFT]),
+        // и питомец при переходе остаётся на месте. Ступни (0.66) ещё в чаше,
+        // которая перекрывает всё ниже 0.642 (борт 0.598 плюс кромка).
+        RoomSpot.BATH -> 0.320f
     }
 
     /**

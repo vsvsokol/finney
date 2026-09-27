@@ -5,11 +5,13 @@ import ru.finney.pet.domain.model.BasketTask
 import ru.finney.pet.domain.model.Category
 import ru.finney.pet.domain.model.ChangeMode
 import ru.finney.pet.domain.model.ChangeTask
+import ru.finney.pet.domain.model.ChoresTask
 import ru.finney.pet.domain.model.DistributorTask
 import ru.finney.pet.domain.model.GameContent
 import ru.finney.pet.domain.model.GoalRaceTask
 import ru.finney.pet.domain.model.GoalSliderTask
 import ru.finney.pet.domain.model.ItemKind
+import ru.finney.pet.domain.model.ReceiptTask
 import ru.finney.pet.domain.model.ReserveTask
 import ru.finney.pet.domain.model.SorterTask
 import ru.finney.pet.domain.model.StandTask
@@ -111,6 +113,8 @@ object ContentValidator {
                 is ReserveTask -> checkReserve(task, at)
                 is StandTask -> checkStand(task, at)
                 is ChangeTask -> checkChange(task, at)
+                is ReceiptTask -> checkReceipt(task, at)
+                is ChoresTask -> checkChores(task, at)
             }
         }
 
@@ -207,6 +211,52 @@ object ContentValidator {
                     if (!payable(round.price, round.wallet)) add("$r — ${round.price} не набрать из кошелька ${round.wallet}")
                 }
             }
+        }
+    }
+
+    private fun MutableList<String>.checkReceipt(task: ReceiptTask, at: String) {
+        if (task.cart.isEmpty()) add("$at — cart пустой")
+        if (task.lines.isEmpty()) add("$at — lines пустой")
+        duplicates(task.cart.map { it.id }).forEach { add("$at — повторяется товар $it") }
+        duplicates(task.lines.map { it.id }).forEach { add("$at — повторяется строка $it") }
+        task.cart.filter { it.price <= 0 || it.qty <= 0 }.forEach { add("$at — ${it.id}: цена и qty должны быть > 0") }
+        task.lines.filter { it.price <= 0 }.forEach { add("$at — строка ${it.id}: цена должна быть > 0") }
+        val cart = task.cart.associateBy { it.id }
+        task.lines.filter { it.item !in cart }.forEach { add("$at — строка ${it.id} ссылается на ${it.item}") }
+        for (item in task.cart) {
+            val lines = task.lines.filter { it.item == item.id }
+            val prices = lines.map { it.price }.toSet()
+            // Недопробитый товар — ошибка в пользу покупателя, её в игре не ищут.
+            if (lines.size < item.qty) add("$at — ${item.id}: в чеке меньше строк, чем штук в пакете")
+            if (prices.size > 1) add("$at — ${item.id}: у строк разная цена")
+            val wrong = prices.singleOrNull()?.takeIf { it != item.price } ?: continue
+            if (wrong < item.price) add("$at — ${item.id}: в чеке дешевле ценника, ошибка в пользу покупателя")
+            if (lines.size > item.qty) add("$at — ${item.id}: и не та цена, и лишняя строка — выберите одну ошибку")
+        }
+        val total = TaskEngines.receiptTotal(task)
+        if (task.paid < total) add("$at — paid меньше суммы чека $total")
+        if (task.change < 0 || task.change > task.paid - total) {
+            add("$at — change должен быть от 0 до ${task.paid - total}: больше — ошибка в пользу покупателя")
+        }
+        val errors = TaskEngines.receiptErrors(task)
+        if (errors.lines.isEmpty() && errors.changeShort == 0) add("$at — в чеке нет ни одной ошибки: искать нечего")
+    }
+
+    /** Неделя до 7 дней, до 6 дел, до 3 часиков: ребёнку обозримо, решателю — мгновенно. */
+    private fun MutableList<String>.checkChores(task: ChoresTask, at: String) {
+        val before = size
+        if (task.days !in 1..7) add("$at — days должен быть от 1 до 7")
+        if (task.hoursPerDay !in 1..3) add("$at — hoursPerDay должен быть от 1 до 3")
+        if (task.minRestDays < 1 || task.minRestDays >= task.days) add("$at — minRestDays должен быть от 1 и меньше days")
+        if (task.goal.price <= 0) add("$at — goal.price должен быть > 0")
+        if (task.chores.size !in 1..6) add("$at — дел должно быть от 1 до 6")
+        duplicates(task.chores.map { it.id }).forEach { add("$at — повторяется дело $it") }
+        task.chores.filter { it.hours !in 1..task.hoursPerDay }.forEach { add("$at — ${it.id}: hours от 1 до ${task.hoursPerDay}") }
+        task.chores.filter { it.reward <= 0 }.forEach { add("$at — ${it.id}: reward должен быть > 0") }
+        task.chores.filter { (it.maxTimes ?: 1) <= 0 }.forEach { add("$at — ${it.id}: maxTimes должен быть > 0") }
+        // Перебор только по целым числам: с битыми он бессмыслен или долог.
+        if (size == before && TaskEngines.choresSolution(task) == null) {
+            add("$at — цель не набрать, даже если работать во все дни, кроме отдыха")
         }
     }
 

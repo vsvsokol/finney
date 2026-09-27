@@ -6,11 +6,16 @@ import ru.finney.pet.domain.model.Category
 import ru.finney.pet.domain.model.ChangeMode
 import ru.finney.pet.domain.model.ChangeRound
 import ru.finney.pet.domain.model.ChangeTask
+import ru.finney.pet.domain.model.Chore
+import ru.finney.pet.domain.model.ChoresTask
 import ru.finney.pet.domain.model.DistributorRule
 import ru.finney.pet.domain.model.DistributorTask
 import ru.finney.pet.domain.model.GoalRaceTask
 import ru.finney.pet.domain.model.GoalSliderTask
 import ru.finney.pet.domain.model.RaceEvent
+import ru.finney.pet.domain.model.ReceiptItem
+import ru.finney.pet.domain.model.ReceiptLine
+import ru.finney.pet.domain.model.ReceiptTask
 import ru.finney.pet.domain.model.ReserveTask
 import ru.finney.pet.domain.model.SorterTask
 import ru.finney.pet.domain.model.StandTask
@@ -41,6 +46,12 @@ sealed interface TaskInput {
 
     /** change: монеты каждого раунда с первой попытки, по порядку раундов. */
     data class Coins(val rounds: List<List<Int>>) : TaskInput
+
+    /** receipt: отмеченные строки чека и отмечена ли сдача — с первой проверки. */
+    data class Flags(val lines: Set<String>, val change: Boolean) : TaskInput
+
+    /** chores: id дел по дням недели. Пустой день — отдых. */
+    data class Schedule(val days: List<List<String>>) : TaskInput
 }
 
 /** Ввод, который нельзя оценить. Это не исход задания: ребёнок исправляет и пробует снова. */
@@ -84,6 +95,12 @@ sealed interface TaskInputError {
 
     /** change: в кошельке нет таких монет, раунд [round] с 0. */
     data class CoinsNotInWallet(val round: Int) : TaskInputError
+
+    /** chores: в день [day] (с 0) дел больше, чем часиков. */
+    data class DayOverloaded(val day: Int) : TaskInputError
+
+    /** chores: дело [id] взято больше [max] раз за неделю. */
+    data class ChoreTooOften(val id: String, val max: Int) : TaskInputError
 }
 
 /** Числа для объяснения исхода. */
@@ -123,14 +140,26 @@ sealed interface TaskDetails {
 
     /** [results] — по раунду: положено минус нужно. 0 — верно, > 0 — лишнее, < 0 — не хватает. */
     data class Change(val correct: Int, val total: Int, val results: List<Int>) : TaskDetails
+
+    /**
+     * Сверка чека. [found] — ошибок отмечено верно, [missed] — не замечено, [extra] — верное
+     * отмечено как ошибка. [refund] — сколько монет вернули за найденное, [lost] — за пропущенное.
+     */
+    data class Receipt(val found: Int, val missed: Int, val extra: Int, val refund: Int, val lost: Int) : TaskDetails
+
+    /** [restDays] — пустых дней недели. */
+    data class Chores(val earned: Int, val shortfall: Int, val restDays: Int) : TaskDetails
 }
+
+/** Ошибки кассира: строки чека, которые нужно отметить, и сколько сдачи недодали. */
+data class ReceiptErrors(val lines: Set<String>, val changeShort: Int)
 
 sealed interface TaskEvaluation {
     data class Done(val outcome: TaskOutcome, val details: TaskDetails) : TaskEvaluation
     data class Invalid(val error: TaskInputError) : TaskEvaluation
 }
 
-/** Движки заданий: три учебных (docs/economy.md, раздел 9) и пять мини-игр (docs/minigames.md). */
+/** Движки заданий: учебные (docs/economy.md, раздел 9) и мини-игры (docs/minigames.md). */
 object TaskEngines {
 
     fun evaluate(task: TaskDefinition, input: TaskInput): TaskEvaluation = when {
@@ -142,6 +171,8 @@ object TaskEngines {
         task is ReserveTask && input is TaskInput.Reserve -> reserve(task, input)
         task is StandTask && input is TaskInput.Stock -> stand(task, input)
         task is ChangeTask && input is TaskInput.Coins -> change(task, input)
+        task is ReceiptTask && input is TaskInput.Flags -> receipt(task, input)
+        task is ChoresTask && input is TaskInput.Schedule -> chores(task, input)
         else -> TaskEvaluation.Invalid(TaskInputError.WrongInputType)
     }
 
@@ -219,6 +250,88 @@ object TaskEngines {
                 }
             }
             .firstOrNull { (race(task, TaskInput.DailyDeposits(it)) as? TaskEvaluation.Done)?.outcome == TaskOutcome.SUCCESS }
+    }
+
+    /** Сумма по чеку — как её посчитал кассир, с ошибками. */
+    fun receiptTotal(task: ReceiptTask): Int = task.lines.sumOf { it.price }
+
+    /**
+     * Что должно быть отмечено. Одинаковые строки одного товара взаимозаменяемы: из дубля
+     * ошибкой названы сначала уже отмеченные в [flagged], потом последние — так экран
+     * подсвечивает то же, что засчитывает оценка.
+     */
+    fun receiptErrors(task: ReceiptTask, flagged: Set<String> = emptySet()): ReceiptErrors = ReceiptErrors(
+        lines = task.cart.flatMap { item ->
+            val check = checkItem(task, item)
+            val (marked, rest) = check.samePrice.partition { it.id in flagged }
+            val duplicates = (marked + rest.reversed()).take(check.duplicates)
+            check.wrongPrice.map { it.id } + duplicates.map { it.id }
+        }.toSet(),
+        changeShort = changeShort(task),
+    )
+
+    /** Недоданная сдача: сдача считается от суммы чека, какой бы она ни была. */
+    private fun changeShort(task: ReceiptTask): Int = maxOf(0, task.paid - receiptTotal(task) - task.change)
+
+    /**
+     * Строки товара. Цена не как на ценнике — ошибка в каждой такой строке. Строк больше, чем
+     * штук в пакете, — лишние [duplicates]. Оба вида ошибки у одного товара валидатор не пускает.
+     */
+    private class ItemCheck(val wrongPrice: List<ReceiptLine>, val samePrice: List<ReceiptLine>, val duplicates: Int)
+
+    private fun checkItem(task: ReceiptTask, item: ReceiptItem): ItemCheck {
+        val (wrong, same) = task.lines.filter { it.item == item.id }.partition { it.price != item.price }
+        val duplicates = if (wrong.isEmpty()) maxOf(0, same.size - item.qty) else 0
+        return ItemCheck(wrong, same, duplicates)
+    }
+
+    /** Сколько часиков занимают дела одного дня. Неизвестные id не считаются. */
+    fun dayHours(task: ChoresTask, ids: List<String>): Int {
+        val byId = task.chores.associateBy { it.id }
+        return ids.sumOf { byId[it]?.hours ?: 0 }
+    }
+
+    /** Сколько заработано за неделю. */
+    fun choresEarned(task: ChoresTask, days: List<List<String>>): Int {
+        val byId = task.chores.associateBy { it.id }
+        return days.flatten().sumOf { byId[it]?.reward ?: 0 }
+    }
+
+    /**
+     * Неделя с самым большим заработком: сначала рабочие дни, в конце [ChoresTask.minRestDays]
+     * отдыха. null — даже так цель не набрать. Перебор наборов дел на день; состояние —
+     * сколько раз уже взяты дела с [Chore.maxTimes].
+     */
+    fun choresSolution(task: ChoresTask): List<List<String>>? {
+        val workDays = task.days - task.minRestDays
+        if (workDays < 0) return null
+        val limited = task.chores.filter { it.maxTimes != null }
+        val packs = dayPacks(task.chores, task.hoursPerDay)
+        var best = mapOf(List(limited.size) { 0 } to (0 to emptyList<List<String>>()))
+        repeat(workDays) {
+            val next = mutableMapOf<List<Int>, Pair<Int, List<List<String>>>>()
+            for ((used, value) in best) for (pack in packs) {
+                val after = limited.mapIndexed { i, chore -> used[i] + pack.count { it == chore } }
+                if (limited.indices.any { after[it] > limited[it].maxTimes!! }) continue
+                val earned = value.first + pack.sumOf { it.reward }
+                if (earned > (next[after]?.first ?: -1)) next[after] = earned to value.second + listOf(pack.map { it.id })
+            }
+            best = next
+        }
+        val (earned, week) = best.values.maxByOrNull { it.first } ?: return null
+        if (earned < task.goal.price) return null
+        return week + List(task.minRestDays) { emptyList() }
+    }
+
+    /** Все наборы дел, которые помещаются в один день, включая пустой. */
+    private fun dayPacks(chores: List<Chore>, hours: Int): List<List<Chore>> {
+        fun from(i: Int, left: Int): List<List<Chore>> {
+            if (i == chores.size) return listOf(emptyList())
+            val chore = chores[i]
+            val most = minOf(left / chore.hours, chore.maxTimes ?: Int.MAX_VALUE)
+            return (0..most).flatMap { n -> from(i + 1, left - n * chore.hours).map { List(n) { chore } + it } }
+        }
+        return from(0, hours)
     }
 
     /** Запас после плана: сумма минус всё запланированное. */
@@ -352,6 +465,63 @@ object TaskEngines {
         return TaskEvaluation.Done(
             outcome(correct >= (task.minCorrect ?: task.rounds.size)),
             TaskDetails.Change(correct = correct, total = task.rounds.size, results = results),
+        )
+    }
+
+    private fun receipt(task: ReceiptTask, input: TaskInput.Flags): TaskEvaluation {
+        val lineIds = task.lines.map { it.id }.toSet()
+        input.lines.firstOrNull { it !in lineIds }?.let {
+            return TaskEvaluation.Invalid(TaskInputError.UnknownItem(it))
+        }
+        var found = 0
+        var missed = 0
+        var extra = 0
+        var refund = 0
+        var lost = 0
+        for (item in task.cart) {
+            val check = checkItem(task, item)
+            check.wrongPrice.forEach { line ->
+                val over = line.price - item.price
+                if (line.id in input.lines) { found++; refund += over } else { missed++; lost += over }
+            }
+            val flagged = check.samePrice.count { it.id in input.lines }
+            val caught = minOf(flagged, check.duplicates)
+            found += caught
+            missed += check.duplicates - caught
+            extra += flagged - caught
+            refund += caught * item.price
+            lost += (check.duplicates - caught) * item.price
+        }
+        val short = changeShort(task)
+        when {
+            short > 0 && input.change -> { found++; refund += short }
+            short > 0 -> { missed++; lost += short }
+            input.change -> extra++
+        }
+        return TaskEvaluation.Done(
+            outcome(missed == 0 && extra == 0),
+            TaskDetails.Receipt(found = found, missed = missed, extra = extra, refund = refund, lost = lost),
+        )
+    }
+
+    private fun chores(task: ChoresTask, input: TaskInput.Schedule): TaskEvaluation {
+        if (input.days.size != task.days) return TaskEvaluation.Invalid(TaskInputError.WrongCount(task.days))
+        val byId = task.chores.associateBy { it.id }
+        input.days.flatten().firstOrNull { it !in byId }?.let {
+            return TaskEvaluation.Invalid(TaskInputError.UnknownItem(it))
+        }
+        input.days.indexOfFirst { dayHours(task, it) > task.hoursPerDay }.takeIf { it >= 0 }?.let {
+            return TaskEvaluation.Invalid(TaskInputError.DayOverloaded(it))
+        }
+        val times = input.days.flatten().groupingBy { it }.eachCount()
+        task.chores.firstOrNull { chore -> chore.maxTimes != null && (times[chore.id] ?: 0) > chore.maxTimes }?.let {
+            return TaskEvaluation.Invalid(TaskInputError.ChoreTooOften(it.id, it.maxTimes!!))
+        }
+        val earned = choresEarned(task, input.days)
+        val rest = input.days.count { it.isEmpty() }
+        return TaskEvaluation.Done(
+            outcome(earned >= task.goal.price && rest >= task.minRestDays),
+            TaskDetails.Chores(earned = earned, shortfall = maxOf(0, task.goal.price - earned), restDays = rest),
         )
     }
 

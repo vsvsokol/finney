@@ -4,15 +4,21 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import ru.finney.pet.content.ContentValidator
 import ru.finney.pet.domain.model.BasketRule
 import ru.finney.pet.domain.model.BasketTask
 import ru.finney.pet.domain.model.Category
 import ru.finney.pet.domain.model.ChangeMode
 import ru.finney.pet.domain.model.ChangeRound
 import ru.finney.pet.domain.model.ChangeTask
+import ru.finney.pet.domain.model.Chore
+import ru.finney.pet.domain.model.ChoresTask
 import ru.finney.pet.domain.model.GoalRaceTask
 import ru.finney.pet.domain.model.RaceEvent
 import ru.finney.pet.domain.model.RaceGoal
+import ru.finney.pet.domain.model.ReceiptItem
+import ru.finney.pet.domain.model.ReceiptLine
+import ru.finney.pet.domain.model.ReceiptTask
 import ru.finney.pet.domain.model.ReserveTask
 import ru.finney.pet.domain.model.ShelfItem
 import ru.finney.pet.domain.model.SortItem
@@ -23,6 +29,7 @@ import ru.finney.pet.domain.model.StandTask
 import ru.finney.pet.domain.model.Surprise
 import ru.finney.pet.domain.model.TaskOutcome
 import ru.finney.pet.domain.model.TaskTheme
+import ru.finney.pet.domain.tasks.ReceiptErrors
 import ru.finney.pet.domain.tasks.TaskDetails
 import ru.finney.pet.domain.tasks.TaskEngines
 import ru.finney.pet.domain.tasks.TaskEvaluation
@@ -294,6 +301,160 @@ class MiniGamesTest {
         assertEquals(TaskInputError.UnknownCoin(3), TaskEngines.evaluate(cashier, TaskInput.Coins(listOf(listOf(3), listOf(10, 5, 2)))).error())
         assertEquals(TaskInputError.CoinsNotInWallet(1), TaskEngines.evaluate(cashier, TaskInput.Coins(listOf(listOf(2, 1), listOf(10, 2, 2, 2, 1)))).error())
         assertEquals(TaskInputError.WrongCount(2), TaskEngines.evaluate(cashier, TaskInput.Coins(listOf(listOf(2, 1)))).error())
+    }
+
+    // ---------- receipt ----------
+
+    /** Сок пробит дважды, хлеб дороже ценника, яблок честно два. Дал 50, сдача меньше на 5. */
+    private val check = ReceiptTask(
+        id = "k", theme = TaskTheme.SHOPPING, title = "", intro = "", explainOk = "", explainFail = "",
+        cart = listOf(
+            ReceiptItem("juice", "", 10),
+            ReceiptItem("bread", "", 5),
+            ReceiptItem("apple", "", 3, qty = 2),
+        ),
+        lines = listOf(
+            ReceiptLine("l1", "juice", 10),
+            ReceiptLine("l2", "juice", 10),
+            ReceiptLine("l3", "bread", 7),
+            ReceiptLine("l4", "apple", 3),
+            ReceiptLine("l5", "apple", 3),
+        ),
+        paid = 50,
+        change = 12,
+    )
+
+    private fun checkOf(task: ReceiptTask, vararg lines: String, change: Boolean) =
+        TaskEngines.evaluate(task, TaskInput.Flags(lines.toSet(), change))
+
+    @Test
+    fun `receipt — ядро называет ошибки, сдача считается от суммы чека`() {
+        assertEquals(33, TaskEngines.receiptTotal(check))
+        assertEquals(ReceiptErrors(lines = setOf("l2", "l3"), changeShort = 5), TaskEngines.receiptErrors(check))
+    }
+
+    @Test
+    fun `receipt — всё найдено — успех и все монеты вернули`() {
+        assertEquals(
+            TaskEvaluation.Done(TaskOutcome.SUCCESS, TaskDetails.Receipt(found = 3, missed = 0, extra = 0, refund = 17, lost = 0)),
+            checkOf(check, "l2", "l3", change = true),
+        )
+    }
+
+    @Test
+    fun `receipt — любая строка из дубля засчитывается`() {
+        assertEquals(TaskOutcome.SUCCESS, checkOf(check, "l1", "l3", change = true).outcome())
+        // И подсветка экрана согласна с оценкой: отмеченная первая строка — ошибка, вторая — нет.
+        assertEquals(setOf("l1", "l3"), TaskEngines.receiptErrors(check, flagged = setOf("l1")).lines)
+    }
+
+    @Test
+    fun `receipt — пропуск и лишняя отметка — неудача`() {
+        assertEquals(
+            TaskEvaluation.Done(TaskOutcome.FAIL, TaskDetails.Receipt(found = 2, missed = 1, extra = 0, refund = 12, lost = 5)),
+            checkOf(check, "l2", "l3", change = false),
+        )
+        // Два яблока куплены честно: отметить одно — лишнее.
+        assertEquals(
+            TaskDetails.Receipt(found = 3, missed = 0, extra = 1, refund = 17, lost = 0),
+            (checkOf(check, "l2", "l3", "l4", change = true) as TaskEvaluation.Done).details,
+        )
+        // Оба сока отмечены, а лишний только один.
+        assertEquals(TaskOutcome.FAIL, checkOf(check, "l1", "l2", "l3", change = true).outcome())
+        // Сдача верная, а её отметили.
+        val fairChange = check.copy(change = 17)
+        assertEquals(TaskOutcome.SUCCESS, checkOf(fairChange, "l2", "l3", change = false).outcome())
+        assertEquals(1, (checkOf(fairChange, "l2", "l3", change = true) as TaskEvaluation.Done).details.let { (it as TaskDetails.Receipt).extra })
+    }
+
+    @Test
+    fun `receipt — чужая строка — ошибка ввода`() {
+        assertEquals(TaskInputError.UnknownItem("l9"), checkOf(check, "l9", change = false).error())
+    }
+
+    @Test
+    fun `receipt — валидатор ловит чек без ошибок и ошибки в пользу покупателя`() {
+        fun errors(task: ReceiptTask) = ContentValidator.validate(Fixtures.content.copy(tasks = Fixtures.tasks + task))
+        assertTrue(errors(check).none { "задание k" in it })
+
+        val clean = check.copy(lines = check.lines.filter { it.id != "l2" }.map { if (it.id == "l3") it.copy(price = 5) else it }, change = 29)
+        assertTrue(errors(clean).any { "нет ни одной ошибки" in it })
+
+        val cheaper = check.copy(lines = check.lines.map { if (it.id == "l3") it.copy(price = 4) else it }, change = 10)
+        assertTrue(errors(cheaper).any { "дешевле ценника" in it })
+
+        val missing = check.copy(lines = check.lines.filter { it.id != "l5" }, change = 15)
+        assertTrue(errors(missing).any { "меньше строк" in it })
+
+        assertTrue(errors(check.copy(change = 20)).any { "change должен быть" in it })
+    }
+
+    // ---------- chores ----------
+
+    /** 5 дней по 2 часика, день отдыха, цель 50. Собака выгоднее посуды, но её дают дважды. */
+    private val week = ChoresTask(
+        id = "j", theme = TaskTheme.PLANNING, title = "", intro = "", explainOk = "", explainFail = "",
+        goal = RaceGoal("Мяч", 50),
+        days = 5,
+        hoursPerDay = 2,
+        chores = listOf(
+            Chore("flowers", "", hours = 1, reward = 5),
+            Chore("dishes", "", hours = 1, reward = 10),
+            Chore("dog", "", hours = 2, reward = 25, maxTimes = 2),
+        ),
+    )
+
+    private fun weekOf(task: ChoresTask, vararg days: List<String>) = TaskEngines.evaluate(task, TaskInput.Schedule(days.toList()))
+
+    private val rest = emptyList<String>()
+
+    @Test
+    fun `chores — набрал на цель и отдохнул — успех`() {
+        assertEquals(
+            TaskEvaluation.Done(TaskOutcome.SUCCESS, TaskDetails.Chores(earned = 85, shortfall = 0, restDays = 1)),
+            weekOf(week, listOf("dog"), listOf("dishes", "dishes"), listOf("dog"), listOf("dishes", "flowers"), rest),
+        )
+    }
+
+    @Test
+    fun `chores — без отдыха или без денег — неудача`() {
+        val noRest = weekOf(week, listOf("dog"), listOf("dishes", "dishes"), listOf("dog"), listOf("dishes", "dishes"), listOf("flowers"))
+        assertEquals(TaskDetails.Chores(earned = 95, shortfall = 0, restDays = 0), (noRest as TaskEvaluation.Done).details)
+        assertEquals(TaskOutcome.FAIL, noRest.outcome)
+
+        assertEquals(
+            TaskEvaluation.Done(TaskOutcome.FAIL, TaskDetails.Chores(earned = 40, shortfall = 10, restDays = 3)),
+            weekOf(week, listOf("dog"), rest, listOf("flowers", "dishes"), rest, rest),
+        )
+    }
+
+    @Test
+    fun `chores — перегруженный день, лишний раз, чужое дело, не та неделя — ошибка ввода`() {
+        assertEquals(TaskInputError.DayOverloaded(1), weekOf(week, rest, listOf("dog", "flowers"), rest, rest, rest).error())
+        assertEquals(TaskInputError.ChoreTooOften("dog", 2), weekOf(week, listOf("dog"), listOf("dog"), listOf("dog"), rest, rest).error())
+        assertEquals(TaskInputError.UnknownItem("cat"), weekOf(week, listOf("cat"), rest, rest, rest, rest).error())
+        assertEquals(TaskInputError.WrongCount(5), weekOf(week, rest).error())
+    }
+
+    @Test
+    fun `chores — решатель находит самую выгодную неделя с отдыхом в конце или null`() {
+        val plan = TaskEngines.choresSolution(week)!!
+        assertEquals(5, plan.size)
+        assertEquals(rest, plan.last())
+        // Собаку дают дважды: 25 + 25 и ещё два дня посуды по 20 — больше не заработать.
+        assertEquals(90, TaskEngines.choresEarned(week, plan))
+        assertEquals(TaskOutcome.SUCCESS, TaskEngines.evaluate(week, TaskInput.Schedule(plan)).outcome())
+
+        assertEquals(null, TaskEngines.choresSolution(week.copy(goal = RaceGoal("Мяч", 95))))
+    }
+
+    @Test
+    fun `chores — валидатор ловит цель, которую не набрать, и дело длиннее дня`() {
+        fun errors(task: ChoresTask) = ContentValidator.validate(Fixtures.content.copy(tasks = Fixtures.tasks + task))
+        assertTrue(errors(week).none { "задание j" in it })
+        assertTrue(errors(week.copy(goal = RaceGoal("Мяч", 95))).any { "цель не набрать" in it })
+        assertTrue(errors(week.copy(hoursPerDay = 1)).any { "dog: hours от 1 до 1" in it })
+        assertTrue(errors(week.copy(minRestDays = 5)).any { "minRestDays" in it })
     }
 
     @Test
