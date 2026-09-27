@@ -1,9 +1,11 @@
 package ru.finney.pet.ui.room
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.StartOffset
 import androidx.compose.animation.core.animateFloat
@@ -43,6 +45,7 @@ import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
@@ -55,6 +58,7 @@ import ru.finney.pet.ui.theme.FinneyTheme
 import ru.finney.pet.ui.sound.LocalSounds
 import ru.finney.pet.ui.sound.Sfx
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.sin
 import kotlin.random.Random
@@ -119,8 +123,33 @@ private val UfoFirstPauseMs = 3_000L..8_000L
 /** Сколько закрывается и открывается дверь капсулы. */
 internal const val DOOR_MS = 600
 
-/** Сколько питомец идёт в капсулу и обратно. */
+/**
+ * Сколько питомец прыгает в капсулу и обратно: приседание [HOP_CROUCH_MS]
+ * и полёт по дуге.
+ */
 internal const val WALK_MS = 900
+
+/** Высота дуги прыжка в капсулу, доля высоты холста: около 50 dp на телефоне. */
+private const val CAPSULE_JUMP_ARC = 0.06f
+
+/**
+ * Во сколько раз камера приближает капсулу. При 1.3 спящий питомец крупный,
+ * а капсула почти целиком между плашками и панелью сна; при 1.4 её верх
+ * уходил под плашки.
+ */
+private const val SLEEP_ZOOM = 1.3f
+
+/** Где по высоте экрана встаёт спящий питомец: чуть ниже середины, над панелью сна. */
+private const val SLEEP_FOCUS_Y = 0.52f
+
+/** Сколько камера наезжает и отъезжает: чуть дольше прыжка, чтобы не дёргать. */
+private const val CAMERA_MS = 1200
+
+/**
+ * Насколько темнеет комната, когда гаснет свет: поверх того, что без торшера
+ * и так темнее. Цвет — небо за окном, ночь остаётся синей, а не серой.
+ */
+private const val NIGHT_SHADE = 0.3f
 private val UfoPauseMs = 20_000L..45_000L
 
 /**
@@ -147,12 +176,12 @@ private val UfoPauseMs = 20_000L..45_000L
  * Стены и пол освещаются одним слоем, питомец и мебель — каждый своим,
  * и у каждого своя тень.
  *
- * @param lampOn горит ли торшер. Выключателя нет, торшер горит всегда — и во сне:
- *   ночь и так видна за окном, а тёмная комната пугала.
+ * @param lampOn горит ли торшер, пока питомец не спит. Во сне свет гаснет сам.
  * @param capsule стоит ли в зале капсула для сна. Мини-играм комната нужна
  *   фоном, и капсула во весь экран там только мешает.
- * @param asleep питомец спит: уходит в капсулу, торшер гаснет, дверь закрывается.
- *   Проснулся — всё в обратном порядке.
+ * @param asleep питомец спит: запрыгивает в капсулу, камера наезжает на неё,
+ *   дверь закрывается и гаснет свет. Проснулся — всё в обратном порядке,
+ *   и выпрыгивает он на своё место, а не туда, где гулял.
  * @param pet встаёт туда, где ему положено быть в текущей комнате.
  * @param onTapItem нажатие по самому предмету: тому же, что делает нижняя кнопка.
  * @param wander гулять ли питомцу по залу самому. Выключается, пока с ним что-то
@@ -174,11 +203,15 @@ fun RoomScene(
     // Где питомец в зале сейчас: сдвиг от его обычного места, доля ширины холста.
     val stroll = remember { Animatable(0f) }
     val ufo = remember { UfoState() }
+
+    // Ночь: свет в комнате выключен. Гаснет, когда за питомцем закрылась дверь,
+    // загорается, как только его будят, — до того, как дверь открылась.
+    var dark by remember { mutableStateOf(asleep) }
     // Свет у каждой комнаты свой: источники в них разные. Во время перехода
     // видны две комнаты сразу, и каждая освещена по-своему.
     val lights = RoomSpot.entries.associateWith { room ->
         rememberRoomLighting(
-            lampOn = lampOn && (room.hasLamp || room.ceilingLight),
+            lampOn = lampOn && !dark && (room.hasLamp || room.ceilingLight),
             ufo = ufo::light,
             window = room.hasWindow,
             ceiling = room.ceilingLight,
@@ -190,19 +223,29 @@ fun RoomScene(
     val currentSpot by rememberUpdatedState(spot)
     LaunchedEffect(ufo) { ufo.fly(onStart = { if (currentSpot.hasWindow) sounds.play(Sfx.Ufo) }) }
 
-    // Отход ко сну: питомец идёт в капсулу (walk 0 → 1), потом закрывается дверь.
-    // Живёт на всю сцену, а не на зал: переход между комнатами его не сбрасывает.
+    // Отход ко сну: питомец прыгает в капсулу (walk 0 → 1), камера наезжает,
+    // закрывается дверь, гаснет свет. Живёт на всю сцену, а не на зал:
+    // переход между комнатами его не сбрасывает.
     val walk = remember { Animatable(if (asleep) 1f else 0f) }
     val door = remember { Animatable(if (asleep) 1f else 0f) }
+    // Камера: 0 — обычный вид, 1 — капсула крупно.
+    val zoom = remember { Animatable(if (asleep) 1f else 0f) }
     LaunchedEffect(asleep) {
         if (asleep) {
-            walk.animateTo(1f, tween(WALK_MS, easing = FastOutSlowInEasing))
+            launch { zoom.animateTo(1f, tween(CAMERA_MS, easing = FastOutSlowInEasing)) }
+            jump(walk, to = 1f, onHop)
+            // В капсуле он уже не там, где гулял: проснувшись, выпрыгнет на своё место.
+            stroll.snapTo(0f)
             door.animateTo(1f, tween(DOOR_MS, easing = FastOutSlowInEasing))
+            dark = true
         } else {
+            dark = false
             door.animateTo(0f, tween(DOOR_MS, easing = FastOutSlowInEasing))
-            walk.animateTo(0f, tween(WALK_MS, easing = FastOutSlowInEasing))
+            launch { zoom.animateTo(0f, tween(CAMERA_MS, easing = FastOutSlowInEasing)) }
+            jump(walk, to = 0f, onHop)
         }
     }
+    val shade = animateFloatAsState(if (dark) NIGHT_SHADE else 0f, tween(DOOR_MS), label = "night")
 
     BoxWithConstraints(modifier = modifier.clipToBounds().background(FinneyCream)) {
         // Масштаб «накрыть экран»: холст не меньше экрана ни по одной стороне.
@@ -271,6 +314,39 @@ fun RoomScene(
             }
         }
 
+        // Камера: весь слой комнаты увеличивается от левого верхнего угла и
+        // сдвигается так, чтобы спящий встал посередине. Сдвиг зажат, чтобы
+        // за краем холста не открылась пустота; масштаб и сдвиг растут вместе,
+        // и в промежутке край тоже не виден. Интерфейс лежит поверх сцены
+        // отдельно и не увеличивается.
+        val density = LocalDensity.current
+        val camera = with(density) {
+            val sleeper = Room.PetInCapsule
+            val cx = (shiftX + canvasW * ((sleeper.left + sleeper.right) / 2f)).toPx()
+            val cy = (shiftY + canvasH * ((sleeper.top + sleeper.bottom) / 2f)).toPx()
+            val w = maxWidth.toPx()
+            val h = maxHeight.toPx()
+            val left = shiftX.toPx()
+            val top = shiftY.toPx()
+            Offset(
+                (w / 2f - SLEEP_ZOOM * cx).coerceIn(w - SLEEP_ZOOM * (left + canvasW.toPx()), -SLEEP_ZOOM * left),
+                (h * SLEEP_FOCUS_Y - SLEEP_ZOOM * cy).coerceIn(h - SLEEP_ZOOM * (top + canvasH.toPx()), -SLEEP_ZOOM * top),
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    val z = zoom.value
+                    val s = 1f + (SLEEP_ZOOM - 1f) * z
+                    transformOrigin = TransformOrigin(0f, 0f)
+                    scaleX = s
+                    scaleY = s
+                    translationX = camera.x * z
+                    translationY = camera.y * z
+                },
+        ) {
         for (room in listOfNotNull(shown, incoming)) {
             key(room) {
                 RoomCanvas(
@@ -295,7 +371,28 @@ fun RoomScene(
                 )
             }
         }
+
+        }
+
+        // Ночь поверх комнаты: свет выключен. Лежит вне камеры — увеличенная
+        // вместе с комнатой, она съезжала бы с края экрана. Читается на отрисовке.
+        Box(
+            modifier = Modifier.fillMaxSize().drawBehind {
+                if (shade.value > 0f) drawRect(SkyColor, alpha = shade.value)
+            },
+        )
     }
+}
+
+/**
+ * Прыжок в капсулу или из неё: присел, как в [ru.finney.pet.ui.pet.PetAnimation.playJoy],
+ * и полетел по дуге. Дуга рисуется в [RoomCanvas] по тому же [walk].
+ */
+private suspend fun jump(walk: Animatable<Float, AnimationVector1D>, to: Float, onHop: () -> Unit) {
+    if (walk.value == to) return
+    onHop()
+    delay(HOP_CROUCH_MS)
+    walk.animateTo(to, tween(WALK_MS - HOP_CROUCH_MS.toInt(), easing = FastOutSlowInEasing))
 }
 
 /**
@@ -343,15 +440,16 @@ private fun RoomCanvas(
             // упала бы на мебель, а мебель пола не знает.
             when (room) {
                 RoomSpot.LIVING -> if (capsule) {
-                    // Капсула в углу, питомец перед ней. Засыпая, он уходит
-                    // в капсулу и становится меньше — она дальше от зрителя.
+                    // Капсула в углу, питомец перед ней. Засыпая, он запрыгивает
+                    // в капсулу по дуге и становится меньше — она дальше от зрителя.
                     // Дверь закрывается перед ним, стекло у неё полупрозрачное,
                     // и спящего видно. Тень на полу — только пока он стоит на месте.
                     LitLayer(Room.Capsule, canvasW, canvasH, lighting, Solids.Capsule, visibility)
                     TapZone(Room.Capsule.rect, canvasW, canvasH, "Уложить спать", onTapItem)
                     val t = walk()
                     val footing = if (t == 0f) PetFooting else null
-                    Pet(ground.lerp(Room.PetInCapsule, t), canvasW, canvasH, lighting, footing, visibility, pet)
+                    val arc = -CAPSULE_JUMP_ARC * 4f * t * (1f - t)
+                    Pet(ground.lerp(Room.PetInCapsule, t).shiftedY(arc), canvasW, canvasH, lighting, footing, visibility, pet)
                     CapsuleDoor(canvasW, canvasH, lighting, shut = door)
                 } else {
                     Pet(ground, canvasW, canvasH, lighting, PetFooting, visibility, pet)

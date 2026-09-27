@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -227,7 +228,12 @@ private const val PurchaseFeedbackMillis = 5_000L
 /** Настроения, на которые питомец вздыхает. */
 private val SadEmotions = setOf(Emotion.HUNGRY, Emotion.DIRTY, Emotion.TIRED, Emotion.SAD)
 
-/** Во сне всё, кроме «Разбудить», приглушено и не нажимается. */
+/**
+ * Сон — перерыв в игре: ребёнок не сидит в приложении, пока питомец спит.
+ * Открыты только верхний ряд (деньги, уровень, меню) и «Зал и сон»; всё
+ * остальное полупрозрачное и не нажимается — кухня, ванная, плашки копилки
+ * и игры уровня, «Завершить уровень» в панели уровня.
+ */
 private const val NightDim = 0.45f
 
 /**
@@ -261,8 +267,8 @@ private fun HomeContent(
     onSleep: () -> Unit = {},
     onWake: () -> Unit = {},
 ) {
-    // Питомец спит — это ночь: он в капсуле, свет выключен, можно только ждать
-    // или разбудить. Глаза закрываются, когда он уже внутри, и открываются,
+    // Питомец спит — это ночь: он в капсуле, свет выключен, игра на паузе
+    // до утра. Глаза закрываются, когда он уже внутри, и открываются,
     // как только проснулся. Открыли приложение, а он спит, — глаза закрыты сразу.
     val sleep = state.sleep
     val sleeping = sleep != null
@@ -335,8 +341,9 @@ private fun HomeContent(
     // Панель отладки: долгое нажатие на уровень, только в отладочной сборке.
     var debugOpen by rememberSaveable { mutableStateOf(false) }
 
-    // Панель уровня: чек-лист условий и «Завершить уровень». Она же — подтверждение:
-    // шаг необратимый, случайное нажатие не должно подводить итоги за ребёнка.
+    // Панель уровня: чек-лист условий и «Завершить уровень». Открывается только
+    // значком уровня, и она же — подтверждение: шаг необратимый, случайное
+    // нажатие не должно подводить итоги за ребёнка.
     var levelOpen by rememberSaveable { mutableStateOf(false) }
 
     // Игра ухода: что выбрали в панели и теперь бросают в рот или трут о питомца.
@@ -367,6 +374,12 @@ private fun HomeContent(
     fun goTo(next: RoomSpot, target: CareTarget) {
         if (sleeping) return
         if (spot == next) openCare(target) else spot = next
+    }
+
+    // Спят только в зале. Вернулись в приложение, а комната запомнилась другая, —
+    // питомец всё равно в капсуле, и на экране должна быть она.
+    LaunchedEffect(sleeping) {
+        if (sleeping) spot = RoomSpot.LIVING
     }
 
 
@@ -443,11 +456,13 @@ private fun HomeContent(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // Верхний ряд во сне не гаснет: деньги, уровень и меню открыты
+            // и ночью. Всё остальное на экране во сне закрыто (см. NightDim).
             Box(
-                modifier = Modifier.weight(1f).graphicsLayer { alpha = if (sleeping) NightDim else 1f },
+                modifier = Modifier.weight(1f),
                 contentAlignment = Alignment.CenterStart,
             ) {
-                MoneyButton(balance = state.balance, onClick = { if (!sleeping) onOpenShop() })
+                MoneyButton(balance = state.balance, onClick = onOpenShop)
             }
 
             // Уровень — главный показатель роста, поэтому в полтора раза крупнее кнопок по краям.
@@ -462,7 +477,7 @@ private fun HomeContent(
                         onClickLabel = "Что нужно для уровня",
                         onLongClickLabel = if (isDebuggable) "Отладка" else null,
                         onLongClick = if (isDebuggable) ({ debugOpen = true }) else null,
-                        onClick = { if (!sleeping) levelOpen = true },
+                        onClick = { levelOpen = true },
                     ),
                 )
                 // Тестовый профиль видно сразу: эксперт знает, почему все игры открыты.
@@ -484,7 +499,7 @@ private fun HomeContent(
             }
 
             Row(
-                modifier = Modifier.weight(1f).graphicsLayer { alpha = if (sleeping) NightDim else 1f },
+                modifier = Modifier.weight(1f),
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -496,7 +511,7 @@ private fun HomeContent(
                 // Низ экрана из-за этого остался про комнаты, а не про меню.
                 Box {
                     FinneyIconButton(
-                        onClick = { if (!sleeping) menuOpen = true },
+                        onClick = { menuOpen = true },
                         contentDescription = "Меню",
                         size = 56.dp,
                     ) {
@@ -521,7 +536,7 @@ private fun HomeContent(
         // лампы, и второй ряд его бы срезал. Сытость, чистота и настроение сюда
         // не попадают — они переехали в кольца кнопок и в шкалу слева.
         Row(
-            modifier = Modifier.fillMaxWidth().graphicsLayer { alpha = if (sleeping) NightDim else hudAlpha },
+            modifier = Modifier.fillMaxWidth().graphicsLayer { alpha = hudAlpha },
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             InfoChip(
@@ -530,7 +545,8 @@ private fun HomeContent(
                     ?.let { "${it.goal.label}: ${it.saved} из ${it.goal.price}" }
                     ?: "Копилка: ${state.totalSavings}",
                 action = "Копилка и цель",
-                onClick = { if (!sleeping) onOpenGoals() },
+                onClick = onOpenGoals,
+                enabled = !sleeping,
                 modifier = Modifier.weight(1f),
             )
 
@@ -542,7 +558,8 @@ private fun HomeContent(
                     icon = FinneyIcons.Star,
                     text = if (state.check.gamePassed) "${state.levelGame} ✓" else "Игра: ${state.levelGame}",
                     action = "Игра уровня",
-                    onClick = { if (!sleeping) onOpenTask(levelTaskId) },
+                    onClick = { onOpenTask(levelTaskId) },
+                    enabled = !sleeping,
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -592,29 +609,15 @@ private fun HomeContent(
                 modifier = Modifier.offset(x = -HappinessEdgeShift),
             )
 
-            // Конец уровня — главный шаг игрового цикла: без него не растёт
-            // уровень и не приходит новый доход. Кнопка, а не автозакрытие:
-            // ребёнок сам решает, когда хватит покупок и игр, и итог не
-            // обрывает его посреди кормления. Кнопка стоит на полу под
-            // питомцем, над кнопками комнат; шкала настроения до низа не
-            // доходит (0.55 высоты), так что места хватает.
-            //
-            // До подтверждения плана уровень завершить нельзя (Rejection.PlanNotConfirmed),
-            // и на месте кнопки — путь к плану: ребёнок видит следующий шаг, а не отказ.
-            // Во время игры ухода кнопку убираем, а не гасим: погашенная ловила бы нажатия.
+            // Во сне на полу — сколько ещё спать и «Разбудить». Днём здесь пусто:
+            // «Завершить уровень» живёт только в панели уровня (значок сверху),
+            // чтобы ребёнок подводил итог, видя условия, а не мимоходом.
             if (sleep != null) {
                 SleepPanel(
                     petName = state.petName,
                     minutesLeft = ((sleep.endsAt - now + 59_999) / 60_000).toInt(),
                     secondsLeft = ((sleep.endsAt - now + 999) / 1_000).toInt(),
                     onWake = onWake,
-                    modifier = Modifier.align(Alignment.BottomCenter),
-                )
-            } else if (playing == null) {
-                FinneyButton(
-                    text = if (state.canClosePeriod) "Завершить уровень" else "Составить план",
-                    onClick = if (state.canClosePeriod) ({ levelOpen = true }) else onOpenBudget,
-                    fillWidth = false,
                     modifier = Modifier.align(Alignment.BottomCenter),
                 )
             }
@@ -644,12 +647,15 @@ private fun HomeContent(
                 value = energyNow,
                 selected = spot == RoomSpot.LIVING,
             )
+            // Спящего не кормят и не моют: кнопки полупрозрачные и не нажимаются.
             FinneyNeedButton(
                 icon = FinneyIcons.Food,
                 label = "Покормить",
                 onClick = { goTo(RoomSpot.KITCHEN, CareTarget.FOOD) },
                 value = state.stats.satiety,
                 selected = spot == RoomSpot.KITCHEN,
+                enabled = !sleeping,
+                modifier = Modifier.graphicsLayer { alpha = if (sleeping) NightDim else 1f },
             )
             FinneyNeedButton(
                 icon = FinneyIcons.Bath,
@@ -657,6 +663,8 @@ private fun HomeContent(
                 onClick = { goTo(RoomSpot.BATH, CareTarget.BATH) },
                 value = state.stats.hygiene,
                 selected = spot == RoomSpot.BATH,
+                enabled = !sleeping,
+                modifier = Modifier.graphicsLayer { alpha = if (sleeping) NightDim else 1f },
             )
         }
 
@@ -782,6 +790,7 @@ private fun HomeContent(
                     level = state.level,
                     check = state.check,
                     levelGame = state.levelGame,
+                    asleep = sleeping,
                     onFinish = {
                         levelOpen = false
                         onClosePeriod()
@@ -820,8 +829,8 @@ private fun HomeContent(
 
 
 /**
- * Ночь: сколько ещё спать и «Разбудить». Стоит на месте кнопки уровня —
- * во сне это единственное, что можно сделать.
+ * Ночь: сколько ещё спать и «Разбудить». Лежит на полу под капсулой, над
+ * кнопками комнат — там, куда смотрит ребёнок, когда уложил питомца.
  */
 @Composable
 private fun SleepPanel(
@@ -853,8 +862,9 @@ private fun SleepPanel(
 /**
  * Панель уровня: что нужно, чтобы его пройти, и «Завершить уровень».
  *
- * Открывается нажатием на значок уровня и кнопкой «Завершить уровень» на полу —
- * одна и та же, поэтому ребёнок всегда видит условия до того, как подвести итог.
+ * Открывается только нажатием на значок уровня, поэтому ребёнок всегда видит
+ * условия до того, как подвести итог. До подтверждения плана вместо
+ * «Завершить уровень» здесь «Составить план» — следующий шаг, а не отказ.
  * Вернуть уровень нельзя, и панель прямо говорит, что будет: пройден или
  * начнётся заново с новыми деньгами. Прогресс при этом не падает никогда.
  */
@@ -863,6 +873,7 @@ private fun LevelPanel(
     level: Int,
     check: LevelCheck,
     levelGame: String?,
+    asleep: Boolean,
     onFinish: () -> Unit,
     onOpenBudget: () -> Unit,
     onOpenProgress: () -> Unit,
@@ -903,7 +914,20 @@ private fun LevelPanel(
                 style = MaterialTheme.typography.bodyLarge,
                 color = FinneyInk,
             )
-            FinneyButton(text = "Завершить уровень", onClick = onFinish)
+            // Во сне уровень не завершают: условия видно, а итог — утром.
+            if (asleep) {
+                Text(
+                    "Питомец спит. Завершить уровень можно, когда он проснётся.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = FinneyInk,
+                )
+            }
+            FinneyButton(
+                text = "Завершить уровень",
+                onClick = onFinish,
+                enabled = !asleep,
+                modifier = Modifier.graphicsLayer { alpha = if (asleep) NightDim else 1f },
+            )
         }
         FinneyButton(text = "Итоги и история", onClick = onOpenProgress)
         FinneyButton(text = "Ещё поиграю", onClick = onDismiss)
@@ -1016,6 +1040,13 @@ private fun MoneyButton(balance: Int, onClick: () -> Unit) {
 
     // Один контейнер размером с монету: плашка привязана к его правому нижнему
     // углу и выходит за край смещением, поэтому ряд не раздвигается от длины суммы.
+    //
+    // Плашка и «+N» меряются без ограничения по ширине (wrapContentSize с unbounded):
+    // контейнер всего 56 dp, и раньше сумма от четырёх цифр в него не влезала —
+    // maxLines = 1 молча срезал хвост числа. Длинная сумма растёт влево, по монете.
+    // Предки кнопки не должны гасить её через graphicsLayer: alpha меньше 1 рисует
+    // слой вне экрана и обрезает всё, что вышло за контейнер, — так сумму и
+    // срезало во сне, когда верхний ряд приглушался.
     Box(
         modifier = Modifier
             .size(MoneyCoinSize)
@@ -1045,9 +1076,11 @@ private fun MoneyButton(balance: Int, onClick: () -> Unit) {
             style = MaterialTheme.typography.titleMedium,
             color = FinneyInk,
             maxLines = 1,
+            softWrap = false,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .offset(x = 14.dp, y = 8.dp)
+                .wrapContentSize(Alignment.BottomEnd, unbounded = true)
                 .clip(RoundedCornerShape(percent = 50))
                 .background(FinneySand)
                 .border(StrokeThin, FinneyInk, RoundedCornerShape(percent = 50))
@@ -1061,6 +1094,7 @@ private fun MoneyButton(balance: Int, onClick: () -> Unit) {
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .offset(x = 24.dp, y = (-4).dp)
+                    .wrapContentSize(Alignment.TopStart, unbounded = true)
                     .graphicsLayer {
                         translationY = -rise.value * 28.dp.toPx()
                         // Первую половину пути видна целиком, потом тает.
@@ -1092,6 +1126,8 @@ private val LevelBadgeSize = 66.dp
  *
  * [action] — что произойдёт при нажатии; уходит в TalkBack вместо [text],
  * который сам по себе действия не называет.
+ *
+ * [enabled] = false — плашка полупрозрачная и не нажимается (во сне).
  */
 @Composable
 private fun InfoChip(
@@ -1100,13 +1136,15 @@ private fun InfoChip(
     action: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     Row(
         modifier = modifier
+            .graphicsLayer { alpha = if (enabled) 1f else NightDim }
             .clip(RoundedCornerShape(RadiusField))
             .background(FinneySand)
             .border(StrokeThin, FinneyInk, RoundedCornerShape(RadiusField))
-            .clickable(onClickLabel = action, onClick = onClick)
+            .clickable(enabled = enabled, onClickLabel = action, onClick = onClick)
             .defaultMinSize(minHeight = 48.dp)
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,

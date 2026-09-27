@@ -366,6 +366,7 @@ fun FinneyNeedButton(
     value: Int? = null,
     selected: Boolean = false,
     size: Dp = 64.dp,
+    enabled: Boolean = true,
 ) {
     val clamped = value?.coerceIn(0, 100)
     ProgressRing(
@@ -377,6 +378,7 @@ fun FinneyNeedButton(
             onClick = onClick,
             contentDescription = if (clamped == null) label else "$label, $clamped из 100",
             size = size,
+            enabled = enabled,
             selected = selected,
         ) {
             FinneyIcon(icon, size = size / 2)
