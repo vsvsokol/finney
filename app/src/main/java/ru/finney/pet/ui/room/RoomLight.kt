@@ -134,6 +134,14 @@ private const val LIGHT_SCALE = 4f
  */
 internal const val PET_PAD = 0.25f
 
+/**
+ * Запас над питомцем — больше, чем по бокам и снизу: шляпы крупнее квадрата
+ * (`HAT_SCALE` в PetAccessories.kt), и с высокой шляпой на пике прыжка верх
+ * уходил за 0.25 — шляпу и макушку срезало по прямой. Вниз и вбок питомец
+ * почти не выходит, там хватает [PET_PAD].
+ */
+internal const val PET_PAD_TOP = 0.6f
+
 /** Сколько источников дают тень одновременно: торшер, луна, НЛО. */
 private const val MAX_SHADOWS = 3
 
@@ -692,6 +700,7 @@ private fun DrawScope.drawContact(occluder: Occluder, canvas: Size) {
  * @param visibility насколько предмет виден в переходе между комнатами.
  *   Лямбдой: читается на отрисовке тени и не пересобирает предмет.
  * @param pad на сколько предмет может выйти за свой прямоугольник, доля размера.
+ * @param padTop то же вверх; по умолчанию как [pad].
  */
 @Composable
 internal fun LitBody(
@@ -702,6 +711,7 @@ internal fun LitBody(
     solid: Solid? = null,
     visibility: () -> Float = { 1f },
     pad: Float = 0f,
+    padTop: Float = pad,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val body = rememberGraphicsLayer()
@@ -724,8 +734,9 @@ internal fun LitBody(
 
             val canvas = Size(size.width / place.width, size.height / place.height)
             val origin = Offset(canvas.width * place.left, canvas.height * place.top)
-            val margin = IntOffset((size.width * pad).toInt(), (size.height * pad).toInt())
-            val padded = IntSize(size.width.toInt() + margin.x * 2, size.height.toInt() + margin.y * 2)
+            val margin = IntOffset((size.width * pad).toInt(), (size.height * padTop).toInt())
+            val below = (size.height * pad).toInt()
+            val padded = IntSize(size.width.toInt() + margin.x * 2, size.height.toInt() + margin.y + below)
 
             light.blendMode = BlendMode.Modulate
             light.stretch()

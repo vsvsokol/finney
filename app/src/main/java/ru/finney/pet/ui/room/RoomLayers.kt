@@ -17,7 +17,6 @@ data class RelRect(val left: Float, val top: Float, val right: Float, val bottom
     val height: Float get() = bottom - top
 
     fun shiftedX(dx: Float) = RelRect(left + dx, top, right + dx, bottom)
-
     fun shiftedY(dy: Float) = RelRect(left, top + dy, right, bottom + dy)
 
     /** Промежуточный прямоугольник: [t] = 0 — этот, 1 — [to]. */
@@ -183,7 +182,7 @@ object Room {
     private const val CAPSULE_BOTTOM = 0.66f
 
     /** Капсула в экспорте дизайнера. */
-    private val CapsuleExport = RelRect(0.1417f, 0.2525f, 0.8403f, 0.7933f)
+    private val CapsuleExport = RelRect(0.1417f, 0.2521f, 0.8410f, 0.7938f)
 
     private fun capsuleX(x: Float) = CAPSULE_RIGHT - (CapsuleExport.right - x) * CAPSULE_SCALE
     private fun capsuleY(y: Float) = CAPSULE_BOTTOM - (CapsuleExport.bottom - y) * CAPSULE_SCALE

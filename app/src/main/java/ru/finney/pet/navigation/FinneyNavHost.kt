@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -62,9 +63,9 @@ fun FinneyNavHost(
             OnboardingScreen(
                 isReplay = route.isReplay,
                 onFinish = {
-                    if (route.isReplay) navController.popBackStack() else navController.navigate(PetSetupRoute())
+                    if (route.isReplay) navController.back() else navController.go(PetSetupRoute())
                 },
-                onStartDemo = { navController.navigate(PetSetupRoute(isDemo = true)) },
+                onStartDemo = { navController.go(PetSetupRoute(isDemo = true)) },
             )
         }
 
@@ -74,7 +75,7 @@ fun FinneyNavHost(
                 isEditing = route.isEditing,
                 isDemo = route.isDemo,
                 onSaved = {
-                    if (route.isEditing) navController.popBackStack() else navController.openGame()
+                    if (route.isEditing) navController.back() else navController.openGame()
                 },
             )
         }
@@ -85,47 +86,47 @@ fun FinneyNavHost(
             // Питомец уже есть — теперь понятно, о ком будут напоминания.
             AskNotificationsOnce()
             HomeScreen(
-                onOpenBudget = { navController.navigate(BudgetRoute) },
-                onOpenShop = { navController.navigate(ShopRoute) },
-                onOpenGoals = { navController.navigate(GoalsRoute) },
-                onOpenTasks = { navController.navigate(TasksRoute) },
-                onOpenTask = { taskId -> navController.navigate(TaskRoute(taskId)) },
-                onOpenWardrobe = { navController.navigate(WardrobeRoute) },
-                onOpenProgress = { navController.navigate(ProgressRoute) },
-                onOpenSettings = { navController.navigate(SettingsRoute) },
-                onOpenHelp = { navController.navigate(OnboardingRoute(isReplay = true)) },
-                onPeriodClosed = { number -> navController.navigate(PeriodResultRoute(number)) },
+                onOpenBudget = { navController.go(BudgetRoute) },
+                onOpenShop = { navController.go(ShopRoute) },
+                onOpenGoals = { navController.go(GoalsRoute) },
+                onOpenTasks = { navController.go(TasksRoute) },
+                onOpenTask = { taskId -> navController.go(TaskRoute(taskId)) },
+                onOpenWardrobe = { navController.go(WardrobeRoute) },
+                onOpenProgress = { navController.go(ProgressRoute) },
+                onOpenSettings = { navController.go(SettingsRoute) },
+                onOpenHelp = { navController.go(OnboardingRoute(isReplay = true)) },
+                onPeriodClosed = { number -> navController.go(PeriodResultRoute(number)) },
             )
         }
 
         composable<BudgetRoute> {
-            BudgetScreen(onBack = { navController.popBackStack() })
+            BudgetScreen(onBack = { navController.back() })
         }
 
         composable<ShopRoute> {
             ShopScreen(
-                onBack = { navController.popBackStack() },
-                onOpenBudget = { navController.navigate(BudgetRoute) },
-                onOpenHistory = { navController.navigate(ProgressRoute) },
+                onBack = { navController.back() },
+                onOpenBudget = { navController.go(BudgetRoute) },
+                onOpenHistory = { navController.go(ProgressRoute) },
             )
         }
 
         composable<WardrobeRoute> {
             WardrobeScreen(
-                onBack = { navController.popBackStack() },
-                onOpenGoals = { navController.navigate(GoalsRoute) },
+                onBack = { navController.back() },
+                onOpenGoals = { navController.go(GoalsRoute) },
             )
         }
 
         composable<GoalsRoute> {
-            GoalsScreen(onBack = { navController.popBackStack() })
+            GoalsScreen(onBack = { navController.back() })
         }
 
         composable<TasksRoute> {
             TasksScreen(
-                onOpenTask = { taskId -> navController.navigate(TaskRoute(taskId)) },
-                onOpenBudget = { navController.navigate(BudgetRoute) },
-                onBack = { navController.popBackStack() },
+                onOpenTask = { taskId -> navController.go(TaskRoute(taskId)) },
+                onOpenBudget = { navController.go(BudgetRoute) },
+                onBack = { navController.back() },
             )
         }
 
@@ -134,8 +135,8 @@ fun FinneyNavHost(
             val route = entry.toRoute<TaskRoute>()
             TaskScreen(
                 taskId = route.taskId,
-                onBack = { navController.popBackStack() },
-                onOpenBudget = { navController.navigate(BudgetRoute) },
+                onBack = { navController.back() },
+                onOpenBudget = { navController.go(BudgetRoute) },
             )
         }
 
@@ -143,36 +144,36 @@ fun FinneyNavHost(
             val route = entry.toRoute<PeriodResultRoute>()
             PeriodResultScreen(
                 periodNumber = route.periodNumber,
-                onBack = { navController.popBackStack() },
+                onBack = { navController.back() },
             )
         }
 
         composable<ProgressRoute> {
             ProgressScreen(
-                onBack = { navController.popBackStack() },
-                onOpenGlossary = { navController.navigate(GlossaryRoute) },
-                onOpenPeriodResult = { number -> navController.navigate(PeriodResultRoute(number)) },
+                onBack = { navController.back() },
+                onOpenGlossary = { navController.go(GlossaryRoute) },
+                onOpenPeriodResult = { number -> navController.go(PeriodResultRoute(number)) },
             )
         }
 
         composable<GlossaryRoute> {
-            GlossaryScreen(onBack = { navController.popBackStack() })
+            GlossaryScreen(onBack = { navController.back() })
         }
 
         // ---------- Взрослый ----------
 
         composable<SettingsRoute> {
             SettingsScreen(
-                onBack = { navController.popBackStack() },
-                onOpenAdult = { navController.navigate(AdultRoute) },
+                onBack = { navController.back() },
+                onOpenAdult = { navController.go(AdultRoute) },
             )
         }
 
         composable<AdultRoute> {
             AdultScreen(
-                onBack = { navController.popBackStack() },
-                onEditPet = { navController.navigate(PetSetupRoute(isEditing = true)) },
-                onResetProgress = { navController.navigate(ResetProgressRoute) },
+                onBack = { navController.back() },
+                onEditPet = { navController.go(PetSetupRoute(isEditing = true)) },
+                onResetProgress = { navController.go(ResetProgressRoute) },
                 onProfileDeleted = { hasProfile -> navController.restart(hasProfile) },
             )
         }
@@ -180,7 +181,7 @@ fun FinneyNavHost(
         composable<ResetProgressRoute> {
             ResetProgressScreen(
                 onDone = { navController.openGame() },
-                onCancel = { navController.popBackStack() },
+                onCancel = { navController.back() },
             )
         }
     }
@@ -199,6 +200,25 @@ private fun BackgroundMusic(navController: NavController) {
         else -> Music.Room
     }
     LaunchedEffect(track) { sounds.music(track) }
+}
+
+/**
+ * Нажатие считается, только пока текущий экран на переднем плане. Двойное касание «✕»
+ * иначе закрывало и главный — оставался пустой фон без выхода; двойное касание кнопки
+ * открывало экран дважды. Во время перехода экран ещё не на переднем плане — лишнее
+ * касание пропускается.
+ */
+private val NavController.ready: Boolean
+    get() = currentBackStackEntry?.lifecycle?.currentState == Lifecycle.State.RESUMED
+
+/** Закрыть текущий экран — один раз, сколько ни нажимай. */
+fun NavController.back() {
+    if (ready) popBackStack()
+}
+
+/** Открыть экран — один раз, сколько ни нажимай. */
+fun <T : Any> NavController.go(route: T) {
+    if (ready) navigate(route)
 }
 
 /** Вход в игру после создания профиля: знакомство и настройка уходят из стека, «назад» закрывает приложение. */
