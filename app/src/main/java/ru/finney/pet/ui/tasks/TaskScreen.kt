@@ -33,6 +33,7 @@ import ru.finney.pet.ui.tasks.games.LocalPlayerBodyColor
 import ru.finney.pet.ui.tasks.games.PetSays
 import ru.finney.pet.ui.tasks.games.ResultBody
 import ru.finney.pet.ui.tasks.games.SceneBody
+import ru.finney.pet.ui.tasks.games.SceneStage
 import ru.finney.pet.ui.tasks.games.ScenePanel
 import ru.finney.pet.ui.tasks.games.TaskGame
 import ru.finney.pet.ui.tasks.games.backdropFor
@@ -69,21 +70,24 @@ fun TaskScreen(
             LocalPlayerBodyColor provides s.bodyColor,
             LocalPlayerAccessory provides s.worn,
         ) {
-            when (s.phase) {
-            TaskPhase.INTRO -> TaskIntro(s, onStart = viewModel::start, onBack = onBack, onOpenBudget = onOpenBudget)
-            // Крестик и системное «назад» посреди игры закрывают её: до итога ничего не засчитано.
-            TaskPhase.PLAY -> key(s.attempt) {
-                TaskGame(
-                    task = s.task,
-                    character = s.character,
-                    balance = s.balance,
-                    inputError = s.inputError,
-                    onInputSeen = viewModel::inputSeen,
-                    onClose = onBack,
-                    onSubmit = viewModel::submit,
-                )
-            }
-            TaskPhase.RESULT -> TaskResultScene(s, onReplay = viewModel::replay, onDone = onBack)
+            // Фон один на вступление, игру и итог — меняется плавно, а не с каждым экраном.
+            SceneStage(initial = backdropFor(s.task, finished = s.phase == TaskPhase.RESULT)) {
+                when (s.phase) {
+                    TaskPhase.INTRO -> TaskIntro(s, onStart = viewModel::start, onBack = onBack, onOpenBudget = onOpenBudget)
+                    // Крестик и системное «назад» посреди игры закрывают её: до итога ничего не засчитано.
+                    TaskPhase.PLAY -> key(s.attempt) {
+                        TaskGame(
+                            task = s.task,
+                            character = s.character,
+                            balance = s.balance,
+                            inputError = s.inputError,
+                            onInputSeen = viewModel::inputSeen,
+                            onClose = onBack,
+                            onSubmit = viewModel::submit,
+                        )
+                    }
+                    TaskPhase.RESULT -> TaskResultScene(s, onReplay = viewModel::replay, onDone = onBack)
+                }
             }
         }
     }
