@@ -27,7 +27,7 @@ fun accessoryArt(itemId: String): AccessoryArt? = when (itemId) {
 private const val HAT_SCALE = 1.5f
 
 /** Насколько выше замера по голове лежат поля — доля высоты холста. */
-private const val HAT_LIFT = 0.10f
+private const val HAT_LIFT = 0.07f
 
 /**
  * Поставить шляпу по [HatFit]: ширина — доля стороны питомца, линия полей [artBrim]
