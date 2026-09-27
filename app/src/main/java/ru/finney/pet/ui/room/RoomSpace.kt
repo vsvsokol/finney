@@ -146,16 +146,16 @@ internal object Solids {
      *
      * Ножки встают на пол на 2010, передний борт посередине — 1590, дно
      * чаши — 1960, край к краю борт от 145 до 1075, дно от 360 до 870.
-     * Вся модель сдвинута вправо вместе с картинкой, на [Room.BATH_SHIFT].
+     * Вся модель сдвинута вместе с картинкой: вправо на [Room.BATH_SHIFT], вверх на [Room.BATH_LIFT].
      * Глубины ванны на картинке нет — она видна только спереди, поэтому
      * взята как у настоящей: вдвое меньше длины.
      */
     val Bath: Solid = run {
-        val feet = 2010f / 2400f
+        val feet = 2010f / 2400f - Room.BATH_LIFT
         val k = RoomSpace.scaleAt(feet)
         val front = 1f / k
-        val rim = (feet - 1590f / 2400f) / k
-        val bottom = (feet - 1960f / 2400f) / k
+        val rim = (2010f - 1590f) / 2400f / k
+        val bottom = (2010f - 1960f) / 2400f / k
 
         val centreX = (610f / 1440f + Room.BATH_SHIFT - Room.ROOM_AXIS_X) * Room.CANVAS_RATIO / k
         val rimLength = 465f / 1440f * Room.CANVAS_RATIO / k
