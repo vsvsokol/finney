@@ -14,7 +14,8 @@ import kotlin.random.Random
  * Задание из tasks.json с разбросом. В шаблоне вместо значения можно написать:
  * - `{"min": 6, "max": 10}` — целое от 6 до 10, с `"step": 2` — через 2 (6, 8, 10);
  * - `{"oneOf": [a, b, c]}` — одно из значений;
- * - `{"pick": 2, "from": [a, b, c]}` — два из списка, порядок как в списке.
+ * - `{"pick": 2, "from": [a, b, c]}` — два из списка, порядок как в списке;
+ * - `{"chance": 30, "value": a}` — только элементом списка: `a` в списке с вероятностью 30 %.
  *
  * В строках — подстановки: `{guests}`, `{ingredient.price}`, `{rounds.0.price}` берут
  * уже выбранное значение из этого же задания, а имена из [TaskEngines.facts] — числа,
@@ -36,7 +37,8 @@ object TaskGenerator {
     private val PLACEHOLDER = Regex("""\{([A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)*)\}""")
 
     /**
-     * Вариант без случайности: разброс — минимум, `oneOf` — первое, `pick` — первые.
+     * Вариант без случайности: разброс — минимум, `oneOf` — первое, `pick` — первые,
+     * `chance` — элемент есть.
      * Его показывают списки игр, и он же запасной, если случайные числа не сложились.
      * Ошибка в шаблоне — [IllegalArgumentException] с понятным текстом.
      */
@@ -77,18 +79,19 @@ object TaskGenerator {
 
     // ---------- Разброс ----------
 
-    private enum class Spread { RANGE, ONE_OF, PICK }
+    private enum class Spread { RANGE, ONE_OF, PICK, CHANCE }
 
     private fun spreadKind(o: JsonObject): Spread? = when (o.keys) {
         setOf("min", "max"), setOf("min", "max", "step") -> Spread.RANGE
         setOf("oneOf") -> Spread.ONE_OF
         setOf("pick", "from") -> Spread.PICK
+        setOf("chance", "value") -> Spread.CHANCE
         else -> null
     }
 
     private fun resolve(element: JsonElement, random: Random?): JsonElement = when (element) {
         is JsonPrimitive -> element
-        is JsonArray -> JsonArray(element.map { resolve(it, random) })
+        is JsonArray -> JsonArray(element.mapNotNull { resolveItem(it, random) })
         is JsonObject -> when (spreadKind(element)) {
             Spread.RANGE -> JsonPrimitive(range(element, random))
             Spread.ONE_OF -> {
@@ -103,8 +106,18 @@ object TaskGenerator {
                 val indices = random?.let { from.indices.shuffled(it).take(count).sorted() } ?: (0 until count)
                 JsonArray(indices.map { resolve(from[it], random) })
             }
+            Spread.CHANCE -> throw IllegalArgumentException("chance бывает только у элемента списка")
             null -> JsonObject(element.mapValues { (_, v) -> resolve(v, random) })
         }
+    }
+
+    /** Элемент списка; null — `chance` не выпал, элемента нет. */
+    private fun resolveItem(element: JsonElement, random: Random?): JsonElement? {
+        if (element !is JsonObject || spreadKind(element) != Spread.CHANCE) return resolve(element, random)
+        val chance = int(element, "chance")
+        require(chance in 0..100) { "chance должен быть от 0 до 100" }
+        val happens = random?.let { it.nextInt(100) < chance } ?: true
+        return if (happens) resolve(element.getValue("value"), random) else null
     }
 
     private fun range(o: JsonObject, random: Random?): Int {

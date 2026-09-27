@@ -88,12 +88,16 @@ data class LevelCheck(
 }
 
 sealed interface TaskResult {
-    /** Исход задания и числа для экрана объяснения. [reward] = 0, если награда уже выдавалась. */
+    /**
+     * Исход задания и числа для экрана объяснения. [reward] = 0, если награда уже выдавалась.
+     * [bonus] — часть [reward] за бонус движка, 0 — бонуса нет или он уже выдавался.
+     */
     data class Submitted(
         val state: GameState,
         val outcome: TaskOutcome,
         val details: TaskDetails,
         val reward: Int,
+        val bonus: Int = 0,
     ) : TaskResult
 
     /** Ввод не принят или задание недоступно. Состояние не изменилось. */
@@ -509,9 +513,11 @@ class Game(
             TaskOutcome.SUCCESS -> if (previous.none { it.outcome == TaskOutcome.SUCCESS }) rates.success else 0
             TaskOutcome.FAIL -> if (previous.isEmpty()) rates.fail else 0
         }
-        val attempt = TaskAttempt(state.currentPeriod.number, taskId, evaluation.outcome, reward, clock(), seed)
-        val ledger = if (reward > 0) {
-            state.ledger + income(state, EntryType.TASK_REWARD, reward).copy(taskId = taskId)
+        val bonusEarned = evaluation.outcome == TaskOutcome.SUCCESS && evaluation.bonus
+        val bonus = if (bonusEarned && previous.none { it.bonus }) rates.bonus else 0
+        val attempt = TaskAttempt(state.currentPeriod.number, taskId, evaluation.outcome, reward + bonus, clock(), seed, bonusEarned)
+        val ledger = if (reward + bonus > 0) {
+            state.ledger + income(state, EntryType.TASK_REWARD, reward + bonus).copy(taskId = taskId)
         } else {
             state.ledger
         }
@@ -519,7 +525,8 @@ class Game(
             state = state.copy(ledger = ledger, attempts = state.attempts + attempt),
             outcome = evaluation.outcome,
             details = evaluation.details,
-            reward = reward,
+            reward = reward + bonus,
+            bonus = bonus,
         )
     }
 

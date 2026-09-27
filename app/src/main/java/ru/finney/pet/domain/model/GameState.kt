@@ -111,6 +111,8 @@ data class TaskAttempt(
     val createdAt: Long,
     /** Зерно чисел игры ([ru.finney.pet.domain.tasks.TaskGenerator]); null — попытка до разброса в контенте. */
     val seed: Long? = null,
+    /** Движок засчитал бонус. Бонусная награда выдаётся за первую такую попытку. */
+    val bonus: Boolean = false,
 )
 
 /** Полное состояние одного профиля. Меняется только через [ru.finney.pet.domain.game.Game]. */

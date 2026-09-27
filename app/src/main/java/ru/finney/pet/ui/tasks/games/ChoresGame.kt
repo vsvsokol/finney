@@ -66,7 +66,8 @@ internal fun ChoresGame(task: ChoresTask, character: PetCharacter, onClose: () -
     val times = week.flatten().groupingBy { it }.eachCount()
     val freeToday = task.hoursPerDay - TaskEngines.dayHours(task, week[selected])
 
-    fun canAdd(chore: Chore) = chore.hours <= freeToday && (chore.maxTimes == null || (times[chore.id] ?: 0) < chore.maxTimes)
+    fun canAdd(chore: Chore) = TaskEngines.choreOpen(chore, selected) && chore.hours <= freeToday &&
+        (chore.maxTimes == null || (times[chore.id] ?: 0) < chore.maxTimes)
 
     GameScene(backdrop = Backdrop.ROOM, onClose = onClose) {
         SceneBody(
@@ -104,6 +105,7 @@ internal fun ChoresGame(task: ChoresTask, character: PetCharacter, onClose: () -
                         pair.forEach { chore ->
                             ChoreTile(
                                 chore = chore,
+                                fee = TaskEngines.choreFee(chore, selected),
                                 left = chore.maxTimes?.let { it - (times[chore.id] ?: 0) },
                                 enabled = canAdd(chore),
                                 modifier = Modifier.weight(1f),
@@ -245,7 +247,7 @@ private fun Clocks(count: Int) {
  * заменяет рисунок. «×2» — сколько раз ещё дают. Нажатие кладёт дело в выбранный день.
  */
 @Composable
-private fun ChoreTile(chore: Chore, left: Int?, enabled: Boolean, modifier: Modifier, onAdd: () -> Unit) {
+private fun ChoreTile(chore: Chore, fee: Int, left: Int?, enabled: Boolean, modifier: Modifier, onAdd: () -> Unit) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -257,7 +259,7 @@ private fun ChoreTile(chore: Chore, left: Int?, enabled: Boolean, modifier: Modi
             .clickable(enabled = enabled, role = Role.Button, onClickLabel = "Добавить в день", onClick = onAdd)
             .semantics(mergeDescendants = true) {
                 contentDescription = buildString {
-                    append("${chore.label}: ${chore.hours} ч., ${chore.reward} финок")
+                    append("${chore.label}: ${chore.hours} ч., $fee финок")
                     if (left != null) append(", осталось $left раз")
                 }
             }
@@ -268,7 +270,7 @@ private fun ChoreTile(chore: Chore, left: Int?, enabled: Boolean, modifier: Modi
         ItemPicture(chore, chore.label, 36.dp, fade)
         Column(fade.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                OutlinedText("+${chore.reward}", style = MaterialTheme.typography.titleMedium)
+                OutlinedText("+$fee", style = MaterialTheme.typography.titleMedium)
                 Coin(size = 18.dp)
             }
             Clocks(chore.hours)

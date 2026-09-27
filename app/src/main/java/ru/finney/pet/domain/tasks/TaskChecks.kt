@@ -117,22 +117,51 @@ object TaskChecks {
 
     private fun MutableList<String>.checkReserve(task: ReserveTask, at: String) {
         if (task.amount <= 0) add("$at — amount должен быть > 0")
-        if (task.surprise.price <= 0) add("$at — surprise.price должен быть > 0")
+        task.surprises.filter { it.price <= 0 }.forEach { add("$at — сюрприз «${it.label}»: price должен быть > 0") }
         duplicates(task.spendings.map { it.id }).forEach { add("$at — повторяется трата $it") }
         task.spendings.filter { it.price <= 0 }.forEach { add("$at — ${it.id}: цена должна быть > 0") }
         val needs = task.spendings.filter { it.category == Category.NEEDS }.sumOf { it.price }
-        if (task.amount - needs < task.surprise.price) {
-            add("$at — после нужного не остаётся запаса на «${task.surprise.label}»: игру не выиграть")
+        if (task.amount - needs < TaskEngines.surprisesTotal(task)) {
+            add("$at — после нужного не остаётся запаса на все сюрпризы: игру не выиграть")
         }
+        // Бонус — за желаемое, которое удалось сохранить: без желаемого его не получить.
+        if (task.spendings.none { it.category == Category.WANTS }) add("$at — нет ни одного желаемого")
     }
 
     private fun MutableList<String>.checkStand(task: StandTask, at: String) {
         val i = task.ingredient
-        if (task.budget <= 0 || i.price <= 0 || i.yields <= 0 || task.cupPrice <= 0 || task.guests <= 0) {
-            add("$at — budget, ingredient.price, ingredient.yields, cupPrice и guests должны быть > 0")
+        if (task.budget <= 0 || i.price <= 0 || i.yields <= 0 || task.cupPrice <= 0) {
+            add("$at — budget, ingredient.price, ingredient.yields и cupPrice должны быть > 0")
+            return
+        }
+        if (task.days.isNotEmpty()) return checkStandWeek(task, at)
+        if (task.guests <= 0) {
+            add("$at — guests должен быть > 0")
             return
         }
         if (TaskEngines.bestStock(task) * i.price > task.budget) add("$at — на всех гостей не хватает budget")
+    }
+
+    /** Лавка на несколько дней: порог достижим, если знать погоду, а «скупить всё» не выигрывает. */
+    private fun MutableList<String>.checkStandWeek(task: StandTask, at: String) {
+        val before = size
+        if (task.days.size > 5) add("$at — дней лавки не больше 5")
+        if (task.cupPrices.any { it <= 0 }) add("$at — цены стакана должны быть > 0")
+        if (task.guestsPerCoin < 0) add("$at — guestsPerCoin не может быть < 0")
+        if (task.freshDays < 1) add("$at — freshDays должен быть ≥ 1")
+        if (task.goalProfit <= 0) add("$at — goalProfit должен быть > 0")
+        task.days.flatMap { listOf(it.forecast, it.weather) }.distinct().filter { it !in task.demand }.forEach {
+            add("$at — в demand нет погоды ${it.name.lowercase()}")
+        }
+        if (size != before) return
+        if (TaskEngines.standBestProfit(task) < task.goalProfit) {
+            add("$at — прибыль ${task.goalProfit} не набрать, даже зная погоду заранее")
+            return
+        }
+        val buyAll = List(task.days.size) { StandChoice(task.budget / task.ingredient.price, task.cupPrice) }
+        if (TaskEngines.standDays(task, buyAll).last().money - task.budget >= task.goalProfit) {
+            add("$at — выигрывает «каждый день скупать лимоны на все деньги»")
+        }
     }
 
     private fun MutableList<String>.checkChange(task: ChangeTask, at: String) {
@@ -195,9 +224,42 @@ object TaskChecks {
         task.chores.filter { it.hours !in 1..task.hoursPerDay }.forEach { add("$at — ${it.id}: hours от 1 до ${task.hoursPerDay}") }
         task.chores.filter { it.reward <= 0 }.forEach { add("$at — ${it.id}: reward должен быть > 0") }
         task.chores.filter { (it.maxTimes ?: 1) <= 0 }.forEach { add("$at — ${it.id}: maxTimes должен быть > 0") }
+        task.chores.forEach { chore ->
+            chore.pay?.let { pay ->
+                if (pay.size != task.days) add("$at — ${chore.id}: в pay нужно ${task.days} чисел, по дню недели")
+                if (pay.any { it <= 0 }) add("$at — ${chore.id}: pay должен быть > 0")
+            }
+            chore.onDays?.let { days ->
+                if (days.isEmpty() || days.any { it !in 1..task.days }) add("$at — ${chore.id}: onDays — дни от 1 до ${task.days}")
+            }
+        }
+        if (task.tiredCut < 0 || task.varietyBonus < 0) add("$at — tiredCut и varietyBonus не могут быть < 0")
+        if (task.varietyBonus > 0 && task.varietyCount !in 2..task.chores.size) {
+            add("$at — varietyCount должен быть от 2 до ${task.chores.size}")
+        }
         // Перебор только по целым числам: с битыми он бессмыслен или долог.
-        if (size == before && TaskEngines.choresSolution(task) == null) {
+        if (size != before) return
+        if (TaskEngines.choresSolution(task) == null) {
             add("$at — цель не набрать, даже если работать во все дни, кроме отдыха")
+        } else if (task.tiredCut > 0 && TaskEngines.choresEarned(task, sameChoreWeek(task)) >= task.goal.price) {
+            add("$at — выигрывает «самое выгодное дело каждый день»: усталость или цель слишком малы")
+        }
+    }
+
+    /**
+     * Заученная схема: в каждый рабочий день — самое выгодное из доступных дел, сколько
+     * влезет, отдых — в конце. С усталостью она не должна выигрывать.
+     */
+    private fun sameChoreWeek(task: ChoresTask): List<List<String>> {
+        val used = mutableMapOf<String, Int>()
+        return List(task.days) { d ->
+            if (d >= task.days - task.minRestDays) return@List emptyList()
+            val chore = task.chores
+                .filter { TaskEngines.choreOpen(it, d) && (used[it.id] ?: 0) < (it.maxTimes ?: Int.MAX_VALUE) }
+                .maxWithOrNull(compareBy({ TaskEngines.choreFee(it, d).toDouble() / it.hours }, { it.hours })) ?: return@List emptyList()
+            val times = minOf(task.hoursPerDay / chore.hours, (chore.maxTimes ?: Int.MAX_VALUE) - (used[chore.id] ?: 0))
+            used[chore.id] = (used[chore.id] ?: 0) + times
+            List(times) { chore.id }
         }
     }
 

@@ -214,29 +214,57 @@ class MiniGamesTest {
             Spending("stickers", "", 10, Category.WANTS),
             Spending("icecream", "", 5, Category.WANTS),
         ),
-        surprise = Surprise("Зонт", "", 15),
+        surprises = listOf(Surprise("Зонт", "", 10), Surprise("Рюкзак", "", 5)),
     )
 
     @Test
-    fun `reserve — хватило запаса — успех, пришлось переносить — неудача`() {
+    fun `reserve — нужное закрыто — успех, желаемое осталось — бонус`() {
         assertEquals(
-            TaskEvaluation.Done(TaskOutcome.SUCCESS, TaskDetails.Reserve(reserve = 20, shortage = 0)),
+            TaskEvaluation.Done(
+                TaskOutcome.SUCCESS,
+                TaskDetails.Reserve(reserve = 20, shortage = 0, surprises = 15, keptWants = 1, left = 5),
+                bonus = true,
+            ),
             TaskEngines.evaluate(rainy, TaskInput.Reserve(setOf("food", "soap", "ball"), emptySet())),
         )
+        // Перенесли желаемое — нужное цело, успех, но без бонуса.
         assertEquals(
-            TaskEvaluation.Done(TaskOutcome.FAIL, TaskDetails.Reserve(reserve = 5, shortage = 10)),
+            TaskEvaluation.Done(
+                TaskOutcome.SUCCESS,
+                TaskDetails.Reserve(reserve = 5, shortage = 10, surprises = 15, keptWants = 0, left = 15),
+                bonus = false,
+            ),
             TaskEngines.evaluate(
                 rainy,
-                TaskInput.Reserve(setOf("food", "soap", "ball", "stickers", "icecream"), setOf("ball")),
+                TaskInput.Reserve(setOf("food", "soap", "ball", "stickers", "icecream"), setOf("ball", "stickers", "icecream")),
             ),
         )
     }
 
     @Test
-    fun `reserve — нужное нельзя убрать или перенести, непредвиденное должно быть покрыто`() {
+    fun `reserve — мало запаса — приходится переносить нужное, и это неудача`() {
+        val all = setOf("food", "soap", "ball", "stickers", "icecream")
+        assertEquals(
+            TaskEvaluation.Done(
+                TaskOutcome.FAIL,
+                TaskDetails.Reserve(reserve = 5, shortage = 10, surprises = 15, droppedNeeds = 1, keptWants = 3, left = 0),
+            ),
+            TaskEngines.evaluate(rainy, TaskInput.Reserve(all, setOf("soap"))),
+        )
+    }
+
+    @Test
+    fun `reserve — без сюрпризов весь запас остаётся на потом`() {
+        val calm = rainy.copy(surprises = emptyList())
+        val done = TaskEngines.evaluate(calm, TaskInput.Reserve(setOf("food", "soap"), emptySet())) as TaskEvaluation.Done
+        assertEquals(30, (done.details as TaskDetails.Reserve).left)
+        assertEquals(TaskOutcome.SUCCESS, done.outcome)
+    }
+
+    @Test
+    fun `reserve — нужное нельзя убрать из плана, непредвиденное должно быть покрыто`() {
         val all = setOf("food", "soap", "ball", "stickers", "icecream")
         assertEquals(TaskInputError.NeedsNotPlanned("soap"), TaskEngines.evaluate(rainy, TaskInput.Reserve(setOf("food"), emptySet())).error())
-        assertEquals(TaskInputError.NeedsLocked("food"), TaskEngines.evaluate(rainy, TaskInput.Reserve(all, setOf("food"))).error())
         assertEquals(TaskInputError.NotPlanned("ball"), TaskEngines.evaluate(rainy, TaskInput.Reserve(setOf("food", "soap"), setOf("ball"))).error())
         assertEquals(TaskInputError.SurpriseNotCovered(5), TaskEngines.evaluate(rainy, TaskInput.Reserve(all, setOf("icecream"))).error())
     }
@@ -437,15 +465,63 @@ class MiniGamesTest {
     }
 
     @Test
-    fun `chores — решатель находит самую выгодную неделя с отдыхом в конце или null`() {
+    fun `chores — решатель находит самую выгодную неделю с отдыхом или null`() {
         val plan = TaskEngines.choresSolution(week)!!
         assertEquals(5, plan.size)
-        assertEquals(rest, plan.last())
+        assertEquals(1, plan.count { it.isEmpty() })
         // Собаку дают дважды: 25 + 25 и ещё два дня посуды по 20 — больше не заработать.
         assertEquals(90, TaskEngines.choresEarned(week, plan))
         assertEquals(TaskOutcome.SUCCESS, TaskEngines.evaluate(week, TaskInput.Schedule(plan)).outcome())
 
         assertEquals(null, TaskEngines.choresSolution(week.copy(goal = RaceGoal("Мяч", 95))))
+    }
+
+    /** Собака платит больше в последние дни, соседке помогают только во 2-й и 4-й, усталость 10, бонус 10 за 3 дела. */
+    private val tired = week.copy(
+        goal = RaceGoal("Конструктор", 90),
+        tiredCut = 10,
+        varietyBonus = 10,
+        chores = listOf(
+            Chore("flowers", "", hours = 1, reward = 5),
+            Chore("dishes", "", hours = 1, reward = 10),
+            Chore("dog", "", hours = 2, reward = 20, pay = listOf(20, 20, 20, 30, 30)),
+            Chore("neighbor", "", hours = 1, reward = 15, maxTimes = 1, onDays = listOf(2, 4)),
+        ),
+    )
+
+    @Test
+    fun `chores — оплата по дням, усталость за то же дело подряд и бонус за разные дела`() {
+        val pay = TaskEngines.choresPay(tired, listOf(listOf("dog"), listOf("dog"), listOf("dishes", "flowers"), listOf("dog"), rest))
+        // 20 + 20 + 15 + 30 = 85, собака во второй день подряд — минус 10, три разных дела — плюс 10.
+        assertEquals(TaskEngines.ChoresPay(fees = 85, tiredLoss = 10, bonus = 10), pay)
+        assertEquals(85, pay.total)
+        assertEquals(30, TaskEngines.choreFee(tired.chores[2], 4))
+        // Усталость не уводит оплату в минус: второй день цветов — 0, а не −95.
+        assertEquals(
+            TaskEngines.ChoresPay(fees = 10, tiredLoss = 5, bonus = 0),
+            TaskEngines.choresPay(tired.copy(tiredCut = 100), listOf(listOf("flowers"), listOf("flowers"), rest, rest, rest)),
+        )
+    }
+
+    @Test
+    fun `chores — дело не в свой день — ошибка ввода, итог с усталостью и бонусом`() {
+        assertEquals(TaskInputError.ChoreNotToday("neighbor", 0), weekOf(tired, listOf("neighbor"), rest, rest, rest, rest).error())
+        val done = weekOf(tired, listOf("dog"), listOf("neighbor", "dishes"), listOf("dog"), listOf("dishes", "flowers"), rest) as TaskEvaluation.Done
+        // 20 + 25 + 20 + 15 = 80, одинаковых дел подряд нет; разных дел четыре — бонус 10.
+        assertEquals(TaskDetails.Chores(earned = 90, shortfall = 0, restDays = 1, tiredLoss = 0, bonus = 10), done.details)
+        assertEquals(TaskOutcome.SUCCESS, done.outcome)
+    }
+
+    @Test
+    fun `chores — решатель учитывает усталость, а «собака каждый день» не выигрывает`() {
+        val plan = TaskEngines.choresSolution(tired)!!
+        assertTrue(TaskEngines.choresEarned(tired, plan) >= tired.goal.price)
+        val dogEveryDay = listOf(listOf("dog"), listOf("dog"), listOf("dog"), listOf("dog"), rest)
+        assertTrue(TaskEngines.choresEarned(tired, dogEveryDay) < tired.goal.price)
+        assertEquals(emptyList<String>(), ContentValidator.validate(Fixtures.content.copy(tasks = listOf(tired))))
+        // Без усталости та же схема выигрывает — валидатор это ловит.
+        val easy = tired.copy(tiredCut = 5, goal = RaceGoal("Мяч", 80))
+        assertTrue(ContentValidator.validate(Fixtures.content.copy(tasks = listOf(easy))).single().contains("самое выгодное дело"))
     }
 
     @Test

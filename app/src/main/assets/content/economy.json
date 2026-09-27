@@ -1,6 +1,6 @@
 {
   "incomeByStage": [50, 55, 60, 65, 70, 70],
-  "taskReward": { "success": 15, "fail": 5 },
+  "taskReward": { "success": 15, "fail": 5, "bonus": 5 },
   "parentBonus": { "step": 5, "maxPerPeriod": 20 },
   "planTolerance": 5,
   "planDirections": 3,

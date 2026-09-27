@@ -21,6 +21,10 @@ import ru.finney.pet.domain.model.SorterTask
 import ru.finney.pet.domain.model.StandTask
 import ru.finney.pet.domain.model.TaskDefinition
 import ru.finney.pet.domain.model.TaskOutcome
+import ru.finney.pet.domain.model.Weather
+
+/** Утро лавки: сколько сырья купить и почём продавать стакан. */
+data class StandChoice(val buy: Int, val price: Int)
 
 sealed interface TaskInput {
     /** distributor: сумма по id корзины. Отсутствующая корзина = 0. */
@@ -43,6 +47,9 @@ sealed interface TaskInput {
 
     /** stand: сколько штук сырья закуплено. */
     data class Stock(val count: Int) : TaskInput
+
+    /** stand на несколько дней: утренние решения по порядку дней. */
+    data class StandDays(val days: List<StandChoice>) : TaskInput
 
     /** change: монеты каждого раунда с первой попытки, по порядку раундов. */
     data class Coins(val rounds: List<List<Int>>) : TaskInput
@@ -81,9 +88,6 @@ sealed interface TaskInputError {
     /** reserve: нужное нельзя убрать из плана. */
     data class NeedsNotPlanned(val id: String) : TaskInputError
 
-    /** reserve: нужное нельзя перенести ради непредвиденной траты. */
-    data class NeedsLocked(val id: String) : TaskInputError
-
     /** reserve: перенести можно только то, что было в плане. */
     data class NotPlanned(val id: String) : TaskInputError
 
@@ -101,6 +105,12 @@ sealed interface TaskInputError {
 
     /** chores: дело [id] взято больше [max] раз за неделю. */
     data class ChoreTooOften(val id: String, val max: Int) : TaskInputError
+
+    /** stand: такой цены стакана в игре нет. */
+    data class PriceNotOffered(val price: Int) : TaskInputError
+
+    /** chores: дело [id] в день [day] (с 0) не дают. */
+    data class ChoreNotToday(val id: String, val day: Int) : TaskInputError
 }
 
 /** Числа для объяснения исхода. */
@@ -119,8 +129,20 @@ sealed interface TaskDetails {
      */
     data class GoalRace(val saved: Int, val shortfall: Int, val eventsTaken: Int, val mood: Int) : TaskDetails
 
-    /** [reserve] — запас после плана; [shortage] — сколько не хватило запаса на непредвиденное. */
-    data class Reserve(val reserve: Int, val shortage: Int) : TaskDetails
+    /**
+     * [reserve] — запас после плана; [surprises] — сколько стоило непредвиденное;
+     * [shortage] — сколько не хватило запаса; [droppedNeeds] — перенесено нужного (тогда
+     * игра не пройдена); [keptWants] — желаемого осталось в плане (за это бонус);
+     * [left] — сколько запаса осталось на потом.
+     */
+    data class Reserve(
+        val reserve: Int,
+        val shortage: Int,
+        val surprises: Int = 0,
+        val droppedNeeds: Int = 0,
+        val keptWants: Int = 0,
+        val left: Int = 0,
+    ) : TaskDetails
 
     /**
      * Итог дня лавки. [leftover] — непроданные стаканы, [missed] — гости, которым не хватило.
@@ -138,6 +160,12 @@ sealed interface TaskDetails {
         val kept: Int get() = earned - spent
     }
 
+    /**
+     * Лавка на несколько дней: итог каждого прошедшего дня, [profit] — сколько денег стало
+     * больше, чем на старте, [goal] — сколько нужно для победы.
+     */
+    data class StandWeek(val days: List<StandDayResult>, val profit: Int, val goal: Int) : TaskDetails
+
     /** [results] — по раунду: положено минус нужно. 0 — верно, > 0 — лишнее, < 0 — не хватает. */
     data class Change(val correct: Int, val total: Int, val results: List<Int>) : TaskDetails
 
@@ -147,15 +175,46 @@ sealed interface TaskDetails {
      */
     data class Receipt(val found: Int, val missed: Int, val extra: Int, val refund: Int, val lost: Int) : TaskDetails
 
-    /** [restDays] — пустых дней недели. */
-    data class Chores(val earned: Int, val shortfall: Int, val restDays: Int) : TaskDetails
+    /**
+     * [restDays] — пустых дней недели. [earned] — уже за вычетом усталости [tiredLoss] и с
+     * бонусом за разные дела [bonus].
+     */
+    data class Chores(
+        val earned: Int,
+        val shortfall: Int,
+        val restDays: Int,
+        val tiredLoss: Int = 0,
+        val bonus: Int = 0,
+    ) : TaskDetails
 }
+
+/**
+ * День лавки. [guests] — сколько пришло по настоящей погоде и цене. [used] — сколько сырья
+ * выжато (сначала старое), [sold] — стаканов продано. [stockLeft] — сырьё на завтра,
+ * [spoiled] — испортилось вечером. [money] — деньги в конце дня.
+ */
+data class StandDayResult(
+    val forecast: Weather,
+    val weather: Weather,
+    val price: Int,
+    val guests: Int,
+    val bought: Int,
+    val used: Int,
+    val sold: Int,
+    val missed: Int,
+    val earned: Int,
+    val spent: Int,
+    val stockLeft: Int,
+    val spoiled: Int,
+    val money: Int,
+)
 
 /** Ошибки кассира: строки чека, которые нужно отметить, и сколько сдачи недодали. */
 data class ReceiptErrors(val lines: Set<String>, val changeShort: Int)
 
 sealed interface TaskEvaluation {
-    data class Done(val outcome: TaskOutcome, val details: TaskDetails) : TaskEvaluation
+    /** [bonus] — успех с бонусом: к награде добавляется [ru.finney.pet.domain.model.TaskReward.bonus]. */
+    data class Done(val outcome: TaskOutcome, val details: TaskDetails, val bonus: Boolean = false) : TaskEvaluation
     data class Invalid(val error: TaskInputError) : TaskEvaluation
 }
 
@@ -169,7 +228,8 @@ object TaskEngines {
         task is SorterTask && input is TaskInput.Sorting -> sort(task, input)
         task is GoalRaceTask && input is TaskInput.DailyDeposits -> race(task, input)
         task is ReserveTask && input is TaskInput.Reserve -> reserve(task, input)
-        task is StandTask && input is TaskInput.Stock -> stand(task, input)
+        task is StandTask && input is TaskInput.Stock && task.days.isEmpty() -> stand(task, input)
+        task is StandTask && input is TaskInput.StandDays && task.days.isNotEmpty() -> standWeek(task, input)
         task is ChangeTask && input is TaskInput.Coins -> change(task, input)
         task is ReceiptTask && input is TaskInput.Flags -> receipt(task, input)
         task is ChoresTask && input is TaskInput.Schedule -> chores(task, input)
@@ -238,6 +298,70 @@ object TaskEngines {
             )
         }
         else -> emptyMap()
+    }
+
+    /** Сколько гостей придёт в погоду [weather], если стакан стоит [price]. */
+    fun standGuests(task: StandTask, weather: Weather, price: Int): Int =
+        maxOf(0, (task.demand[weather] ?: 0) + (task.cupPrice - price) * task.guestsPerCoin)
+
+    /**
+     * Итоги дней лавки по утренним решениям [choices] — столько дней, сколько решений.
+     * Экран зовёт после каждого дня, чтобы показать вечер: погода объявляется после выбора.
+     * Решения не проверяет — это делает оценка; сырья больше, чем по деньгам, не купить.
+     */
+    fun standDays(task: StandTask, choices: List<StandChoice>): List<StandDayResult> {
+        var money = task.budget
+        // Партии сырья: день покупки → сколько осталось. Выжимается сначала старое.
+        val batches = sortedMapOf<Int, Int>()
+        return choices.take(task.days.size).mapIndexed { d, choice ->
+            val day = task.days[d]
+            val bought = choice.buy.coerceIn(0, money / task.ingredient.price)
+            val spent = bought * task.ingredient.price
+            if (bought > 0) batches[d] = bought
+            val guests = standGuests(task, day.weather, choice.price)
+            var need = (guests + task.ingredient.yields - 1) / task.ingredient.yields
+            var used = 0
+            for (key in batches.keys.toList()) {
+                val take = minOf(need, batches.getValue(key))
+                batches[key] = batches.getValue(key) - take
+                need -= take
+                used += take
+            }
+            val sold = minOf(guests, used * task.ingredient.yields)
+            val spoiled = batches.filterKeys { it <= d - task.freshDays + 1 }.values.sum()
+            batches.keys.removeAll { it <= d - task.freshDays + 1 || batches[it] == 0 }
+            val earned = sold * choice.price
+            money += earned - spent
+            StandDayResult(
+                forecast = day.forecast,
+                weather = day.weather,
+                price = choice.price,
+                guests = guests,
+                bought = bought,
+                used = used,
+                sold = sold,
+                missed = guests - sold,
+                earned = earned,
+                spent = spent,
+                stockLeft = batches.values.sum(),
+                spoiled = spoiled,
+                money = money,
+            )
+        }
+    }
+
+    /** Сколько можно заработать, если знать погоду заранее: для проверки, что порог достижим. */
+    fun standBestProfit(task: StandTask): Int {
+        val maxGuests = task.days.maxOf { day -> task.cupPrices.maxOf { standGuests(task, day.weather, it) } }
+        val maxBuy = (maxGuests + task.ingredient.yields - 1) / task.ingredient.yields + 1
+        val options = (0..maxBuy).flatMap { buy -> task.cupPrices.map { StandChoice(buy, it) } }
+        fun best(prefix: List<StandChoice>): Int =
+            if (prefix.size == task.days.size) {
+                standDays(task, prefix).last().money - task.budget
+            } else {
+                options.maxOf { best(prefix + it) }
+            }
+        return best(emptyList())
     }
 
     /** Позволил ли себе соблазн дня: после взноса на него хватает. */
@@ -314,36 +438,78 @@ object TaskEngines {
         return ids.sumOf { byId[it]?.hours ?: 0 }
     }
 
-    /** Сколько заработано за неделю. */
-    fun choresEarned(task: ChoresTask, days: List<List<String>>): Int {
-        val byId = task.chores.associateBy { it.id }
-        return days.flatten().sumOf { byId[it]?.reward ?: 0 }
+    /** Оплата дела в день [day] (с 0) — без усталости. */
+    fun choreFee(chore: Chore, day: Int): Int = chore.pay?.getOrNull(day) ?: chore.reward
+
+    /** Дают ли дело в день [day] (с 0). */
+    fun choreOpen(chore: Chore, day: Int): Boolean = chore.onDays?.contains(day + 1) ?: true
+
+    /** Заработок недели по частям: [fees] — оплата дел, [tiredLoss] — минус усталость, [bonus] — за разные дела. */
+    data class ChoresPay(val fees: Int, val tiredLoss: Int, val bonus: Int) {
+        val total: Int get() = fees - tiredLoss + bonus
     }
 
+    /** Разбор заработка недели. Неизвестные id не считаются. */
+    fun choresPay(task: ChoresTask, days: List<List<String>>): ChoresPay {
+        val byId = task.chores.associateBy { it.id }
+        var fees = 0
+        var tired = 0
+        days.forEachIndexed { d, ids ->
+            val yesterday = days.getOrNull(d - 1).orEmpty().toSet()
+            ids.mapNotNull(byId::get).forEach { chore ->
+                val fee = choreFee(chore, d)
+                fees += fee
+                if (chore.id in yesterday) tired += minOf(fee, task.tiredCut)
+            }
+        }
+        val distinct = days.flatten().filter { it in byId }.toSet().size
+        return ChoresPay(fees, tired, varietyBonus(task, distinct))
+    }
+
+    private fun varietyBonus(task: ChoresTask, distinct: Int): Int =
+        if (task.varietyBonus > 0 && distinct >= task.varietyCount) task.varietyBonus else 0
+
+    /** Сколько заработано за неделю: с усталостью и бонусом. */
+    fun choresEarned(task: ChoresTask, days: List<List<String>>): Int = choresPay(task, days).total
+
     /**
-     * Неделя с самым большим заработком: сначала рабочие дни, в конце [ChoresTask.minRestDays]
-     * отдыха. null — даже так цель не набрать. Перебор наборов дел на день; состояние —
-     * сколько раз уже взяты дела с [Chore.maxTimes].
+     * Неделя с самым большим заработком, в которой не меньше [ChoresTask.minRestDays] дней
+     * отдыха. null — даже так цель не набрать. Перебор по дням: состояние — сколько раз взяты
+     * дела с [Chore.maxTimes], какие дела были вчера (усталость), какие были за неделю (бонус)
+     * и сколько уже дней отдыха.
      */
     fun choresSolution(task: ChoresTask): List<List<String>>? {
-        val workDays = task.days - task.minRestDays
-        if (workDays < 0) return null
+        if (task.minRestDays > task.days) return null
+        data class State(val used: List<Int>, val yesterday: Set<String>, val seen: Set<String>, val rest: Int)
         val limited = task.chores.filter { it.maxTimes != null }
-        val packs = dayPacks(task.chores, task.hoursPerDay)
-        var best = mapOf(List(limited.size) { 0 } to (0 to emptyList<List<String>>()))
-        repeat(workDays) {
-            val next = mutableMapOf<List<Int>, Pair<Int, List<List<String>>>>()
-            for ((used, value) in best) for (pack in packs) {
-                val after = limited.mapIndexed { i, chore -> used[i] + pack.count { it == chore } }
-                if (limited.indices.any { after[it] > limited[it].maxTimes!! }) continue
-                val earned = value.first + pack.sumOf { it.reward }
-                if (earned > (next[after]?.first ?: -1)) next[after] = earned to value.second + listOf(pack.map { it.id })
+        var best = mapOf(State(List(limited.size) { 0 }, emptySet(), emptySet(), 0) to (0 to emptyList<List<String>>()))
+        for (d in 0 until task.days) {
+            val packs = dayPacks(task.chores.filter { choreOpen(it, d) }, task.hoursPerDay)
+            val next = mutableMapOf<State, Pair<Int, List<List<String>>>>()
+            for ((state, value) in best) for (pack in packs) {
+                val used = limited.mapIndexed { i, chore -> state.used[i] + pack.count { it == chore } }
+                if (limited.indices.any { used[it] > limited[it].maxTimes!! }) continue
+                val earned = value.first + pack.sumOf { chore ->
+                    val fee = choreFee(chore, d)
+                    fee - if (chore.id in state.yesterday) minOf(fee, task.tiredCut) else 0
+                }
+                val ids = pack.map { it.id }
+                val after = State(
+                    used = used,
+                    yesterday = ids.toSet(),
+                    seen = state.seen + ids,
+                    rest = minOf(task.minRestDays, state.rest + if (pack.isEmpty()) 1 else 0),
+                )
+                if (earned > (next[after]?.first ?: -1)) next[after] = earned to value.second + listOf(ids)
             }
             best = next
         }
-        val (earned, week) = best.values.maxByOrNull { it.first } ?: return null
+        val (earned, week) = best
+            .filterKeys { it.rest >= task.minRestDays }
+            .map { (state, value) -> value.first + varietyBonus(task, state.seen.size) to value.second }
+            .maxByOrNull { it.first } ?: return null
         if (earned < task.goal.price) return null
-        return week + List(task.minRestDays) { emptyList() }
+        return week
     }
 
     /** Все наборы дел, которые помещаются в один день, включая пустой. */
@@ -356,6 +522,9 @@ object TaskEngines {
         }
         return from(0, hours)
     }
+
+    /** Сколько стоит всё непредвиденное недели. */
+    fun surprisesTotal(task: ReserveTask): Int = task.surprises.sumOf { it.price }
 
     /** Запас после плана: сумма минус всё запланированное. */
     fun reserveLeft(task: ReserveTask, planned: Set<String>): Int =
@@ -455,14 +624,26 @@ object TaskEngines {
         input.dropped.firstOrNull { it !in input.planned }?.let {
             return TaskEvaluation.Invalid(TaskInputError.NotPlanned(it))
         }
-        input.dropped.firstOrNull { byId.getValue(it).category == Category.NEEDS }?.let {
-            return TaskEvaluation.Invalid(TaskInputError.NeedsLocked(it))
-        }
 
-        val shortage = maxOf(0, task.surprise.price - reserve)
+        val total = surprisesTotal(task)
+        val shortage = maxOf(0, total - reserve)
         val freed = input.dropped.sumOf { byId.getValue(it).price }
         if (freed < shortage) return TaskEvaluation.Invalid(TaskInputError.SurpriseNotCovered(shortage - freed))
-        return TaskEvaluation.Done(outcome(shortage == 0), TaskDetails.Reserve(reserve = reserve, shortage = shortage))
+        val droppedNeeds = input.dropped.count { byId.getValue(it).category == Category.NEEDS }
+        val keptWants = (input.planned - input.dropped).count { byId.getValue(it).category == Category.WANTS }
+        val success = droppedNeeds == 0
+        return TaskEvaluation.Done(
+            outcome(success),
+            TaskDetails.Reserve(
+                reserve = reserve,
+                shortage = shortage,
+                surprises = total,
+                droppedNeeds = droppedNeeds,
+                keptWants = keptWants,
+                left = reserve + freed - total,
+            ),
+            bonus = success && keptWants > 0,
+        )
     }
 
     private fun stand(task: StandTask, input: TaskInput.Stock): TaskEvaluation {
@@ -471,6 +652,24 @@ object TaskEngines {
         if (cost > task.budget) return TaskEvaluation.Invalid(TaskInputError.OverLimit(cost, task.budget))
         val day = standDay(task, input.count)
         return TaskEvaluation.Done(outcome(input.count == day.best), day)
+    }
+
+    private fun standWeek(task: StandTask, input: TaskInput.StandDays): TaskEvaluation {
+        if (input.days.size != task.days.size) return TaskEvaluation.Invalid(TaskInputError.WrongCount(task.days.size))
+        if (input.days.any { it.buy < 0 }) return TaskEvaluation.Invalid(TaskInputError.NegativeAmount)
+        input.days.firstOrNull { it.price !in task.cupPrices }?.let {
+            return TaskEvaluation.Invalid(TaskInputError.PriceNotOffered(it.price))
+        }
+        // Купить больше, чем есть денег к утру, нельзя: проверка по дням, как в магазине.
+        var money = task.budget
+        input.days.forEachIndexed { d, choice ->
+            val cost = choice.buy * task.ingredient.price
+            if (cost > money) return TaskEvaluation.Invalid(TaskInputError.OverLimit(cost, money))
+            money = standDays(task, input.days.take(d + 1)).last().money
+        }
+        val days = standDays(task, input.days)
+        val profit = days.last().money - task.budget
+        return TaskEvaluation.Done(outcome(profit >= task.goalProfit), TaskDetails.StandWeek(days, profit, task.goalProfit))
     }
 
     private fun change(task: ChangeTask, input: TaskInput.Coins): TaskEvaluation {
@@ -540,11 +739,22 @@ object TaskEngines {
         task.chores.firstOrNull { chore -> chore.maxTimes != null && (times[chore.id] ?: 0) > chore.maxTimes }?.let {
             return TaskEvaluation.Invalid(TaskInputError.ChoreTooOften(it.id, it.maxTimes!!))
         }
-        val earned = choresEarned(task, input.days)
+        input.days.forEachIndexed { d, ids ->
+            ids.firstOrNull { !choreOpen(byId.getValue(it), d) }?.let {
+                return TaskEvaluation.Invalid(TaskInputError.ChoreNotToday(it, d))
+            }
+        }
+        val pay = choresPay(task, input.days)
         val rest = input.days.count { it.isEmpty() }
         return TaskEvaluation.Done(
-            outcome(earned >= task.goal.price && rest >= task.minRestDays),
-            TaskDetails.Chores(earned = earned, shortfall = maxOf(0, task.goal.price - earned), restDays = rest),
+            outcome(pay.total >= task.goal.price && rest >= task.minRestDays),
+            TaskDetails.Chores(
+                earned = pay.total,
+                shortfall = maxOf(0, task.goal.price - pay.total),
+                restDays = rest,
+                tiredLoss = pay.tiredLoss,
+                bonus = pay.bonus,
+            ),
         )
     }
 

@@ -93,7 +93,7 @@ fun taskIcon(task: TaskDefinition): ItemArt? = when (task) {
     is SorterTask -> task.items.firstOrNull()
     is BasketTask -> task.shelf.firstOrNull()
     is GoalRaceTask -> task.goal
-    is ReserveTask -> task.surprise
+    is ReserveTask -> task.surprises.firstOrNull() ?: task.spendings.firstOrNull()
     is StandTask -> task.ingredient
     is ChangeTask -> task.rounds.firstOrNull()
     is ReceiptTask -> task.cart.firstOrNull()
@@ -153,10 +153,12 @@ fun ColumnScope.ResultBody(task: TaskDefinition, details: TaskDetails, input: Ta
         is TaskDetails.Reserve -> {
             val reserve = task as? ReserveTask
             SumRow("Запас был", details.reserve.toString(), strong = true)
-            reserve?.let { SumRow(it.surprise.label, it.surprise.price.toString()) }
+            reserve?.surprises?.forEach { SumRow(it.label, it.price.toString()) }
             val dropped = (input as? TaskInput.Reserve)?.dropped.orEmpty()
             reserve?.spendings?.filter { it.id in dropped }?.forEach { ResultRow(it, "${it.label} — перенесли", ok = false) }
             ResultRow(null, if (details.shortage == 0) "Запаса хватило" else "Не хватило ${details.shortage}", ok = details.shortage == 0)
+            if (details.droppedNeeds > 0) ResultRow(null, "Пришлось перенести нужное", ok = false)
+            if (details.left > 0) SumRow("Осталось на потом", details.left.toString())
         }
 
         is TaskDetails.Stand -> {
@@ -170,6 +172,15 @@ fun ColumnScope.ResultBody(task: TaskDefinition, details: TaskDetails, input: Ta
                 details.missed.takeIf { it > 0 }?.let { "${plural(it, "гостю", "гостям", "гостям")} не хватило." },
             )
             if (notes.isNotEmpty()) Summary(notes.joinToString(" ") + " На всех гостей хватило бы: ${stand?.ingredient?.label?.lowercase().orEmpty()} × ${details.best}.")
+        }
+
+        // Лавка на несколько дней: по строке на день, итог — прибыль против цели.
+        // Экран дней ещё не сделан, см. docs/minigames.md, «Лавка на несколько дней».
+        is TaskDetails.StandWeek -> {
+            details.days.forEachIndexed { d, day ->
+                SumRow("День ${d + 1}: продал ${day.sold}, испортилось ${day.spoiled}", "${day.earned - day.spent}")
+            }
+            ResultRow(null, "Прибыль ${details.profit}, нужно ${details.goal}", ok = details.profit >= details.goal)
         }
 
         is TaskDetails.Change -> {
@@ -206,6 +217,8 @@ fun ColumnScope.ResultBody(task: TaskDefinition, details: TaskDetails, input: Ta
                     }
                 }
                 ResultRow(null, "Дней отдыха: ${details.restDays}, нужно ${it.minRestDays}", ok = details.restDays >= it.minRestDays)
+                if (details.tiredLoss > 0) SumRow("Устал — заплатили меньше", "−${details.tiredLoss}")
+                if (details.bonus > 0) SumRow("Бонус за разные дела", "+${details.bonus}")
             }
             if (details.shortfall > 0) Summary("Не хватило ${details.shortfall}")
         }

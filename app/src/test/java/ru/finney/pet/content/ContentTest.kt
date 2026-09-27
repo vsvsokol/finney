@@ -110,10 +110,10 @@ class ContentTest {
 
     /** Входы для успешного и неудачного прохождения. «Конвейер» и «Касса» — в тесте ниже, по самому контенту. */
     private val cases: Map<String, Pair<TaskInput, TaskInput>> = mapOf(
-        "game_shopping" to (TaskInput.Basket(setOf("apple5", "soap", "milk")) to TaskInput.Basket(setOf("apple2", "soap"))),
+        "game_shopping" to (TaskInput.Basket(setOf("apple5", "soap")) to TaskInput.Basket(setOf("apple2", "soap"))),
         "game_race" to (TaskInput.DailyDeposits(listOf(10, 10, 5, 5, 10, 10)) to TaskInput.DailyDeposits(listOf(5, 5, 5, 5, 5, 5))),
         "game_rainy" to (TaskInput.Reserve(setOf("food", "soap", "icecream"), emptySet()) to
-            TaskInput.Reserve(setOf("food", "soap", "ball", "stickers", "icecream"), setOf("ball"))),
+            TaskInput.Reserve(setOf("food", "soap", "ball", "stickers", "icecream"), setOf("soap", "ball"))),
         "game_lemonade" to (TaskInput.Stock(3) to TaskInput.Stock(6)),
     )
 
@@ -182,11 +182,11 @@ class ContentTest {
         is GoalRaceTask -> TaskInput.DailyDeposits(TaskEngines.raceSolution(task)!!) to TaskInput.DailyDeposits(List(task.days) { task.incomePerDay })
         is ReserveTask -> {
             val needs = task.spendings.filter { it.category == Category.NEEDS }.map { it.id }.toSet()
-            // Неудача: все желаемые, какие влезают, без запаса; ради сюрприза переносим самые дорогие.
+            // Неудача: все желаемые, какие влезают, без запаса; на сюрпризы приходится переносить нужное.
             val planned = task.spendings.filter { it.category == Category.WANTS }.sortedBy { it.price }
                 .fold(needs) { acc, s -> if (TaskEngines.reserveLeft(task, acc + s.id) >= 0) acc + s.id else acc }
-            val shortage = task.surprise.price - TaskEngines.reserveLeft(task, planned)
-            val dropped = task.spendings.filter { it.id in planned && it.category == Category.WANTS }.sortedByDescending { it.price }
+            val shortage = TaskEngines.surprisesTotal(task) - TaskEngines.reserveLeft(task, planned)
+            val dropped = task.spendings.filter { it.id in planned }.sortedWith(compareBy({ it.category != Category.NEEDS }, { -it.price }))
                 .fold(emptyList<String>()) { acc, s -> if (acc.sumOf { id -> task.spendings.first { it.id == id }.price } >= shortage) acc else acc + s.id }
             TaskInput.Reserve(needs, emptySet()) to TaskInput.Reserve(planned, dropped.toSet())
         }
