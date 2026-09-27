@@ -59,6 +59,8 @@ fun SettingsScreen(
         music = settings.music,
         onSound = sounds::setSound,
         onMusic = sounds::setMusic,
+        animations = settings.animations,
+        onAnimations = sounds::setAnimations,
         demo = demo,
         onDemo = viewModel::setDemo,
         onBack = onBack,
@@ -75,6 +77,8 @@ private fun SettingsContent(
     onMusic: (Boolean) -> Unit,
     onBack: () -> Unit,
     onOpenAdult: () -> Unit,
+    animations: Boolean = true,
+    onAnimations: (Boolean) -> Unit = {},
     demo: Boolean? = null,
     onDemo: (Boolean) -> Unit = {},
 ) {
@@ -92,9 +96,10 @@ private fun SettingsContent(
     ) {
         OutlinedText("Настройки", style = MaterialTheme.typography.headlineLarge)
 
-        FinneyPanel(title = "Звук") {
+        FinneyPanel(title = "Звук и анимации") {
             ToggleRow(if (sound) "Звуки: включены" else "Звуки: выключены", sound, onSound)
             ToggleRow(if (music) "Музыка: включена" else "Музыка: выключена", music, onMusic)
+            ToggleRow(if (animations) "Анимации: включены" else "Анимации: выключены", animations, onAnimations)
         }
 
         // Демо — для экспертов: короткий сон и напоминания, быстрые уровни, все игры открыты.

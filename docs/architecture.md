@@ -59,7 +59,7 @@ ru.finney.pet
 ├── data/            ХРАНИЛИЩЕ                      — [@lemonke68], только он
 │   ├── db/          Room: entity, dao, database, маппинг в domain
 │   ├── repository/  RoomGameStorage — реализация domain/game/GameStorage
-│   └── prefs/       DataStore — открытый профиль, звук и музыка; анимации (ещё не сделано)
+│   └── prefs/       DataStore — открытый профиль, звук, музыка, вибрация и анимации
 │
 ├── content/         ЗАГРУЗКА УЧЕБНОГО КОНТЕНТА     — [@lemonke68]
 │                    ContentParser, ContentValidator, AssetContentLoader

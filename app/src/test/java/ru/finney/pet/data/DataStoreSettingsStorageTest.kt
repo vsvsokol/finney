@@ -15,7 +15,7 @@ import org.junit.rules.TemporaryFolder
 import ru.finney.pet.data.prefs.DataStoreSettingsStorage
 import ru.finney.pet.domain.settings.SoundSettings
 
-/** Звук, музыка и вибрация хранятся отдельно и по умолчанию включены. */
+/** Звук, музыка, вибрация и анимации хранятся отдельно и по умолчанию включены. */
 class DataStoreSettingsStorageTest {
 
     @get:Rule
@@ -32,7 +32,7 @@ class DataStoreSettingsStorageTest {
 
     @Test
     fun `по умолчанию включено всё`() = runBlocking {
-        assertEquals(SoundSettings(sound = true, music = true, haptics = true), storage.sound.first())
+        assertEquals(SoundSettings(sound = true, music = true, haptics = true, animations = true), storage.sound.first())
     }
 
     @Test
@@ -41,5 +41,11 @@ class DataStoreSettingsStorageTest {
         assertEquals(SoundSettings(sound = true, music = true, haptics = false), storage.sound.first())
         storage.setHaptics(true)
         assertEquals(true, storage.sound.first().haptics)
+    }
+
+    @Test
+    fun `анимации выключаются отдельно, ТЗ 3-6`() = runBlocking {
+        storage.setAnimations(false)
+        assertEquals(SoundSettings(animations = false), storage.sound.first())
     }
 }
