@@ -41,9 +41,11 @@ import kotlinx.coroutines.launch
 import ru.finney.pet.ui.components.FinneyIcons
 import ru.finney.pet.ui.sound.LocalSounds
 import ru.finney.pet.ui.sound.Sfx
+import kotlin.math.PI
 import kotlin.math.hypot
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlin.math.sin
 
 // Кормление как в «Говорящем Томе»: еду тянут пальцем и бросают питомцу в рот.
 //
@@ -62,6 +64,9 @@ private class FoodState {
     var rotation by mutableFloatStateOf(0f)
     val scale = Animatable(1f)
     var velocity = Offset.Zero
+
+    /** Брал ли ребёнок еду: до этого она сама показывает бросок в рот. */
+    var touched by mutableStateOf(false)
 
     /** До первого касания еда лежит на месте; где это место, знает только разметка. */
     fun at(rest: Offset): Offset = if (position.isSpecified) position else rest
@@ -100,7 +105,7 @@ fun FeedingGame(
     val sounds = LocalSounds.current
 
     CareGameFrame(
-        hint = "Брось еду питомцу в рот",
+        slot = CareSlot.KITCHEN,
         onCancel = {
             currentOnMouthOpen(false)
             onCancel()
@@ -189,6 +194,19 @@ fun FeedingGame(
                 }
             }
 
+            // Подсказка вместо надписи: еда сама взлетает дугой в рот, и пауза.
+            GestureGhost(
+                itemId = itemId,
+                fallback = FinneyIcons.Food,
+                visible = !food.touched,
+                periodMs = 1600,
+                at = { t ->
+                    val u = (t / GHOST_FLIGHT).coerceAtMost(1f)
+                    rest + (mouthLocal() - rest) * u - Offset(0f, sin(u * PI.toFloat()) * 120f * px)
+                },
+                alphaAt = { t -> if (t < GHOST_FLIGHT) 1f - t / GHOST_FLIGHT * 0.6f else 0f },
+            )
+
             ItemPicture(
                 itemId = itemId,
                 fallback = FinneyIcons.Food,
@@ -222,6 +240,7 @@ fun FeedingGame(
                             if (food.phase != FoodPhase.REST) return@awaitEachGesture
                             if ((down.position - food.at(rest)).getDistance() > grabRadius) return@awaitEachGesture
                             food.phase = FoodPhase.DRAG
+                            food.touched = true
                             val grab = food.at(rest) - down.position
                             val tracker = VelocityTracker()
                             tracker.addPosition(down.uptimeMillis, down.position)
@@ -257,6 +276,9 @@ fun FeedingGame(
         }
     }
 }
+
+/** Какую часть круга подсказка летит; остальное — пауза, чтобы было видно начало броска. */
+private const val GHOST_FLIGHT = 0.6f
 
 /** Расстояние от точки [p] до отрезка [a]–[b]: за кадр быстрая еда пролетает рот насквозь. */
 private fun segmentDistance(p: Offset, a: Offset, b: Offset): Float {

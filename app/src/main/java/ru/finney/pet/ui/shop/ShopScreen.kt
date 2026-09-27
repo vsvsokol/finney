@@ -76,10 +76,7 @@ private fun ShopContent(
     ) {
         OutlinedText("Магазин", style = MaterialTheme.typography.headlineLarge)
 
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("У тебя:", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
-            CoinAmount(amount = state.balance)
-        }
+        CoinAmount(amount = state.balance)
 
         FeedbackDialog(
             feedback = state.feedback,
@@ -101,8 +98,7 @@ private fun ShopContent(
 
         ShopSection(
             title = "Нужное",
-            hint = state.needsLeft?.let { "По плану осталось $it" }
-                ?: "Еда и мытьё",
+            planLeft = state.needsLeft,
             previews = state.needs,
             selectedId = state.selectedId,
             block = block,
@@ -111,8 +107,7 @@ private fun ShopContent(
         )
         ShopSection(
             title = "Хочется",
-            hint = state.wantsLeft?.let { "По плану осталось $it" }
-                ?: "Игрушки и сладости",
+            planLeft = state.wantsLeft,
             previews = state.wants,
             selectedId = state.selectedId,
             block = block,
@@ -127,14 +122,21 @@ private fun ShopContent(
 @Composable
 private fun ShopSection(
     title: String,
-    hint: String,
+    planLeft: Int?,
     previews: List<PurchasePreview>,
     selectedId: String?,
     block: CareBlock?,
     onSelect: (String) -> Unit,
     onBuy: (String) -> Unit,
 ) {
-    Text(hint, style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
+    // Сколько осталось по плану на эту категорию — числом с монеткой. Что в
+    // категории лежит, видно по картинкам, подпись «Еда и мытьё» убрана.
+    planLeft?.let {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("по плану осталось", style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
+            CoinAmount(amount = it, coinSize = 22.dp)
+        }
+    }
     CarePanel(
         title = title,
         options = previews.map { CareOption(it.item, it, isSelected = it.item.id == selectedId) },

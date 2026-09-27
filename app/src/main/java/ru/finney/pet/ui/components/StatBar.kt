@@ -163,23 +163,32 @@ fun HappinessBar(
                 .border(StrokeRegular, FinneyInk, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
-            Canvas(modifier = Modifier.size(faceSize * 0.55f)) {
-                val s = size.minDimension
-                val eye = s * 0.09f
-                drawCircle(FinneyInk, eye, Offset(s * 0.30f, s * 0.32f))
-                drawCircle(FinneyInk, eye, Offset(s * 0.70f, s * 0.32f))
-                // Рот: дуга вниз — улыбка, вверх — грусть.
-                drawArc(
-                    color = FinneyInk,
-                    startAngle = if (isLow) 200f else 20f,
-                    sweepAngle = 140f,
-                    useCenter = false,
-                    topLeft = Offset(s * 0.26f, if (isLow) s * 0.62f else s * 0.42f),
-                    size = Size(s * 0.48f, s * 0.34f),
-                    style = Stroke(width = s * 0.10f, cap = StrokeCap.Round),
-                )
-            }
+            MoodFace(size = faceSize * 0.55f, sad = isLow)
         }
+    }
+}
+
+/**
+ * Лицо настроения: два глаза и рот. Тот же знак, что под шкалой на главном, —
+ * поэтому им же в магазине показано, что предмет поднимает радость.
+ */
+@Composable
+fun MoodFace(size: Dp, modifier: Modifier = Modifier, sad: Boolean = false) {
+    Canvas(modifier = modifier.size(size)) {
+        val s = this.size.minDimension
+        val eye = s * 0.09f
+        drawCircle(FinneyInk, eye, Offset(s * 0.30f, s * 0.32f))
+        drawCircle(FinneyInk, eye, Offset(s * 0.70f, s * 0.32f))
+        // Рот: дуга вниз — улыбка, вверх — грусть.
+        drawArc(
+            color = FinneyInk,
+            startAngle = if (sad) 200f else 20f,
+            sweepAngle = 140f,
+            useCenter = false,
+            topLeft = Offset(s * 0.26f, if (sad) s * 0.62f else s * 0.42f),
+            size = Size(s * 0.48f, s * 0.34f),
+            style = Stroke(width = s * 0.10f, cap = StrokeCap.Round),
+        )
     }
 }
 

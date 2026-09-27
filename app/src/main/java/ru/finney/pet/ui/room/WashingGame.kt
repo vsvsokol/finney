@@ -12,8 +12,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
@@ -28,7 +26,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -48,9 +45,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import ru.finney.pet.ui.components.FinneyIcon
 import ru.finney.pet.ui.components.FinneyIcons
-import ru.finney.pet.ui.components.ProgressRing
 import ru.finney.pet.ui.theme.FinneyGlare
 import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.sound.LocalSounds
@@ -96,6 +91,9 @@ private class WashState {
     var tilt by mutableFloatStateOf(0f)
     var holding by mutableStateOf(false)
     var nowMs by mutableLongStateOf(0L)
+
+    /** Касался ли ребёнок экрана: до этого мыло-подсказка само трёт питомца. */
+    var touched by mutableStateOf(false)
     var poppedAtMs by mutableLongStateOf(-1L)
     var lastFoam = Offset.Unspecified
 
@@ -133,7 +131,15 @@ fun WashingGame(
         while (true) withFrameNanos { wash.nowMs = it / 1_000_000 }
     }
 
-    CareGameFrame(hint = "Намыль питомца", onCancel = onCancel, modifier = modifier) {
+    // Сколько осталось — кольцом вокруг ванны внизу, на её месте в ряду комнат.
+    // Цифр нет — ребёнку хватает «кольцо почти замкнулось».
+    CareGameFrame(
+        slot = CareSlot.BATH,
+        onCancel = onCancel,
+        progress = (wash.progress / SCRUB_DONE).coerceAtMost(1f),
+        progressLabel = "Намылено ${wash.scrubbedCount} из ${(SCRUB_COLS * SCRUB_ROWS * SCRUB_DONE).roundToInt()}",
+        modifier = modifier,
+    ) {
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
@@ -218,6 +224,18 @@ fun WashingGame(
                 }
             }
 
+            // Подсказка вместо надписи: мыло само ходит восьмёркой по питомцу.
+            GestureGhost(
+                itemId = itemId,
+                fallback = FinneyIcons.Bath,
+                visible = !wash.touched,
+                periodMs = 1800,
+                at = { t ->
+                    val a = t * 2f * PI.toFloat()
+                    Offset(area.center.x + sin(a) * area.width * 0.3f, area.center.y + sin(2 * a) * area.height * 0.15f)
+                },
+            )
+
             ItemPicture(
                 itemId = itemId,
                 fallback = FinneyIcons.Bath,
@@ -249,6 +267,7 @@ fun WashingGame(
                         awaitEachGesture {
                             val down = awaitFirstDown()
                             if (wash.poppedAtMs >= 0) return@awaitEachGesture
+                            wash.touched = true
                             wash.holding = true
                             wash.soap = down.position
                             wash.lastFoam = Offset.Unspecified
@@ -273,20 +292,6 @@ fun WashingGame(
                         }
                     },
             )
-
-            // Сколько осталось: кольцо вокруг значка ванны под подсказкой.
-            // Цифр нет — ребёнку хватает «кольцо почти замкнулось».
-            ProgressRing(
-                diameter = 44.dp,
-                progress = (wash.progress / SCRUB_DONE).coerceAtMost(1f),
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .systemBarsPadding()
-                    .padding(top = 150.dp)
-                    .semantics { contentDescription = "Намылено ${wash.scrubbedCount} из ${(SCRUB_COLS * SCRUB_ROWS * SCRUB_DONE).roundToInt()}" },
-            ) {
-                FinneyIcon(FinneyIcons.Bath, size = 28.dp)
-            }
         }
     }
 }

@@ -146,7 +146,6 @@ fun HomeScreen(
     onOpenSettings: () -> Unit,
     onOpenHelp: () -> Unit,
     onPeriodClosed: (periodNumber: Int) -> Unit,
-    onOpenPetLab: () -> Unit,
     viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -190,7 +189,6 @@ fun HomeScreen(
             onOpenProgress = onOpenProgress,
             onOpenSettings = onOpenSettings,
             onOpenHelp = onOpenHelp,
-            onOpenPetLab = onOpenPetLab,
             onClosePeriod = viewModel::closePeriod,
             onBuy = viewModel::buy,
             onSleep = viewModel::sleep,
@@ -255,7 +253,6 @@ private fun HomeContent(
     onOpenProgress: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenHelp: () -> Unit,
-    onOpenPetLab: () -> Unit,
     onClosePeriod: () -> Unit,
     onBuy: (itemId: String) -> Unit,
     onSleep: () -> Unit = {},
@@ -390,10 +387,7 @@ private fun HomeContent(
             wander = playing == null && care == null,
             onHop = animation::playJoy,
         ) {
-            // Нажатие — питомец подпрыгивает: это игра, а не меню. Черновик
-            // анимаций, который раньше открывался здесь же, ушёл на долгое
-            // нажатие и только в отладочной сборке — ребёнку он не нужен,
-            // а команде по-прежнему под рукой.
+            // Нажатие — питомец подпрыгивает: это игра, а не меню.
             //
             // Подсветку убираем: у питомца нет прямоугольной формы, и ripple
             // лёг бы квадратом вокруг.
@@ -406,12 +400,10 @@ private fun HomeContent(
                 modifier = Modifier
                     .fillMaxSize()
                     .onGloballyPositioned { petBounds = it.boundsInRoot() }
-                    .combinedClickable(
+                    .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
                         onClickLabel = "Погладить питомца",
-                        onLongClick = if (isDebuggable) onOpenPetLab else null,
-                        onLongClickLabel = if (isDebuggable) "Черновик анимаций" else null,
                         onClick = {
                             if (!sleeping) {
                                 sounds.play(Sfx.PetHappy)
@@ -1168,7 +1160,7 @@ private fun HomeContentPreview() {
                 care = emptyList(),
             ),
             onOpenBudget = {}, onOpenShop = {}, onOpenGoals = {}, onOpenTasks = {}, onOpenTask = {}, onOpenWardrobe = {},
-            onOpenProgress = {}, onOpenSettings = {}, onOpenHelp = {}, onOpenPetLab = {},
+            onOpenProgress = {}, onOpenSettings = {}, onOpenHelp = {},
             onClosePeriod = {}, onBuy = {},
         )
     }

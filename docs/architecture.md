@@ -190,9 +190,6 @@ fun ShopScreen(onBack: () -> Unit, viewModel: ShopViewModel = viewModel(factory 
 повёрнутой рукой видно исходную. Делает это `tools/split_pet_base.py` — он же кладёт
 в `res/drawable-nodpi` WebP без потерь. Исходные PNG живут в `design/exports/pet`.
 
-`PetLabScreen` — черновой экран для подбора анимаций, в игру не входит. Удаляется
-вместе с `PetLabRoute`, когда питомец переедет на настоящий главный экран.
-
 ## Структура данных
 
 ### Room: локальный профиль

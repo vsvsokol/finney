@@ -1,35 +1,61 @@
 package ru.finney.pet.ui.room
 
+import androidx.activity.compose.BackHandler
 import androidx.annotation.DrawableRes
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import ru.finney.pet.R
-import ru.finney.pet.ui.components.FinneyButton
 import ru.finney.pet.ui.components.FinneyIcon
+import ru.finney.pet.ui.components.FinneyIconButton
 import ru.finney.pet.ui.components.FinneyIcons
 import ru.finney.pet.ui.components.OutlinedText
+import ru.finney.pet.ui.components.ProgressRing
+import ru.finney.pet.ui.sound.Sfx
+import ru.finney.pet.ui.theme.FinneyInk
+import ru.finney.pet.ui.theme.FinneyYellow
+import ru.finney.pet.ui.theme.StrokeRegular
+import kotlin.math.roundToInt
 
 // Общее у игр ухода: кормления (FeedingGame) и мытья (WashingGame).
 //
 // Покупка в них случается в конце игры, а не на кнопке панели: ребёнок
 // выбирает и соглашается в CarePanel (цена и эффект видны до покупки, ТЗ п. 2.5.6),
 // а деньги уходят, когда еда попала в рот или питомец отмыт. Промахнулся —
-// ничего не потрачено, можно ещё раз. Передумал — «Не сейчас», тоже бесплатно.
+// ничего не потрачено, можно ещё раз. Передумал — «✕» внизу слева, тоже бесплатно.
 
-/** Где предмет ждёт, пока его возьмут: над кнопкой отмены, по центру. */
+/** Где предмет ждёт, пока его возьмут: над нижним рядом, по центру. */
 internal val ItemRestFromBottom = 200.dp
 
 /** Размер предмета в руке. */
@@ -47,7 +73,19 @@ internal fun itemArt(itemId: String): Int? = when (itemId) {
     "care_towel" -> R.drawable.item_care_towel
     "treat_candy" -> R.drawable.item_treat_candy
     "toy_ball" -> R.drawable.item_toy_ball
+    "toy_book" -> R.drawable.item_toy_book
+    "hat_cowboy" -> R.drawable.acc_hat_cowboy
+    "hat_pirate" -> R.drawable.acc_hat_pirate
+    "hat_wizard" -> R.drawable.acc_hat_wizard
     else -> null
+}
+
+/** Значок вместо рисунка, пока его нет: лампа — лампой, остальное — значком комнаты или звездой. */
+internal fun itemFallback(itemId: String): FinneyIcons = when {
+    itemId.startsWith("food_") -> FinneyIcons.Food
+    itemId.startsWith("care_") -> FinneyIcons.Bath
+    itemId == "decor_lamp" -> FinneyIcons.Lamp
+    else -> FinneyIcons.Star
 }
 
 /** Предмет в руке: рисунок, а если рисунка нет — значок комнаты. */
@@ -63,43 +101,109 @@ internal fun ItemPicture(itemId: String, fallback: FinneyIcons, size: Dp, modifi
     }
 }
 
+/** Какой по счёту в нижнем ряду главного стоит кнопка комнаты: зал, кухня, ванная. */
+internal enum class CareSlot { KITCHEN, BATH }
+
 /**
- * Рамка игры: подсказка сверху, «Не сейчас» снизу, сама игра между ними.
+ * Рамка игры ухода, одинаковая у кормления и мытья. Внизу — тот же ряд, что
+ * кнопки комнат на главном: значок комнаты стоит на своём месте, кольцо вокруг —
+ * сколько сделано (у мытья), а слева — привычный «✕», как в мини-играх.
+ * Системное «назад» тоже выходит. Подписей нет: что делать, показывает сама
+ * игра — предмет-подсказка повторяет жест, пока ребёнок не коснулся экрана.
  *
- * Подсказка — крупным контурным шрифтом, как заголовки панелей: ребёнку 7 лет
- * нужно одно короткое действие, а не абзац.
+ * Раньше сверху была надпись («Намыль питомца») — она налезала на значок
+ * уровня, — а снизу кнопка «Не сейчас», которой нет больше нигде.
  */
 @Composable
 internal fun CareGameFrame(
-    hint: String,
+    slot: CareSlot,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
+    progress: Float? = null,
+    progressLabel: String? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
+    BackHandler(onBack = onCancel)
     Box(modifier = modifier.fillMaxSize()) {
         content()
-        Box(
+        // Ряд — как на главном: колонка там с системными полями и полями 16 dp,
+        // кнопки 64 dp поровну по ширине. Так значок не сдвигается, когда игра открылась.
+        Row(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .align(Alignment.BottomCenter)
                 .systemBarsPadding()
                 .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            OutlinedText(
-                text = hint,
-                style = MaterialTheme.typography.headlineSmall,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    // Ниже верхней полосы с деньгами и уровнем: её закрывать нельзя,
-                    // деньги спишутся на глазах.
-                    .padding(top = 80.dp),
-            )
-            FinneyButton(
-                text = "Не сейчас",
-                onClick = onCancel,
-                fillWidth = false,
-                modifier = Modifier.align(Alignment.BottomCenter),
-            )
+            Box(Modifier.size(RoomButtonSize), contentAlignment = Alignment.Center) {
+                FinneyIconButton(onClick = onCancel, contentDescription = "Не сейчас", size = 56.dp, sound = Sfx.Back) {
+                    OutlinedText("✕", style = MaterialTheme.typography.titleLarge)
+                }
+            }
+            Box(Modifier.size(RoomButtonSize)) {
+                if (slot == CareSlot.KITCHEN) RoomMark(FinneyIcons.Food, progress, progressLabel)
+            }
+            Box(Modifier.size(RoomButtonSize)) {
+                if (slot == CareSlot.BATH) RoomMark(FinneyIcons.Bath, progress, progressLabel)
+            }
         }
     }
 }
+
+/** Размер кнопок комнат на главном — у FinneyNeedButton по умолчанию. */
+private val RoomButtonSize = 64.dp
+
+/** Значок комнаты на своём месте в ряду: где идёт игра и сколько уже сделано. */
+@Composable
+private fun RoomMark(icon: FinneyIcons, progress: Float?, label: String?) {
+    ProgressRing(
+        diameter = RoomButtonSize,
+        progress = progress,
+        modifier = Modifier.semantics { contentDescription = label ?: "" },
+    ) {
+        Box(
+            Modifier.fillMaxSize().clip(CircleShape).background(FinneyYellow).border(StrokeRegular, FinneyInk, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) { FinneyIcon(icon, size = RoomButtonSize / 2) }
+    }
+}
+
+/**
+ * Подсказка жестом: полупрозрачная копия предмета сама делает то, что нужно,
+ * — трёт питомца или летит ему в рот. [at] — где она в момент [t] 0…1 круга.
+ * Пропадает с первым касанием ([visible]).
+ */
+@Composable
+internal fun GestureGhost(
+    itemId: String,
+    fallback: FinneyIcons,
+    visible: Boolean,
+    periodMs: Int,
+    at: (Float) -> Offset,
+    alphaAt: (Float) -> Float = { 1f },
+) {
+    if (!visible) return
+    val density = LocalDensity.current
+    val t by rememberInfiniteTransition(label = "ghost").animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(periodMs, easing = LinearEasing)),
+        label = "t",
+    )
+    val half = with(density) { ItemSize.toPx() } / 2
+    ItemPicture(
+        itemId = itemId,
+        fallback = fallback,
+        size = ItemSize,
+        modifier = Modifier
+            .offset {
+                val p = at(t)
+                IntOffset((p.x - half).roundToInt(), (p.y - half).roundToInt())
+            }
+            .graphicsLayer { alpha = GHOST_ALPHA * alphaAt(t) },
+    )
+}
+
+private const val GHOST_ALPHA = 0.55f

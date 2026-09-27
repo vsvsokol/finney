@@ -23,7 +23,6 @@ import ru.finney.pet.ui.home.HomeScreen
 import ru.finney.pet.ui.onboarding.OnboardingScreen
 import ru.finney.pet.ui.onboarding.PetSetupScreen
 import ru.finney.pet.ui.period.PeriodResultScreen
-import ru.finney.pet.ui.pet.PetLabScreen
 import ru.finney.pet.ui.progress.GlossaryScreen
 import ru.finney.pet.ui.progress.ProgressScreen
 import ru.finney.pet.ui.settings.SettingsScreen
@@ -93,13 +92,8 @@ fun FinneyNavHost(
                 onOpenSettings = { navController.navigate(SettingsRoute) },
                 onOpenHelp = { navController.navigate(OnboardingRoute(isReplay = true)) },
                 onPeriodClosed = { number -> navController.navigate(PeriodResultRoute(number)) },
-                onOpenPetLab = { navController.navigate(PetLabRoute) },
             )
         }
-
-        // Черновой экран анимаций. Удалить вместе с PetLabRoute, когда анимации
-        // переедут на главный экран.
-        composable<PetLabRoute> { PetLabScreen() }
 
         composable<BudgetRoute> {
             BudgetScreen(onBack = { navController.popBackStack() })
