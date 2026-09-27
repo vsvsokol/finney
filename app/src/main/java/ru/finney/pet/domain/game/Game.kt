@@ -265,7 +265,8 @@ class Game(
         val item = content.item(itemId) ?: return reject(Rejection.UnknownItem(itemId))
         if (state.currentPeriod.phase != PeriodPhase.ACTIVE) return reject(Rejection.PlanNotConfirmed)
         content.goalFor(item.id)?.let { return reject(Rejection.NotForSale(item.id, it.label)) }
-        if (item.kind == ItemKind.ACCESSORY && state.owns(item.id)) return reject(Rejection.AlreadyOwned)
+        // Аксессуар и игрушка покупаются один раз: они остаются у питомца.
+        if (item.kind != ItemKind.CONSUMABLE && state.owns(item.id)) return reject(Rejection.AlreadyOwned)
         if (item.price > state.balance) return reject(Rejection.InsufficientFunds(item.price, state.balance))
         val entry = entry(state, EntryType.PURCHASE, balanceDelta = -item.price)
             .copy(category = item.category, itemId = item.id)
@@ -335,6 +336,59 @@ class Game(
     /** Купленные и заработанные целями аксессуары в порядке магазина. */
     fun wardrobe(state: GameState): List<ShopItem> =
         content.shop.filter { it.kind == ItemKind.ACCESSORY && state.owns(it.id) }
+
+    // ---------- Игрушки ----------
+
+    /** Купленные игрушки в порядке магазина — то, что лежит в зале. */
+    fun toys(state: GameState): List<ShopItem> =
+        content.shop.filter { it.kind == ItemKind.TOY && state.owns(it.id) }
+
+    /** Сколько длится сессия игры: после неё игрушки снова радуют. В демо-режиме — секунды. */
+    fun playSessionMillis(state: GameState): Long =
+        if (state.isDemo) economy.play.demoSessionSeconds * 1_000L else economy.play.sessionMinutes * 60_000L
+
+    /** Сессия игры кончилась или не начиналась: следующая прибавка начнёт новую. */
+    private fun playSessionOver(state: GameState, now: Long): Boolean {
+        val since = state.playSince ?: return true
+        return now - since >= playSessionMillis(state)
+    }
+
+    /**
+     * Сколько настроения игрушки ещё могут дать сейчас. 0 — питомец наигрался:
+     * ждать конца сессии или нового уровня.
+     */
+    fun playMoodLeft(state: GameState, now: Long = clock()): Int =
+        if (playSessionOver(state, now)) economy.play.sessionMoodCap
+        else maxOf(0, economy.play.sessionMoodCap - state.playMood)
+
+    /**
+     * Поиграть с игрушкой: [shakes] потряхиваний рядом с питомцем. Бесплатно и в любой фазе
+     * периода — игрушка уже куплена. Прибавка к настроению — [ru.finney.pet.domain.model.PlayRule.moodPerShake]
+     * за потряхивание, но не больше того, что осталось в сессии ([playMoodLeft]), и не выше 100.
+     * Прибавки нет — состояние не меняется, сессия не начинается. Во сне не играют.
+     */
+    fun play(state: GameState, toyId: String, shakes: Int): GameResult {
+        if (state.sleepingSince != null) return reject(Rejection.Asleep)
+        val item = content.item(toyId) ?: return reject(Rejection.UnknownItem(toyId))
+        if (item.kind != ItemKind.TOY) return reject(Rejection.NotPlayable(toyId))
+        if (!state.owns(toyId)) return reject(Rejection.NotOwned(toyId))
+        if (shakes <= 0) return reject(Rejection.InvalidAmount)
+        val now = clock()
+        val gain = minOf(
+            shakes * economy.play.moodPerShake,
+            playMoodLeft(state, now),
+            PetRules.STAT_MAX - state.pet.mood,
+        )
+        if (gain <= 0) return ok(state)
+        val fresh = playSessionOver(state, now)
+        return ok(
+            state.copy(
+                pet = PetRules.apply(state.pet, StatEffect(mood = gain)),
+                playMood = (if (fresh) 0 else state.playMood) + gain,
+                playSince = if (fresh) now else state.playSince,
+            ),
+        )
+    }
 
     // ---------- Накопления ----------
 
@@ -474,6 +528,9 @@ class Game(
         val stage = stage(state)
         val opened = state.copy(
             pet = PetRules.decay(state.pet, economy.decay(stage)),
+            // Новый уровень — новая сессия игры: игрушки снова радуют в полную силу.
+            playMood = 0,
+            playSince = null,
             periods = state.periods + Period(number = number, stage = stage, phase = PeriodPhase.PLANNING),
         )
         val income = entry(opened, EntryType.INCOME, balanceDelta = economy.income(stage))

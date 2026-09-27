@@ -36,7 +36,7 @@ fun ProfileEntity.toDomain() = Profile(
 fun GameState.toRows(profileId: Long) = GameRows(
     activeGoalId = activeGoalId,
     wornItemId = wornItemId,
-    pet = PetStateEntity(profileId, pet.satiety, pet.hygiene, pet.mood, pet.energy, sleepingSince),
+    pet = PetStateEntity(profileId, pet.satiety, pet.hygiene, pet.mood, pet.energy, sleepingSince, playMood, playSince),
     periods = periods.map { it.toEntity(profileId) },
     ledger = ledger.map { it.toEntity(profileId) },
     attempts = attempts.map { TaskAttemptEntity(0, profileId, it.periodNumber, it.taskId, it.outcome, it.reward, it.createdAt) },
@@ -57,6 +57,8 @@ fun ProfileWithGame.toDomain(): SavedGame {
             },
             wornItemId = profile.wornItemId,
             sleepingSince = pet.sleepingSince,
+            playMood = pet.playMood,
+            playSince = pet.playSince,
         ),
     )
 }

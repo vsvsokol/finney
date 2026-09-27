@@ -26,5 +26,11 @@
     "emotionHappy": 60,
     "sleepMinutes": 60,
     "demoSleepSeconds": 10
+  },
+  "play": {
+    "moodPerShake": 2,
+    "sessionMoodCap": 20,
+    "sessionMinutes": 60,
+    "demoSessionSeconds": 30
   }
 }

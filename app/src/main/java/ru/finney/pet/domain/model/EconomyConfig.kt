@@ -17,6 +17,7 @@ data class EconomyConfig(
     val maxLevel: Int,
     val stageStartLevels: List<Int>,
     val pet: PetRule,
+    val play: PlayRule = PlayRule(),
 ) {
     fun income(stage: Int): Int = incomeByStage[stage - 1]
     fun decay(stage: Int): StatEffect = pet.decayByStage[stage - 1]
@@ -50,4 +51,18 @@ data class PetRule(
     val sleepMinutes: Int,
     /** Полный сон в демо-режиме, секунды. */
     val demoSleepSeconds: Int,
+)
+
+/**
+ * Игра с игрушкой. Каждое «потряхивание» рядом с питомцем — плюс [moodPerShake] к настроению,
+ * но за одну сессию игры не больше [sessionMoodCap]: дальше питомец наигрался, и игрушка
+ * настроения не прибавляет. Сессия начинается с первой прибавки и длится [sessionMinutes]
+ * (в демо-режиме — [demoSessionSeconds] секунд); новый уровень начинает новую сессию сразу.
+ */
+@Serializable
+data class PlayRule(
+    val moodPerShake: Int = 2,
+    val sessionMoodCap: Int = 20,
+    val sessionMinutes: Int = 60,
+    val demoSessionSeconds: Int = 30,
 )

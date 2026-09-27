@@ -114,6 +114,19 @@ private fun ShopContent(
             onSelect = onSelect,
             onBuy = onBuy,
         )
+        // Игрушки — тоже «хочется» и тратятся из той же части плана (остаток — строкой выше).
+        // Отдельно — потому что покупаются один раз и остаются в зале. Все куплены — раздел уходит.
+        if (state.toys.isNotEmpty()) {
+            ShopSection(
+                title = "Игрушки",
+                planLeft = null,
+                previews = state.toys,
+                selectedId = state.selectedId,
+                block = block,
+                onSelect = onSelect,
+                onBuy = onBuy,
+            )
+        }
 
         FinneyButton(text = "История трат", onClick = onOpenHistory)
     }

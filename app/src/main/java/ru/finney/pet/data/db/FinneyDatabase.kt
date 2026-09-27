@@ -10,7 +10,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 /**
  * Схема каждой версии экспортируется в app/schemas и коммитится.
  *
- * С версии 3 изменения переносятся миграциями — [MIGRATION_3_4] … [MIGRATION_5_6]. Базы версий 1–2
+ * С версии 3 изменения переносятся миграциями — [MIGRATION_3_4] … [MIGRATION_6_7]. Базы версий 1–2
  * пересоздаются с нуля: версия 3 переименовала питомцев, а перенести старые значения было бы
  * возможно только храня прежние имена прямо в коде.
  */
@@ -22,7 +22,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         LedgerEntryEntity::class,
         TaskAttemptEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 abstract class FinneyDatabase : RoomDatabase() {
@@ -34,7 +34,7 @@ abstract class FinneyDatabase : RoomDatabase() {
 
         fun create(context: Context): FinneyDatabase =
             Room.databaseBuilder(context.applicationContext, FinneyDatabase::class.java, NAME)
-                .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                 .fallbackToDestructiveMigration(dropAllTables = true)
                 .build()
 
@@ -70,6 +70,17 @@ abstract class FinneyDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE periods ADD COLUMN levelTaskId TEXT")
                 db.execSQL("ALTER TABLE periods ADD COLUMN gamePassed INTEGER")
+            }
+        }
+
+        /**
+         * 6 → 7: сессия игры с игрушками. Сама игрушка — покупка, она уже в ledger;
+         * в pet_state добавляется только счётчик сессии. У всех — сессии нет.
+         */
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE pet_state ADD COLUMN playMood INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE pet_state ADD COLUMN playSince INTEGER")
             }
         }
     }

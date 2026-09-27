@@ -116,6 +116,10 @@ data class GameState(
     val wornItemId: String? = null,
     /** Когда питомец лёг спать, мс; null — не спит. Сколько он уже выспался — [ru.finney.pet.domain.game.Game.energyAt]. */
     val sleepingSince: Long? = null,
+    /** Сколько настроения уже дала игра с игрушками в текущей сессии, см. [ru.finney.pet.domain.game.Game.play]. */
+    val playMood: Int = 0,
+    /** Когда началась текущая сессия игры, мс; null — сессии нет. */
+    val playSince: Long? = null,
 ) {
     val currentPeriod: Period get() = periods.last()
 

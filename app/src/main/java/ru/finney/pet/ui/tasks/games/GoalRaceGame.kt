@@ -51,6 +51,7 @@ import ru.finney.pet.domain.model.PetCharacter
 import ru.finney.pet.domain.tasks.TaskEngines
 import ru.finney.pet.domain.tasks.TaskInput
 import ru.finney.pet.ui.components.FinneyButton
+import ru.finney.pet.ui.components.HeartIcon
 import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.theme.FinneyCream
 import ru.finney.pet.ui.theme.FinneyGreen
@@ -337,22 +338,7 @@ internal fun Hearts(count: Int, max: Int, size: Dp = 22.dp) {
 }
 
 @Composable
-private fun Heart(filled: Boolean, size: Dp) {
-    Canvas(Modifier.size(size)) {
-        val w = this.size.width
-        val h = this.size.height
-        val heart = Path().apply {
-            moveTo(w / 2, h * 0.92f)
-            cubicTo(w * 0.1f, h * 0.62f, -w * 0.04f, h * 0.28f, w * 0.24f, h * 0.1f)
-            cubicTo(w * 0.38f, h * 0.02f, w * 0.5f, h * 0.12f, w * 0.5f, h * 0.24f)
-            cubicTo(w * 0.5f, h * 0.12f, w * 0.62f, h * 0.02f, w * 0.76f, h * 0.1f)
-            cubicTo(w * 1.04f, h * 0.28f, w * 0.9f, h * 0.62f, w / 2, h * 0.92f)
-            close()
-        }
-        drawPath(heart, if (filled) FinneyPink else FinneyCream)
-        drawPath(heart, FinneyInk, style = Stroke(2.dp.toPx()))
-    }
-}
+private fun Heart(filled: Boolean, size: Dp) = HeartIcon(filled = filled, size = size)
 
 /** «+♥» или «−♥» у соблазна дня. [enabled] false — Финни уже загрустил, сердечки не меняются. */
 @Composable

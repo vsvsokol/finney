@@ -46,6 +46,10 @@ data class PetStateEntity(
     val energy: Int,
     /** Когда лёг спать, мс; null — не спит. Тоже с версии 5. */
     val sleepingSince: Long? = null,
+    /** Сессия игры с игрушками: сколько настроения уже дала и когда началась. С версии 7, см. [FinneyDatabase.MIGRATION_6_7]. */
+    @ColumnInfo(defaultValue = "0")
+    val playMood: Int = 0,
+    val playSince: Long? = null,
 )
 
 @Entity(
