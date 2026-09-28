@@ -122,6 +122,7 @@ import ru.finney.pet.ui.theme.StrokeThin
 import ru.finney.pet.ui.theme.FinneyTheme
 import ru.finney.pet.ui.theme.FinneyGreen
 import ru.finney.pet.ui.motion.LocalAnimations
+import ru.finney.pet.ui.motion.PortalReveal
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 
@@ -233,6 +234,8 @@ fun HomeScreen(
         actionLabel = if (rejected is Rejection.PlanNotConfirmed) "К плану расходов" else null,
         onAction = onOpenBudget,
     )
+    // Пришли из портала — зал раскрывается из круга в центре, поверх всего.
+    PortalReveal(ready = state is HomeUiState.Ready)
 }
 
 private const val PurchaseFeedbackMillis = 5_000L

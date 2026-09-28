@@ -2,7 +2,15 @@ package ru.finney.pet.ui.onboarding
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.EaseIn
+import androidx.compose.animation.core.EaseInBack
+import androidx.compose.animation.core.EaseOutBack
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -30,6 +38,21 @@ import androidx.compose.ui.layout.layout
 import kotlinx.coroutines.launch
 import ru.finney.pet.ui.components.ScreenPadding
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.util.lerp
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import ru.finney.pet.ui.motion.LocalAnimations
+import ru.finney.pet.ui.motion.PortalArrival
+import ru.finney.pet.ui.motion.drawPortal
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -116,54 +139,147 @@ private fun PetSetupContent(
     onBodyColorChange: (BodyColor) -> Unit,
     onSave: () -> Unit,
 ) {
-    FinneyScreen(
-        backdrop = MenuBackdrop.SHAPES,
-        scrollable = true,
-        verticalArrangement = Arrangement.spacedBy(20.dp),
-    ) {
-        OutlinedText(
-            text = if (state.isEditing) "Настройка" else "Твой питомец",
-            style = MaterialTheme.typography.headlineLarge,
-        )
-
-        // Заголовки «Кто это будет» и «Какого цвета» убраны: выбор — картинками самих
-        // питомцев, он понятен без подписи. Имя без подписи не понять — она осталась.
-        CharacterPicker(
-            selected = state.appearance.character,
-            bodyColor = state.appearance.bodyColor,
-            enabled = !state.isLoading,
-            onSelect = onCharacterChange,
-        )
-
-        ColorPicker(
-            character = state.appearance.character,
-            selected = state.appearance.bodyColor,
-            enabled = !state.isLoading,
-            onSelect = onBodyColorChange,
-        )
-
-        OutlinedText("Как назовёшь?", style = MaterialTheme.typography.headlineMedium)
-        NameField(
-            name = state.name,
-            error = state.nameError,
-            maxLength = state.maxNameLength,
-            enabled = !state.isLoading,
-            onNameChange = onNameChange,
-        )
-
-        // «Начать игру» заряжается — начало игры бывает один раз и должно ощущаться.
-        // С неверным именем заряжать нечего: обычное нажатие сразу покажет ошибку.
-        // «Сохранить» в настройке — обычная кнопка, её жмут по делу.
-        val canSave = !state.isSaving && !state.isLoading
-        if (!state.isEditing && state.nameValid) {
-            ChargeButton(text = "Начать игру", onCharged = onSave, enabled = canSave)
-        } else {
-            FinneyButton(
-                text = if (state.isEditing) "Сохранить" else "Начать игру",
-                onClick = onSave,
-                enabled = canSave,
-            )
+    // Переход в мир: после зарядки питомец уходит в портал, и только потом сохранение
+    // и переход. «Сохранить» в настройке и выключенные анимации — сразу, без портала.
+    val animations = LocalAnimations.current
+    val portal = remember { PortalRun() }
+    var entering by remember { mutableStateOf(false) }
+    LaunchedEffect(entering) {
+        if (!entering) return@LaunchedEffect
+        portal.play()
+        PortalArrival.arm()
+        onSave()
+    }
+    // Имя не приняли — портал закрывается, ребёнок видит ошибку.
+    LaunchedEffect(state.nameError) {
+        if (state.nameError != null && entering) {
+            PortalArrival.take()
+            portal.reset()
+            entering = false
         }
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        FinneyScreen(
+            backdrop = MenuBackdrop.SHAPES,
+            scrollable = true,
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            OutlinedText(
+                text = if (state.isEditing) "Настройка" else "Твой питомец",
+                style = MaterialTheme.typography.headlineLarge,
+            )
+
+            // Заголовки «Кто это будет» и «Какого цвета» убраны: выбор — картинками самих
+            // питомцев, он понятен без подписи. Имя без подписи не понять — она осталась.
+            CharacterPicker(
+                selected = state.appearance.character,
+                bodyColor = state.appearance.bodyColor,
+                // Карусель стоит, пока питомец уходит: иначе выбор сменился бы на полпути.
+                // Остальное не гасим — погасшие поля мелькнули бы бледными до конца перехода.
+                enabled = !state.isLoading && !entering,
+                portal = portal,
+                onSelect = onCharacterChange,
+            )
+
+            ColorPicker(
+                character = state.appearance.character,
+                selected = state.appearance.bodyColor,
+                enabled = !state.isLoading,
+                onSelect = onBodyColorChange,
+            )
+
+            OutlinedText("Как назовёшь?", style = MaterialTheme.typography.headlineMedium)
+            NameField(
+                name = state.name,
+                error = state.nameError,
+                maxLength = state.maxNameLength,
+                enabled = !state.isLoading,
+                onNameChange = onNameChange,
+            )
+
+            // «Начать игру» заряжается — начало игры бывает один раз и должно ощущаться.
+            // С неверным именем заряжать нечего: обычное нажатие сразу покажет ошибку.
+            // «Сохранить» в настройке — обычная кнопка, её жмут по делу.
+            val canSave = !state.isSaving && !state.isLoading
+            if (!state.isEditing && state.nameValid) {
+                ChargeButton(
+                    text = "Начать игру",
+                    onCharged = { if (animations) entering = true else onSave() },
+                    enabled = canSave,
+                )
+            } else {
+                FinneyButton(
+                    text = if (state.isEditing) "Сохранить" else "Начать игру",
+                    onClick = onSave,
+                    enabled = canSave,
+                )
+            }
+        }
+        PortalOverlay(portal, blockTouches = entering)
+    }
+}
+
+/**
+ * Портал по шагам: круг открывается на карточке выбранного питомца, питомец
+ * уменьшается и уходит в него, круг растёт на весь экран. Всего ~0,7 с.
+ * [center] и [radius] — где круг на экране: их пишет карточка, пока стоит на месте.
+ */
+private class PortalRun {
+    val open = Animatable(0f)
+    val swallow = Animatable(0f)
+    val grow = Animatable(0f)
+    var center = Offset.Zero
+    var radius = 0f
+
+    suspend fun play() = coroutineScope {
+        launch { open.animateTo(1f, tween(220, easing = EaseOutBack)) }
+        delay(120)
+        swallow.animateTo(1f, tween(300, easing = EaseInBack))
+        grow.animateTo(1f, tween(280, easing = EaseIn))
+    }
+
+    suspend fun reset() {
+        open.snapTo(0f)
+        swallow.snapTo(0f)
+        grow.snapTo(0f)
+    }
+}
+
+/**
+ * Вторая половина портала — круг, который растёт с карточки на весь экран. Лежит
+ * поверх экрана целиком: внутри карточки ему тесно. Пока идёт переход, забирает
+ * касания — карусель под ним не должна сменить питомца.
+ */
+@Composable
+private fun PortalOverlay(portal: PortalRun, blockTouches: Boolean) {
+    var origin by remember { mutableStateOf(Offset.Zero) }
+    val touches = if (blockTouches) {
+        Modifier.pointerInput(Unit) {
+            awaitPointerEventScope {
+                while (true) awaitPointerEvent().changes.forEach { it.consume() }
+            }
+        }
+    } else {
+        Modifier
+    }
+    Canvas(
+        Modifier
+            .fillMaxSize()
+            .onGloballyPositioned { origin = it.positionInRoot() }
+            .then(touches),
+    ) {
+        val g = portal.grow.value
+        if (g <= 0f) return@Canvas
+        val c = portal.center - origin
+        // До самого дальнего угла и ещё запас на обводку — чтобы кольцо ушло за край.
+        val far = maxOf(
+            c.getDistance(),
+            (c - Offset(size.width, 0f)).getDistance(),
+            (c - Offset(0f, size.height)).getDistance(),
+            (c - Offset(size.width, size.height)).getDistance(),
+        ) + 16.dp.toPx()
+        drawPortal(c, lerp(portal.radius, far, g))
     }
 }
 
@@ -263,6 +379,7 @@ private fun CharacterPicker(
     selected: PetCharacter,
     bodyColor: BodyColor,
     enabled: Boolean,
+    portal: PortalRun,
     onSelect: (PetCharacter) -> Unit,
 ) {
     // LazyRow, а не Row: питомцев стало пять, и в ряд по ширине экрана они не
@@ -328,6 +445,7 @@ private fun CharacterPicker(
                     bodyColor = bodyColor,
                     isSelected = character == selected,
                     enabled = enabled,
+                    portal = if (character == selected) portal else null,
                     onSelect = {
                         onSelect(character)
                         scope.launch { list.animateScrollToItem(index) }
@@ -382,6 +500,7 @@ private fun CharacterCard(
     enabled: Boolean,
     onSelect: () -> Unit,
     modifier: Modifier = Modifier,
+    portal: PortalRun? = null,
 ) {
     val animation = rememberPetAnimation()
     val label = CharacterLabels.getValue(character)
@@ -418,7 +537,7 @@ private fun CharacterCard(
             bodyColor = bodyColor,
             mood = PetMood.HAPPY,
             pose = if (isSelected) pose else StillPose,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().then(if (portal != null) Modifier.intoPortal(portal) else Modifier),
         )
         Text(
             text = label,
@@ -429,6 +548,30 @@ private fun CharacterCard(
         )
     }
 }
+
+/**
+ * Первая половина портала — на самой карточке: круг открывается позади питомца,
+ * питомец крутится, уменьшается и пропадает в нём. Круг рисуется до слоя питомца,
+ * поэтому не поворачивается вместе с ним. Сам питомец не меняется — только слой поверх.
+ */
+private fun Modifier.intoPortal(portal: PortalRun): Modifier = this
+    .onGloballyPositioned {
+        val bounds = it.boundsInRoot()
+        portal.center = bounds.center
+        portal.radius = minOf(bounds.width, bounds.height) * PortalShare
+    }
+    .drawBehind {
+        drawPortal(Offset(size.width / 2, size.height / 2), minOf(size.width, size.height) * PortalShare * portal.open.value)
+    }
+    .graphicsLayer {
+        val s = 1f - portal.swallow.value
+        scaleX = s
+        scaleY = s
+        rotationZ = 200f * portal.swallow.value
+    }
+
+/** Радиус открывшегося портала — доля меньшей стороны питомца. */
+private const val PortalShare = 0.42f
 
 /** Поза невыбранного питомца: стоит ровно. Одна на всех, чтобы не плодить лямбды. */
 private val StillPose: () -> PetPose = { PetPose() }
