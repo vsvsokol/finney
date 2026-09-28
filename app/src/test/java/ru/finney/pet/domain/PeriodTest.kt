@@ -110,6 +110,10 @@ class PeriodTest {
         s = game.confirmPlan(s, needs = game.needsHint(s)!!, wants = 0, savings = 10).state()
         check = game.levelCheck(s)
         assertTrue(check.planConfirmed)
+        assertFalse("копилка в плане — только обещание", check.savingsAdded)
+
+        s = game.deposit(s, 10).state()
+        check = game.levelCheck(s)
         assertTrue(check.planMatched)
         assertTrue(check.savingsAdded)
         assertFalse("без игры уровня", check.willPass)

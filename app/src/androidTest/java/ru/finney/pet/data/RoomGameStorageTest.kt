@@ -101,8 +101,8 @@ class RoomGameStorageTest {
         assertEquals(3, after.state.periods.size)
         assertTrue(after.state.periods.take(2).all { it.result != null })
         assertTrue(after.state.balance >= 0)
-        // За круг: 10 из плана (копилка плана списывается сразу) + 15 − 5.
-        assertEquals(40, after.state.goalSaved("goal_bike"))
+        // За круг: + 15 − 5 кнопками; копилка в плане — только обещание.
+        assertEquals(20, after.state.goalSaved("goal_bike"))
         assertEquals("Финни", after.profile.petName)
         assertEquals(look, after.profile.appearance)
     }
@@ -112,10 +112,14 @@ class RoomGameStorageTest {
         val store = store(db)
         val look = PetAppearance(PetCharacter.ROGATIK, BodyColor.A, EyesVariant.ROUND)
         val id = (store.createProfile("Финни", look) as ProfileResult.Saved).profileId
-        // Шляпа — награда за цель: копим 50 и забираем.
+        // Шляпа — награда за цель: копим 90 за два уровня и забираем.
         store.ok(id) { selectGoal(it, "goal_crown") }
         store.ok(id) { addParentBonus(it, 20) }
-        store.ok(id) { confirmPlan(it, needs = 5, wants = 5, savings = 50) }
+        store.ok(id) { confirmPlan(it, needs = 5, wants = 5, savings = 60) }
+        store.ok(id) { deposit(it, 60) }
+        store.ok(id) { closePeriod(it) }
+        store.ok(id) { confirmPlan(it, needs = 5, wants = 5, savings = 30) }
+        store.ok(id) { deposit(it, 30) }
         store.ok(id) { completeGoal(it) }
 
         db.close()

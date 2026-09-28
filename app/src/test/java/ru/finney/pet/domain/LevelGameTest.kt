@@ -68,6 +68,7 @@ class LevelGameTest {
         val game = Fixtures.game()
         var s = game.selectGoal(game.newGame(), "bike").state()
         s = game.confirmPlan(s, needs = game.needsHint(s)!!, wants = 0, savings = 10).state()
+        s = game.deposit(s, 10).state()
         s = game.coverNeeds(s)
 
         var check = game.levelCheck(s)
