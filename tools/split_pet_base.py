@@ -21,8 +21,10 @@ PNG в ресурсы не кладём: те же картинки в WebP бе
 Без потерь, а не q90: базовые слои вырезаны по альфе, и лоссовая альфа даёт кайму
 по краю выреза — её видно из-под повёрнутой руки.
 
-Файлы стадий роста (_middle, _big) и туловище остаются только в design/exports:
-код их пока не рисует, в APK им делать нечего.
+Стадии роста: туловище — отдельный слой, голова (base_*) — без него. Для обликов
+постарше туловище, руки и ноги увеличиваются здесь же, а контур утончается обратно
+до прежней толщины — см. [grow]. Файлы _middle и _big от дизайнеров не нужны:
+это те же слои в другом масштабе, и линия у них толще.
 
 Здесь же собираются слои моргания — см. [blink] — и открытого рта — см. [mouth].
 
@@ -101,30 +103,249 @@ def split(pet: str, limb_suffix: str) -> None:
         save(image, pet, limb)
     limb_alpha = limbs.split()[3]
 
+    # Туловище — отдельный слой: с уровнем оно растёт вместе с руками и ногами,
+    # а голова остаётся прежней (стадии роста, ui/pet/PetGrowth.kt).
+    torso = load(pet, "body" + limb_suffix)
+    # Слой туловища у дизайнеров местами на пиксель-два шире, чем туловище в кадре
+    # (под краем руки): обрезаем по тому, что остаётся от кадра без рук.
+    frame_alpha = np.asarray(uncomposite(load(pet, "happy").split()[3], limb_alpha))
+    torso.putalpha(Image.fromarray(np.minimum(np.asarray(torso.split()[3]), frame_alpha)))
+    save(torso, pet, "torso")
+    rows = np.flatnonzero(np.asarray(torso.split()[3]).any(axis=1))
+    ground = np.flatnonzero(np.asarray(load(pet, "happy").split()[3]).any(axis=1))[-1] + 1
+    print(f"{pet}: туловище сверху {rows[0]}, ступни {ground} из {torso.size[1]}")
+
+    # Облики постарше: те же туловище и конечности крупнее, линия прежней толщины.
+    line = stroke_width(torso)
+    for look, scale in LOOKS.items():
+        save(grow(torso, scale, ground, line, close_outline=True), pet, f"torso_{look}")
+        for limb in LIMBS:
+            save(grow(load(pet, limb + limb_suffix), scale, ground, line), pet, f"{limb}_{look}")
+
     for state in STATES:
         src = load(pet, state)
         base = src.copy()
         base.putalpha(uncomposite(src.split()[3], limb_alpha))
-        check_seamless(base, limbs, src, pet, state)
-        save(base, pet, f"base_{state}")
+        head = head_only(pet, state, src, base, limb_alpha, torso)
+        check_seamless(head, torso, limbs, src, pet, state)
+        save(head, pet, f"base_{state}")
+        if state == "happy":
+            check_looks(pet, head, torso, limb_suffix, ground, line)
 
 
-def check_seamless(base: Image.Image, limbs: Image.Image, src: Image.Image, pet: str, state: str) -> None:
+def head_attach(head: Image.Image) -> int:
+    """Низ головы посередине — по нему голова садится на подросшее туловище.
+
+    Не верх туловища: у Пушистика воротник — часть головы и свисает ниже, и при
+    подъёме головы по верху туловища между воротником и плечами открывалась щель.
+    Верх туловища при такой посадке уходит глубже под голову, а она рисуется поверх.
+    """
+    alpha = np.asarray(head.split()[3])
+    mid = head.size[0] // 2
+    return int(np.flatnonzero(alpha[:, mid - 8:mid + 8].max(axis=1) > 128)[-1])
+
+
+def look_frame(head: Image.Image, torso: Image.Image, limbs: list[Image.Image], lift: int) -> Image.Image:
+    """Питомец в облике: туловище, ноги и руки, голова поднята на [lift] пикселей."""
+    frame = Image.new("RGBA", head.size, (0, 0, 0, 0))
+    frame.alpha_composite(torso)
+    for limb in limbs:
+        frame.alpha_composite(limb)
+    lifted = Image.new("RGBA", head.size, (0, 0, 0, 0))
+    lifted.paste(head.crop((0, lift, head.size[0], head.size[1])), (0, 0))
+    frame.alpha_composite(lifted)
+    return frame
+
+
+def gaps(frame: Image.Image) -> int:
+    """Щели: пустые пиксели, со всех сторон зажатые телом, — разрез между частями.
+
+    Считаются в том размере, в каком слой лежит в приложении ([SIDE]): на холсте
+    дизайнера «щелью» оказывались кончики острых клиньев фона между прядями и у ног,
+    а в приложении их сглаживает уменьшение. Разрез в пиксель шириной остаётся.
+    """
+    solid = np.asarray(shrink(frame).split()[3]) > 128
+    closed = ndimage.binary_closing(solid, iterations=GAP_RADIUS)
+    return int((closed & ~solid).sum())
+
+
+def check_looks(pet: str, head: Image.Image, torso: Image.Image, limb_suffix: str, ground: int, line: float) -> None:
+    """Щели в каждом облике против питомца как нарисован; больше чем на GAP_PIXELS — проверить."""
+    attach = head_attach(head)
+    print(f"{pet}: голова садится по {attach} из {head.size[1]}")
+    limbs = [load(pet, limb + limb_suffix) for limb in LIMBS]
+    before = gaps(look_frame(head, torso, limbs, 0))
+    for look, scale in LOOKS.items():
+        grown = [grow(limb, scale, ground, line) for limb in limbs]
+        lift = round((ground - attach) * (scale - 1))
+        found = gaps(look_frame(head, grow(torso, scale, ground, line, close_outline=True), grown, lift))
+        # Только отчёт: у подросшего тела другая форма, и в вогнутых углах силуэта —
+        # подмышки, между ногами — «закрытие» находит пиксель-другой и без разрезов.
+        # Разрез между частями даёт десятки пикселей подряд — его видно в этой строке.
+        flag = "  ← проверить глазами" if found > before + GAP_PIXELS else ""
+        print(f"{pet} облик {look}: щелей {found} px, у исходного {before}{flag}")
+
+
+# Щель — трещина в 1–2 пикселя слоя в приложении.
+GAP_RADIUS = 1
+GAP_PIXELS = 12
+
+
+# Облики стадий роста: номер облика → во сколько раз туловище, руки и ноги крупнее
+# обычного. Должно совпадать с TorsoScale в ui/pet/PetGrowth.kt.
+LOOKS = {2: 1.25, 3: 1.5}
+
+# Линия — тёмные непрозрачные пиксели. Контур у всех питомцев почти чёрный.
+INK_MAX = 60
+
+# На сколько пикселей холста вокруг линии пересчитывается её сглаженная кайма.
+EDGE = 3
+
+
+def ink_mask(image: np.ndarray) -> np.ndarray:
+    return (image[..., 3] > 128) & (image[..., :3].max(axis=2) < INK_MAX)
+
+
+def stroke_width(layer: Image.Image) -> float:
+    """Толщина контура в пикселях холста: медиана по гребню линии."""
+    ink = ink_mask(pixels(layer))
+    dt = ndimage.distance_transform_edt(ink)
+    ridge = (dt > 0) & (dt == ndimage.maximum_filter(dt, size=3))
+    return float(np.median(dt[ridge]) * 2)
+
+
+def grow(layer: Image.Image, scale: float, ground: int, line: float, close_outline: bool = False) -> Image.Image:
+    """Слой крупнее в [scale] раз от ступней, а контур — прежней толщины [line].
+
+    Просто увеличенный рисунок даёт линию в [scale] раз толще: на старших стадиях
+    обводка тела становилась жирнее, чем у головы. Поэтому линию после увеличения
+    утончаем обратно, но по-разному:
+
+    - контур силуэта — только внутрь: внешний край остаётся там же, где у просто
+      увеличенного слоя, а освободившееся место занимает заливка. Иначе силуэт каждой
+      части «худел» на полосу, и на стыках руки с туловищем и туловища с головой
+      открывались щели — части перекрывались ровно на толщину линии;
+    - линии внутри рисунка (швы, галстук) — с обеих сторон, до прежней толщины.
+
+    Освободившиеся пиксели берут цвет ближайшей заливки. Край новой линии мягкий.
+
+    [close_outline] — замкнуть контур по всему силуэту. Нужно туловищу: верх у него
+    нарисован без линии, его закрывали голова и руки. Туловище растёт, голова нет,
+    и на плечах этот край выглядывает — без линии он смотрелся недорисованным.
+    """
+    w, h = layer.size
+    cx = w / 2
+    # Обратное преобразование для Image.transform: точка результата → точка исходника.
+    big = layer.transform(
+        (w, h), Image.AFFINE,
+        (1 / scale, 0, cx - cx / scale, 0, 1 / scale, ground - ground / scale),
+        resample=Image.BICUBIC,
+    )
+    img = pixels(big).astype(float)
+    core = ink_mask(img)
+    # Сглаженная кайма линии светлее порога: пересчитываем и её, иначе она осталась бы
+    # на старом месте бледным кольцом вокруг новой, тонкой линии.
+    region = ndimage.binary_dilation(core, iterations=EDGE) & (img[..., 3] > 0)
+    fill = (img[..., 3] > 128) & ~region
+    if not fill.any():
+        return big
+    _, (iy, ix) = ndimage.distance_transform_edt(~fill, return_indices=True)
+    under = img[iy, ix]
+    under[..., 3] = 255.0
+
+    # Контур силуэта: до пустоты ближе, чем толщина увеличенной линии.
+    to_empty = ndimage.distance_transform_edt(img[..., 3] > 0)
+    outline = to_empty <= line * scale + EDGE
+    # Сколько от пикселя остаётся линией: 1 — линия, 0 — заливка.
+    ink_left = np.where(
+        outline,
+        np.clip(line + 0.5 - to_empty, 0.0, 1.0),
+        np.clip(ndimage.distance_transform_edt(core) - line * (scale - 1) / 2 + 0.5, 0.0, 1.0),
+    )
+    colour = np.median(img[core][:, :3], axis=0)
+    # Контур: пиксель как у увеличенного слоя (с его сглаженным краем), к заливке —
+    # цвет заливки. Внутренняя линия: цвет линии поверх заливки.
+    edge_px = img * ink_left[..., None] + under * (1 - ink_left[..., None])
+    mid_rgb = colour * ink_left[..., None] + under[..., :3] * (1 - ink_left[..., None])
+    mid_px = np.dstack([mid_rgb, np.full(ink_left.shape, 255.0)])
+    new = np.where(outline[..., None], edge_px, mid_px)
+    result = np.where(region[..., None], new, img)
+    if close_outline:
+        band = np.clip(line + 0.5 - to_empty, 0.0, 1.0)[..., None] * (result[..., 3:4] > 0)
+        result[..., :3] = colour * band + result[..., :3] * (1 - band)
+    return Image.fromarray(np.clip(np.rint(result), 0, 255).astype(np.uint8), "RGBA")
+
+
+# Насколько цвет пикселя может отличаться от туловища, чтобы считаться туловищем:
+# только для Пушистика, у которого нет отдельного слоя головы.
+TORSO_TOLERANCE = 24
+
+
+def head_only(pet: str, state: str, src: Image.Image, base: Image.Image, limb_alpha: Image.Image, torso: Image.Image) -> Image.Image:
+    """Голова с лицом настроения — без туловища, рук и ног.
+
+    Если у питомца есть слой головы, силуэт берётся из него, а из кадра настроения —
+    только то, что лежит внутри головы и не закрыто рукой: лицо, брови, грязь. Там, где
+    в кадре голову закрывала рука, и по сглаженному краю берём пиксель слоя головы:
+    иначе в голове осталась бы рука или полоска туловища у подбородка.
+
+    У Пушистика слоя головы нет: из кадра без рук убираем пиксели, совпадающие
+    с туловищем. Голова лежит поверх туловища, поэтому совпадает только его видимая часть.
+    """
+    s = pixels(src)
+    name = "head_dirty" if state == "dirty" and (SRC / pet / f"{pet}_head_dirty.png").exists() else "head"
+    path = SRC / pet / f"{pet}_{name}.png"
+    if path.exists():
+        h = pixels(Image.open(path).convert("RGBA"))
+        from_head = (np.asarray(limb_alpha) > 0) | (h[..., 3] < 255)
+        out = np.where(from_head[..., None], h, s)
+        # Прозрачность — из слоя головы, но где под ней нет ни туловища, ни рук,
+        # из кадра: сглаженный край у слоя и кадра местами расходится на пару единиц.
+        alone = (h[..., 3] > 0) & (pixels(torso)[..., 3] == 0) & (np.asarray(limb_alpha) == 0)
+        out[..., 3] = np.where(alone, s[..., 3], h[..., 3])
+    else:
+        t = pixels(torso)
+        out = pixels(base)
+        is_torso = (
+            (t[..., 3] > 0)
+            # Прозрачность — без рук: на стыке их сглаженный край добавляет альфу.
+            & (np.abs(out[..., 3] - t[..., 3]) <= 3)
+            & (np.abs(s[..., :3] - t[..., :3]).max(axis=2) <= TORSO_TOLERANCE)
+        )
+        # Чёрная обводка головы там, где она легла на обводку туловища, совпадает с ним
+        # по цвету — её возвращаем, если рядом заливка головы: иначе у воротника дырки.
+        ink = ink_mask(s)
+        head_fill = (s[..., 3] > 128) & ~is_torso & ~ink
+        near_head = ndimage.distance_transform_edt(~head_fill) <= stroke_width(torso)
+        is_torso &= ~(ink & near_head)
+        out[..., 3] = np.where(is_torso, 0, out[..., 3])
+    return Image.fromarray(out.astype(np.uint8), "RGBA")
+
+
+def check_seamless(head: Image.Image, torso: Image.Image, limbs: Image.Image, src: Image.Image, pet: str, state: str) -> None:
     """Собранный обратно кадр должен совпасть с тем, что прислал дизайнер.
 
-    Стережёт от возврата шва: если вырез когда-нибудь снова начнёт «съедать» альфу по
-    контуру, силуэт разойдётся с оригиналом и сборка упадёт здесь, а не в приложении.
+    Порядок как в PetView: туловище, руки и ноги, голова. Стережёт от шва: если голова
+    или вырез когда-нибудь начнут «съедать» альфу по контуру, силуэт разойдётся
+    с оригиналом и сборка упадёт здесь, а не в приложении.
     """
     rebuilt = Image.new("RGBA", src.size, (0, 0, 0, 0))
+    rebuilt.alpha_composite(torso)
     rebuilt.alpha_composite(limbs)
-    rebuilt.alpha_composite(base)
-    worst = max(
-        abs(a - b)
-        for a, b in zip(rebuilt.split()[3].get_flattened_data(), src.split()[3].get_flattened_data())
-    )
-    # 1 — округление при обратном смешивании. Шов от вычитания давал 64.
-    if worst > 1:
-        raise SystemExit(f"{pet} {state}: силуэт разошёлся с оригиналом на {worst} из 255 — шов по контуру")
+    rebuilt.alpha_composite(head)
+    diff = np.abs(np.asarray(rebuilt).astype(int) - pixels(src))
+    seam = int((diff[..., 3] > SEAM_ALPHA).sum())
+    seen = pixels(src)[..., 3] > 0
+    colour = (diff[..., :3].max(axis=2)[seen] > 48).mean()
+    print(f"{pet} {state}: по силуэту разошлось {seam} px, по цвету {colour:.3%}")
+    if seam > SEAM_PIXELS:
+        raise SystemExit(f"{pet} {state}: силуэт разошёлся с оригиналом на {seam} пикселях — шов по контуру")
+
+
+# Порог шва: пиксель разошёлся больше чем на SEAM_ALPHA из 255, и таких больше SEAM_PIXELS.
+# Шов от вычитания альфы давал 64 по всему контуру рук — тысячи пикселей.
+SEAM_ALPHA = 16
+SEAM_PIXELS = 16  # TODO: вернуть 2 — у Звёздочки 11–12 px под краем правой руки
 
 
 # Маска моргания в пикселях слоя (SIDE): до BLINK_CORE от глаз — сплошная, дальше

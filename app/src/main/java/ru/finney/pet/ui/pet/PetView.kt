@@ -80,28 +80,39 @@ fun PetView(
     bodyColor: BodyColor = BodyColor.A,
     /** Надетое — id из магазина: шляпа и очки. Двигается вместе с питомцем: лежит внутри позы. */
     accessories: List<String> = emptyList(),
-    /** Стадия роста = уровень: чем выше, тем крупнее облик ([growthScale]). */
-    stage: Int = GROWN_STAGE,
+    /** Стадия роста = уровень: с ней растут туловище, руки и ноги ([lookFor]). Без стадии — как нарисован. */
+    stage: Int = 1,
 ) {
     val skin = character.skin
     val tint = bodyColor.colorFilter
-    val growth = growthScale(stage)
+    val look = lookFor(stage)
+    val body = skin.bodies[look - 1]
+    val lift = skin.headLift(stage)
     Box(
         modifier = modifier
             .aspectRatio(1f)
             .graphicsLayer {
                 val current = pose()
-                scaleX = current.scaleX * growth
-                scaleY = current.scaleY * growth
+                scaleX = current.scaleX
+                scaleY = current.scaleY
                 translationY = current.offsetY.toPx()
                 rotationZ = current.tilt
                 transformOrigin = skin.ground
             },
     ) {
-        Limb(skin.leftLeg, skin.leftLegPivot, tint) { pose().leftLeg }
-        Limb(skin.rightLeg, skin.rightLegPivot, tint) { pose().rightLeg }
-        Limb(skin.leftHand, skin.leftHandPivot, tint) { pose().leftHand }
-        Limb(skin.rightHand, skin.rightHandPivot, tint) { pose().rightHand }
+        Image(
+            painter = painterResource(body.torso),
+            contentDescription = null,
+            colorFilter = tint,
+            modifier = Modifier.matchParentSize(),
+        )
+        Limb(body.leftLeg, skin.grownPivot(skin.leftLegPivot, look), tint) { pose().leftLeg }
+        Limb(body.rightLeg, skin.grownPivot(skin.rightLegPivot, look), tint) { pose().rightLeg }
+        Limb(body.leftHand, skin.grownPivot(skin.leftHandPivot, look), tint) { pose().leftHand }
+        Limb(body.rightHand, skin.grownPivot(skin.rightHandPivot, look), tint) { pose().rightHand }
+
+        // Голова с лицом и тем, что на ней надето, — поднята на подросшее туловище.
+        Box(modifier = Modifier.matchParentSize().graphicsLayer { translationY = -size.height * lift }) {
 
         Crossfade(
             targetState = skin.face(mood),
@@ -155,6 +166,7 @@ fun PetView(
                 contentScale = ContentScale.FillWidth,
                 modifier = if (art.onEyes) Modifier.glassesPlacement(skin, art) else Modifier.hatPlacement(skin.hat, art.brim),
             )
+        }
         }
     }
 }
