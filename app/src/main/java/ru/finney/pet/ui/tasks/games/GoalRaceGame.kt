@@ -2,10 +2,8 @@ package ru.finney.pet.ui.tasks.games
 
 import ru.finney.pet.ui.motion.motionEnabled
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -52,13 +50,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -71,7 +69,6 @@ import ru.finney.pet.domain.tasks.TaskInput
 import ru.finney.pet.ui.components.AlertBadge
 import ru.finney.pet.ui.components.CheckBadge
 import ru.finney.pet.ui.components.Coin
-import ru.finney.pet.ui.components.FillBar
 import ru.finney.pet.ui.components.FinneyButton
 import ru.finney.pet.ui.components.FinneyIcon
 import ru.finney.pet.ui.components.FinneyIcons
@@ -99,10 +96,16 @@ import ru.finney.pet.ui.theme.StrokeRegular
 //
 // Плейтест: без вступления ребёнок видел «осталось 45», полоску и «−5 / +5»,
 // не понимал, что это, и жал «Готово» наугад; наклейки на втором ходу ставили
-// в тупик, доход в 10 монет было не видно. Поэтому теперь экран объясняет себя
-// сам: доход приходит монетами с «пришло +10», монеты лежат в двух подписанных
-// ящиках, соблазн — с кнопками «Купить» и «Не надо», банка копилки наполняется,
-// а следующий шаг пульсирует. Правила прежние — их считает ядро.
+// в тупик, доход в 10 монет было не видно. Поэтому экран объясняет себя сам:
+// доход приходит монетами в два подписанных ящика, соблазн — с кнопками «Купить»
+// и «Не надо», банка копилки наполняется. Правила прежние — их считает ядро.
+//
+// Плейтест 28.09: «нереально забит весь экран, глаза разбегаются». Теперь одно
+// решение за раз. Всегда видны только дорога (какой день и где Финни), банка
+// с числом и «Следующий день». В обычный день ниже — два ящика и строка «ещё N
+// до цели»; в день соблазна ящики уступают место карточке «Финни хочет…», а после
+// выбора монеты высыпаются в ящики. Доход дня есть во вступлении, «успеваешь ли» —
+// в итоге; сердечки остались лицом на банке.
 
 @Composable
 internal fun GoalRaceGame(
@@ -121,14 +124,7 @@ internal fun GoalRaceGame(
     var decided by remember(day) { mutableStateOf(event == null) }
     val saved = task.startSaved + deposits.sum()
     val mood = TaskEngines.raceMood(task, deposits).lastOrNull() ?: task.mood
-    val firstEventDay = task.events.minOfOrNull { it.day }
     val sounds = LocalSounds.current
-
-    // Доход дня звенит, когда монеты высыпаются в ящики.
-    LaunchedEffect(day) {
-        delay(IncomeDelayMs)
-        sounds.play(Sfx.Coin)
-    }
 
     fun split(toPiggy: Int) {
         today = toPiggy.coerceIn(0, task.incomePerDay)
@@ -138,12 +134,12 @@ internal fun GoalRaceGame(
     GameScene(backdrop = Backdrop.FIELD, onClose = onClose) {
         SceneBody(
             bottom = {
-                // Подсказка первого хода — пульсом: первый день и первый соблазн.
-                val teach = day == 1 || day == firstEventDay
+                // Подсказка первого хода — пульсом, только в первый день: дальше ребёнок знает,
+                // куда жать, а соблазн и так держит кнопку, пока не выбрали.
                 FinneyButton(
                     text = if (day == task.days) "Финиш" else "Следующий день",
                     enabled = decided,
-                    modifier = Modifier.pulse(decided && teach),
+                    modifier = Modifier.pulse(decided && day == 1),
                     onClick = {
                         if (today > 0) sounds.play(Sfx.PiggyIn)
                         val all = deposits + today
@@ -153,29 +149,39 @@ internal fun GoalRaceGame(
             },
         ) {
             Road(task, deposits, day, character, sad = mood == 0)
-            PiggyCard(task, saved = saved, pending = today, mood = mood, lastDeposit = deposits.lastOrNull(), depositCount = deposits.size)
+            // Пока выбирают соблазн, в банке нечего показывать заранее: монеты ещё не разложены.
+            PiggyJarRow(task, saved = saved, pending = if (decided) today else 0, mood = mood, lastDeposit = deposits.lastOrNull(), depositCount = deposits.size)
             Spacer(Modifier.weight(1f))
             ScenePanel(title = null, modifier = Modifier.fillMaxWidth()) {
-                DayHeader(day, task.days, task.incomePerDay)
-                Buckets(task, day = day, toPiggy = today, onPiggy = { split(today + task.step) }, onJoy = { split(today - task.step) })
-                event?.let {
-                    EventCard(
-                        task = task,
-                        event = it,
-                        choice = if (decided) TaskEngines.raceTaken(task, it, today) else null,
-                        moodCounts = mood > 0,
-                        hint = !decided,
-                        onBuy = { split((task.incomePerDay - it.price) / task.step * task.step) },
-                        onSkip = { split(task.incomePerDay) },
+                // Ящики и соблазн — по очереди на одном месте. Обе карточки стоят друг на друге,
+                // высота берётся по большей: кнопки не прыгают, когда одна сменяет другую.
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Buckets(
+                        task,
+                        day = day,
+                        shown = decided,
+                        toPiggy = today,
+                        onPiggy = { split(today + task.step) },
+                        onJoy = { split(today - task.step) },
                     )
+                    event?.let {
+                        EventCard(
+                            task = task,
+                            event = it,
+                            shown = !decided,
+                            moodCounts = mood > 0,
+                            onBuy = { split((task.incomePerDay - it.price) / task.step * task.step) },
+                            onSkip = { split(task.incomePerDay) },
+                        )
+                    }
                 }
                 if (mood == 0) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         AlertBadge(size = 28.dp)
-                        Text("Финни загрустил: без радостей цель не засчитается.", style = MaterialTheme.typography.bodyMedium, color = FinneyInk)
+                        Text("Финни загрустил: без радостей цель не засчитается.", style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
                     }
                 } else {
-                    Forecast(task, savedAfterToday = saved + today, daysLeft = task.days - day)
+                    GoalLeft(task, savedAfterToday = saved + if (decided) today else 0)
                 }
             }
         }
@@ -186,66 +192,41 @@ internal fun GoalRaceGame(
 private const val IncomeDelayMs = 250L
 
 /**
- * Хватит ли до цели: сколько ещё и успеваешь ли, если откладывать весь доход.
+ * Одна строка под ящиками: сколько ещё до цели. Успеваешь ли — уже в итоге:
+ * прогноз на каждый день был ещё одним числом, на которое разбегались глаза.
  * Цель — картинкой: склонять название из контента («до самоката») нельзя.
  */
 @Composable
-private fun Forecast(task: GoalRaceTask, savedAfterToday: Int, daysLeft: Int) {
+private fun GoalLeft(task: GoalRaceTask, savedAfterToday: Int) {
     val left = task.goal.price - savedAfterToday
-    // Набрано — дальше копить незачем, а Финни радость нужна: не толкаем отложить и это.
-    if (left <= 0) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            CheckBadge(size = 28.dp)
-            Text("Набрано! Можно порадовать Финни.", style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
-        }
-        return
-    }
-    val perDay = if (daysLeft == 0) Int.MAX_VALUE else ((left + daysLeft - 1) / daysLeft + task.step - 1) / task.step * task.step
-    val inTime = perDay <= task.incomePerDay
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.semantics(mergeDescendants = true) {
-            contentDescription = "До цели «${task.goal.label}» ещё $left, " + if (inTime) "успеваешь" else "к сроку не успеть"
-        },
+        modifier = Modifier.semantics(mergeDescendants = true) {},
     ) {
-        ItemPicture(task.goal, task.goal.label, 32.dp)
-        Text("ещё $left", style = MaterialTheme.typography.titleMedium, color = FinneyInk, modifier = Modifier.weight(1f))
-        Text(if (inTime) "успеваешь" else "не успеть", style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
-        if (inTime) CheckBadge(size = 26.dp) else AlertBadge(size = 26.dp)
-    }
-}
-
-/** «День 2» и доход дня: «пришло +10» с монеткой выскакивает, когда начинается день. */
-@Composable
-private fun DayHeader(day: Int, days: Int, income: Int) {
-    val pop = remember(day) { Animatable(0f) }
-    LaunchedEffect(day) {
-        pop.animateTo(1f, spring(dampingRatio = 0.4f, stiffness = Spring.StiffnessMediumLow))
-    }
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        OutlinedText("День $day", style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { contentDescription = "День $day из $days" })
-        Spacer(Modifier.weight(1f))
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            modifier = Modifier
-                .graphicsLayer {
-                    scaleX = pop.value
-                    scaleY = pop.value
-                }
-                .clip(RoundedCornerShape(50))
-                .background(FinneyYellow)
-                .border(StrokeRegular, FinneyInk, RoundedCornerShape(50))
-                .padding(horizontal = 10.dp, vertical = 2.dp)
-                .clearAndSetSemantics { contentDescription = "Сегодня пришло $income монет" },
-        ) {
-            Text("пришло", style = MaterialTheme.typography.labelMedium, color = FinneyInk)
-            OutlinedText("+$income", style = MaterialTheme.typography.titleLarge)
-            Coin(size = 22.dp)
+        // Набрано — дальше копить незачем, а Финни радость нужна: не толкаем отложить и это.
+        if (left <= 0) {
+            CheckBadge(size = 28.dp)
+            Text("Набрано! Можно порадовать Финни.", style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
+        } else {
+            ItemPicture(task.goal, task.goal.label, 32.dp)
+            Text("ещё $left до цели", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
         }
     }
 }
+
+/**
+ * Показ и уход карточки на месте решения дня: уходящая сжимается и гаснет, но место под
+ * собой держит. Невидимая не нажимается и не читается TalkBack.
+ */
+private fun Modifier.slotPart(shown: Boolean, visibility: Float): Modifier = this
+    .graphicsLayer {
+        alpha = visibility
+        val s = 0.9f + 0.1f * visibility
+        scaleX = s
+        scaleY = s
+    }
+    .then(if (shown) Modifier else Modifier.clearAndSetSemantics {})
 
 /**
  * Два ящика с монетами дня: «в копилку» и «на радость». Нажатие на ящик
@@ -253,17 +234,26 @@ private fun DayHeader(day: Int, days: Int, income: Int) {
  * Раньше монеты делила черта, которую надо было тянуть, а подписей не было.
  */
 @Composable
-private fun Buckets(task: GoalRaceTask, day: Int, toPiggy: Int, onPiggy: () -> Unit, onJoy: () -> Unit) {
+private fun Buckets(task: GoalRaceTask, day: Int, shown: Boolean, toPiggy: Int, onPiggy: () -> Unit, onJoy: () -> Unit) {
+    val sounds = LocalSounds.current
     // Монеты высыпаются в ящики каждый новый день — это и есть «пришёл доход».
+    // В день соблазна — когда выбор сделан и ящики показались.
     var arrived by remember(day) { mutableStateOf(false) }
-    LaunchedEffect(day) {
+    LaunchedEffect(day, shown) {
+        arrived = false
+        if (!shown) return@LaunchedEffect
         delay(IncomeDelayMs)
         arrived = true
+        sounds.play(Sfx.Coin)
     }
+    val visibility by animateFloatAsState(if (shown) 1f else 0f, tween(220), label = "buckets")
     val income = task.incomePerDay
     // Одна монетка — одна финка, пока их не больше двадцати; иначе монетка — шаг взноса.
     val unit = if (income <= 20) 1 else task.step
-    Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(
+        Modifier.fillMaxWidth().height(IntrinsicSize.Min).slotPart(shown, visibility),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         Bucket(
             icon = { FinneyIcon(FinneyIcons.Piggy, size = 24.dp) },
             label = "в копилку",
@@ -274,7 +264,7 @@ private fun Buckets(task: GoalRaceTask, day: Int, toPiggy: Int, onPiggy: () -> U
             arrived = arrived,
             coin = FinneyYellow,
             step = task.step,
-            canTake = toPiggy + task.step <= income,
+            canTake = shown && toPiggy + task.step <= income,
             onTake = onPiggy,
             modifier = Modifier.weight(1f).fillMaxHeight(),
         )
@@ -288,7 +278,7 @@ private fun Buckets(task: GoalRaceTask, day: Int, toPiggy: Int, onPiggy: () -> U
             arrived = arrived,
             coin = FinneyPeach,
             step = task.step,
-            canTake = toPiggy - task.step >= 0,
+            canTake = shown && toPiggy - task.step >= 0,
             onTake = onJoy,
             modifier = Modifier.weight(1f).fillMaxHeight(),
         )
@@ -385,22 +375,24 @@ private fun Bucket(
  * Соблазн дня: что хочет Финни и две кнопки — «Купить» и «Не надо». На кнопках —
  * что станет с настроением. Кнопки лишь раскладывают монеты дня за ребёнка; взят
  * соблазн или нет, решает ядро по тому, сколько монет осталось на радость.
- * [choice] null — ещё не решено: кнопки пульсируют, дальше не пройти.
+ * Выбрали — карточка уступает место ящикам, и монеты в них показывают выбор.
+ * Кнопки стоят спокойно: пульс заставлял их прыгать, а решение здесь и так одно.
  */
 @Composable
 private fun EventCard(
     task: GoalRaceTask,
     event: RaceEvent,
-    choice: Boolean?,
+    shown: Boolean,
     moodCounts: Boolean,
-    hint: Boolean,
     onBuy: () -> Unit,
     onSkip: () -> Unit,
 ) {
+    val visibility by animateFloatAsState(if (shown) 1f else 0f, tween(220), label = "event")
     Column(
         verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier
             .fillMaxWidth()
+            .slotPart(shown, visibility)
             .clip(RoundedCornerShape(16.dp))
             .background(Color.White)
             .border(StrokeRegular, FinneyInk, RoundedCornerShape(16.dp))
@@ -409,7 +401,7 @@ private fun EventCard(
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ItemPicture(event, event.label, 44.dp)
             Column(Modifier.weight(1f)) {
-                Text("Финни хочет:", style = MaterialTheme.typography.labelMedium, color = FinneyInk)
+                Text("Финни хочет:", style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
                 Text(event.label, style = MaterialTheme.typography.titleMedium, color = FinneyInk)
             }
             PriceTag(event.price.toString())
@@ -418,31 +410,28 @@ private fun EventCard(
             ChoiceButton(
                 text = "Купить",
                 up = true,
-                selected = choice == true,
-                enabled = event.price <= task.incomePerDay,
+                enabled = shown && event.price <= task.incomePerDay,
                 moodCounts = moodCounts,
-                modifier = Modifier.weight(1f).pulse(hint),
+                modifier = Modifier.weight(1f),
                 onClick = onBuy,
             )
             ChoiceButton(
                 text = "Не надо",
                 up = false,
-                selected = choice == false,
-                enabled = true,
+                enabled = shown,
                 moodCounts = moodCounts,
-                modifier = Modifier.weight(1f).pulse(hint),
+                modifier = Modifier.weight(1f),
                 onClick = onSkip,
             )
         }
     }
 }
 
-/** Кнопка выбора: слово и «+♥» / «−♥». Выбранная — жёлтая, с толстой рамкой и «✓». */
+/** Кнопка выбора: слово и «+♥» / «−♥». */
 @Composable
 private fun ChoiceButton(
     text: String,
     up: Boolean,
-    selected: Boolean,
     enabled: Boolean,
     moodCounts: Boolean,
     modifier: Modifier,
@@ -456,19 +445,17 @@ private fun ChoiceButton(
             .defaultMinSize(minHeight = 52.dp)
             .alpha(if (enabled) 1f else 0.4f)
             .clip(RoundedCornerShape(50))
-            .background(if (selected) FinneyYellow else FinneyCream)
-            .border(if (selected) StrokeBold else StrokeRegular, FinneyInk, RoundedCornerShape(50))
+            .background(FinneyCream)
+            .border(StrokeRegular, FinneyInk, RoundedCornerShape(50))
             .clickable(enabled = enabled, role = Role.Button) {
                 sounds.play(Sfx.Tap)
                 onClick()
             }
             .semantics {
-                this.selected = selected
                 contentDescription = text + if (moodCounts) (if (up) ", настроение плюс одно" else ", настроение минус одно") else ""
             }
             .padding(horizontal = 8.dp),
     ) {
-        if (selected) CheckBadge(size = 22.dp)
         Text(text, style = MaterialTheme.typography.titleMedium, color = FinneyInk)
         // Грустному Финни сердечки уже не вернуть — значок не обещает лишнего.
         if (moodCounts) {
@@ -479,42 +466,29 @@ private fun ChoiceButton(
 }
 
 /**
- * Копилка: банка наполняется монетами, рядом «сколько из скольки» с полосой и
- * настроение Финни. Сегодняшний взнос виден заранее — светлой полосой и уровнем
- * в банке; положили — над банкой всплывает «+5».
+ * Копилка — одна банка с числом рядом. Сегодняшний взнос виден заранее — светлым
+ * уровнем в банке; положили — над банкой всплывает «+5». Лицо на банке — настроение
+ * Финни: отдельная шкала сердечек дублировала его и занимала строку.
  */
 @Composable
-private fun PiggyCard(task: GoalRaceTask, saved: Int, pending: Int, mood: Int, lastDeposit: Int?, depositCount: Int) {
+private fun PiggyJarRow(task: GoalRaceTask, saved: Int, pending: Int, mood: Int, lastDeposit: Int?, depositCount: Int) {
+    val feeling = when {
+        mood == 0 -> "Финни грустит"
+        mood < task.mood -> "Финни спокоен"
+        else -> "Финни доволен"
+    }
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(FinneyCream)
-            .border(StrokeRegular, FinneyInk, RoundedCornerShape(16.dp))
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .clearAndSetSemantics { contentDescription = "В копилке $saved из ${task.goal.price}. $feeling" },
     ) {
         Box(contentAlignment = Alignment.TopCenter) {
-            PiggyJar(saved = saved, pending = pending, price = task.goal.price)
+            PiggyJar(saved = saved, pending = pending, price = task.goal.price, mood = mood, maxMood = task.mood)
             DepositPop(lastDeposit, depositCount)
         }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            // Сердечки — в той же строке: их «+♥ / −♥» стоят на кнопках соблазна, так что
-            // что они значат, видно и без подписи, а поле дороги не теряет высоту.
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Копилка", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
-                OutlinedText("$saved / ${task.goal.price}", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-                Hearts(mood, task.mood)
-            }
-            FillBar(
-                value = saved,
-                max = task.goal.price,
-                pending = pending,
-                modifier = Modifier.fillMaxWidth(),
-                description = "В копилке $saved из ${task.goal.price}, сегодня плюс $pending",
-            )
-        }
+        OutlinedText("$saved / ${task.goal.price}", style = MaterialTheme.typography.headlineMedium)
     }
 }
 
@@ -548,12 +522,16 @@ private fun DepositPop(amount: Int?, count: Int) {
     }
 }
 
-/** Банка копилки: жёлтые монеты поднимаются по мере накопления, сегодняшние — светлее. */
+/**
+ * Банка копилки: жёлтые монеты поднимаются по мере накопления, сегодняшние — светлее.
+ * На банке лицо: улыбка, пока Финни доволен, ровный рот, когда сердечек меньше, и
+ * грусть, когда их не осталось.
+ */
 @Composable
-private fun PiggyJar(saved: Int, pending: Int, price: Int) {
+private fun PiggyJar(saved: Int, pending: Int, price: Int, mood: Int, maxMood: Int) {
     val fill by animateFloatAsState((saved.toFloat() / price).coerceIn(0f, 1f), tween(700), label = "jar")
     val extra by animateFloatAsState((pending.toFloat() / price).coerceIn(0f, 1f), tween(300), label = "jarToday")
-    Canvas(Modifier.size(width = 48.dp, height = 58.dp)) {
+    Canvas(Modifier.size(width = 64.dp, height = 76.dp)) {
         val lid = 9.dp.toPx()
         val stroke = StrokeRegular.toPx()
         val radius = CornerRadius(12.dp.toPx())
@@ -578,9 +556,31 @@ private fun PiggyJar(saved: Int, pending: Int, price: Int) {
             }
         }
         drawPath(body, FinneyInk, style = Stroke(stroke))
+        drawJarFace(top = lid + bodyHeight * 0.22f, mood = mood, maxMood = maxMood)
         drawRoundRect(FinneyPeach, Offset(4.dp.toPx(), 0f), Size(size.width - 8.dp.toPx(), lid), CornerRadius(4.dp.toPx()))
         drawRoundRect(FinneyInk, Offset(4.dp.toPx(), 0f), Size(size.width - 8.dp.toPx(), lid), CornerRadius(4.dp.toPx()), style = Stroke(stroke))
     }
+}
+
+/** Лицо на банке: две точки-глаза и рот — дугой вверх, прямой или дугой вниз. */
+private fun DrawScope.drawJarFace(top: Float, mood: Int, maxMood: Int) {
+    val cx = size.width / 2
+    val eye = 3.dp.toPx()
+    val gap = 9.dp.toPx()
+    drawCircle(FinneyInk, eye, Offset(cx - gap, top))
+    drawCircle(FinneyInk, eye, Offset(cx + gap, top))
+    val mouthY = top + 10.dp.toPx()
+    val half = 8.dp.toPx()
+    val bend = 5.dp.toPx() * when {
+        mood == 0 -> -1f
+        mood < maxMood -> 0f
+        else -> 1f
+    }
+    val mouth = Path().apply {
+        moveTo(cx - half, mouthY)
+        quadraticTo(cx, mouthY + bend * 2, cx + half, mouthY)
+    }
+    drawPath(mouth, FinneyInk, style = Stroke(2.5.dp.toPx(), cap = StrokeCap.Round))
 }
 
 /**
@@ -590,7 +590,12 @@ private fun PiggyJar(saved: Int, pending: Int, price: Int) {
  */
 @Composable
 private fun Road(task: GoalRaceTask, deposits: List<Int>, day: Int, character: PetCharacter, sad: Boolean) {
-    BoxWithConstraints(Modifier.fillMaxWidth().height(RoadHeight)) {
+    BoxWithConstraints(
+        Modifier
+            .fillMaxWidth()
+            .height(RoadHeight)
+            .semantics { contentDescription = "День $day из ${task.days}" },
+    ) {
         val goalSlot = 64.dp
         val stepX = (maxWidth - goalSlot) / task.days
         val circle = (stepX - 6.dp).coerceIn(26.dp, 40.dp)
