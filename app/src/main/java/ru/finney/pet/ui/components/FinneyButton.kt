@@ -41,6 +41,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -170,6 +172,7 @@ private val BackLabels = setOf("Назад", "Закрыть", "Отмена", "
  * палец у неё свои.
  * [calm] — зелёная с голубой полосой вместо жёлтой: второстепенные пути в панели
  * уровня («Итоги и история», «Ещё поиграю»), как в макете экрана условий уровня.
+ * [textStyle] — кегль надписи: в панели уровня кнопки крупнее обычных, как в макете.
  */
 @Composable
 fun FinneyButton(
@@ -182,6 +185,7 @@ fun FinneyButton(
     icon: (@Composable () -> Unit)? = null,
     interactionSource: MutableInteractionSource? = null,
     calm: Boolean = false,
+    textStyle: TextStyle = MaterialTheme.typography.titleLarge,
 ) {
     val sounds = LocalSounds.current
     val interactionSource = interactionSource ?: remember { MutableInteractionSource() }
@@ -225,7 +229,7 @@ fun FinneyButton(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 icon?.invoke()
-                OutlinedText(text, style = MaterialTheme.typography.titleLarge)
+                OutlinedText(text, style = textStyle, textAlign = TextAlign.Center)
             }
         }
     }

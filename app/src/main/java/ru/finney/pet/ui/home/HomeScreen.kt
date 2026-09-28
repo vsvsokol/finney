@@ -1,5 +1,7 @@
 package ru.finney.pet.ui.home
 
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.ui.geometry.Size
@@ -1147,9 +1149,16 @@ private fun LevelPanel(
                 if (levelGame != null && check.levelTaskId != null) {
                     LevelGameRow(levelGame, check.gamePassed, required = check.gameRequired)
                 }
+                // Обязательна ли игра — здесь, а не в её плашке: там крупному
+                // названию и так тесно.
+                val withGame = levelGame != null && check.levelTaskId != null && check.gameRequired
                 Text(
-                    "Выполни ${check.toPass} из $LEVEL_CONDITIONS:",
-                    style = MaterialTheme.typography.bodyLarge,
+                    if (withGame) {
+                        "Пройди игру и выполни ${check.toPass} из $LEVEL_CONDITIONS:"
+                    } else {
+                        "Выполни ${check.toPass} из $LEVEL_CONDITIONS:"
+                    },
+                    style = MaterialTheme.typography.titleLarge,
                     color = FinneyInk,
                     textAlign = TextAlign.Center,
                 )
@@ -1203,6 +1212,7 @@ private fun LevelPanel(
                     text = "Завершить уровень",
                     onClick = onFinish,
                     enabled = !asleep,
+                    textStyle = LevelMainButtonText,
                     modifier = Modifier.graphicsLayer { alpha = if (asleep) NightDim else 1f },
                 )
             }
@@ -1213,6 +1223,7 @@ private fun LevelPanel(
                 onClick = onOpenProgress,
                 fillWidth = false,
                 calm = true,
+                textStyle = LevelSideButtonText,
                 modifier = Modifier.fillMaxWidth(SideButtonWidth),
             )
             FinneyButton(
@@ -1220,6 +1231,7 @@ private fun LevelPanel(
                 onClick = onDismiss,
                 fillWidth = false,
                 calm = true,
+                textStyle = LevelSideButtonText,
                 modifier = Modifier.fillMaxWidth(SideButtonWidth),
             )
         }
@@ -1228,6 +1240,23 @@ private fun LevelPanel(
 
 /** Ширина второстепенных кнопок панели уровня — доля ширины панели, как в макете. */
 private const val SideButtonWidth = 0.82f
+
+// Кегли панели уровня. В макете надписи здесь заметно крупнее, чем на обычных
+// кнопках: это главный выбор уровня, и его должно быть видно издалека.
+// lineHeight задан вместе с кеглем: у Glina высокие круглые буквы, и без запаса
+// строки им срезает верх (см. Type.kt).
+
+/** «Уровень N» над панелью. */
+private val LevelTitleText: TextStyle @Composable get() = MaterialTheme.typography.headlineLarge.copy(fontSize = 40.sp, lineHeight = 52.sp)
+
+/** «Завершить уровень». */
+private val LevelMainButtonText: TextStyle @Composable get() = MaterialTheme.typography.headlineLarge.copy(fontSize = 30.sp, lineHeight = 40.sp)
+
+/** «Итоги и история», «Ещё поиграю». */
+private val LevelSideButtonText: TextStyle @Composable get() = MaterialTheme.typography.headlineLarge.copy(fontSize = 27.sp, lineHeight = 36.sp)
+
+/** Название игры уровня и подписи плиток. */
+private val LevelItemText: TextStyle @Composable get() = MaterialTheme.typography.headlineLarge.copy(fontSize = 23.sp, lineHeight = 31.sp)
 
 /** Номер уровня плашкой-«стадионом» над панелью: та же заливка, что у кнопки, но не нажимается. */
 @Composable
@@ -1241,7 +1270,7 @@ private fun LevelTitle(level: Int) {
             .padding(horizontal = 36.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center,
     ) {
-        OutlinedText("Уровень $level", style = MaterialTheme.typography.headlineMedium)
+        OutlinedText("Уровень $level", style = LevelTitleText)
     }
 }
 
@@ -1266,10 +1295,15 @@ private fun LevelGameRow(game: String, passed: Boolean, required: Boolean) {
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         FinneyIcon(FinneyIcons.Gamepad, size = 40.dp)
-        Column(Modifier.weight(1f)) {
-            Text("Игра «$game»", style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
-            Text(note, style = MaterialTheme.typography.bodyLarge, color = FinneyInkFaded)
-        }
+        // Без слова «Игра»: о нём говорит геймпад, а с ним название крупным кеглем
+        // переносилось и вылезало на нижнюю полосу плашки.
+        Text(
+            "«$game»",
+            style = LevelItemText,
+            color = FinneyInk,
+            maxLines = 2,
+            modifier = Modifier.weight(1f),
+        )
         CheckSquare(passed)
     }
 }
@@ -1312,7 +1346,7 @@ private fun ConditionTile(
                 .border(StrokeRegular, FinneyInk, RoundedCornerShape(RadiusCard)),
             contentAlignment = Alignment.Center,
         ) { icon() }
-        Text(label, style = MaterialTheme.typography.bodyLarge, color = FinneyInk, maxLines = 1)
+        Text(label, style = LevelItemText, color = FinneyInk, maxLines = 1)
         CheckSquare(done)
     }
 }
