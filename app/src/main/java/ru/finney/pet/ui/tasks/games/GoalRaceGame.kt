@@ -84,6 +84,7 @@ import ru.finney.pet.ui.theme.FinneyPeach
 import ru.finney.pet.ui.theme.FinneyYellow
 import ru.finney.pet.ui.theme.StrokeBold
 import ru.finney.pet.ui.theme.StrokeRegular
+import ru.finney.pet.ui.theme.StrokeThin
 
 // «Дорога к цели», как ходилка в Тамагочи, только фишку двигает копилка, а не
 // кубик. Каждый день Финни получает доход, и ребёнок решает, куда его деть:
@@ -562,15 +563,23 @@ private fun PiggyJar(saved: Int, pending: Int, price: Int, mood: Int, maxMood: I
     }
 }
 
-/** Лицо на банке: две точки-глаза и рот — дугой вверх, прямой или дугой вниз. */
+/**
+ * Лицо на банке: две точки-глаза и рот — дугой вверх, прямой или дугой вниз.
+ * Нарисовано на белой наклейке: в полной банке кольца монет съедали лицо.
+ */
 private fun DrawScope.drawJarFace(top: Float, mood: Int, maxMood: Int) {
     val cx = size.width / 2
+    val label = Size(34.dp.toPx(), 26.dp.toPx())
+    val labelTopLeft = Offset(cx - label.width / 2, top - 7.dp.toPx())
+    val labelRadius = CornerRadius(8.dp.toPx())
+    drawRoundRect(Color.White, labelTopLeft, label, labelRadius)
+    drawRoundRect(FinneyInk, labelTopLeft, label, labelRadius, style = Stroke(StrokeThin.toPx()))
     val eye = 3.dp.toPx()
-    val gap = 9.dp.toPx()
+    val gap = 8.dp.toPx()
     drawCircle(FinneyInk, eye, Offset(cx - gap, top))
     drawCircle(FinneyInk, eye, Offset(cx + gap, top))
     val mouthY = top + 10.dp.toPx()
-    val half = 8.dp.toPx()
+    val half = 7.dp.toPx()
     val bend = 5.dp.toPx() * when {
         mood == 0 -> -1f
         mood < maxMood -> 0f
