@@ -1,5 +1,10 @@
 package ru.finney.pet.ui.home
 
+import ru.finney.pet.R
+import androidx.annotation.DrawableRes
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.Image
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.foundation.Canvas
@@ -1172,7 +1177,7 @@ private fun LevelPanel(
                         spoken = "Сыт, чист и выспался",
                         done = check.needsCovered,
                         modifier = Modifier.weight(1f),
-                    ) { SmileFace(Modifier.fillMaxSize(0.66f)) }
+                    ) { LevelIcon(R.drawable.ic_level_care) }
                     // «По плану» проверяют по числам на другом экране: плитка ведёт
                     // туда, в «План и факт». Иначе этот экран ребёнок видел один
                     // раз — сразу после подтверждения плана.
@@ -1188,7 +1193,7 @@ private fun LevelPanel(
                         spoken = "Отложено в копилку",
                         done = check.savingsAdded,
                         modifier = Modifier.weight(1f),
-                    ) { FinneyIcon(FinneyIcons.Piggy, size = 56.dp) }
+                    ) { LevelIcon(R.drawable.ic_level_piggy) }
                 }
                 Text(
                     if (check.willPass) {
@@ -1291,16 +1296,22 @@ private fun LevelGameRow(game: String, passed: Boolean, required: Boolean) {
             .clearAndSetSemantics {
                 contentDescription = "Игра «$game», $note: ${if (passed) "пройдена" else "пока нет"}"
             }
-            .padding(start = 20.dp, end = 14.dp, top = 8.dp, bottom = 16.dp),
+            .padding(start = 20.dp, end = 14.dp, top = 6.dp, bottom = 22.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        FinneyIcon(FinneyIcons.Gamepad, size = 40.dp)
+        Image(
+            painterResource(R.drawable.ic_level_game),
+            contentDescription = null,
+            modifier = Modifier.size(width = 47.dp, height = 40.dp),
+        )
         // Без слова «Игра»: о нём говорит геймпад, а с ним название крупным кеглем
         // переносилось и вылезало на нижнюю полосу плашки.
         Text(
             "«$game»",
-            style = LevelItemText,
+            // Длинное название («Лимонадная лавка») встаёт в две строки: интервал
+            // плотнее, чтобы вторая строка не заходила на нижнюю полосу плашки.
+            style = LevelItemText.copy(lineHeight = 26.sp),
             color = FinneyInk,
             maxLines = 2,
             modifier = Modifier.weight(1f),
@@ -1381,26 +1392,18 @@ private fun CheckSquare(done: Boolean) {
     }
 }
 
-/** Смайлик условия «уход»: питомец сыт, чист и выспался — значит, доволен. */
+/**
+ * Значок условия в плитке — рисунок из design/exports/ui/icons (tools/render_icons.py).
+ * Подпись для TalkBack не нужна: плитка читается целиком своей фразой.
+ */
 @Composable
-private fun SmileFace(modifier: Modifier = Modifier) {
-    Canvas(modifier.aspectRatio(1f)) {
-        val s = size.minDimension
-        val line = s * 0.08f
-        drawCircle(FinneyYellow, s * 0.5f - line / 2f)
-        drawCircle(FinneyInk, s * 0.5f - line / 2f, style = Stroke(line))
-        drawCircle(FinneyInk, s * 0.06f, Offset(s * 0.36f, s * 0.40f))
-        drawCircle(FinneyInk, s * 0.06f, Offset(s * 0.64f, s * 0.40f))
-        drawArc(
-            color = FinneyInk,
-            startAngle = 20f,
-            sweepAngle = 140f,
-            useCenter = false,
-            topLeft = Offset(s * 0.30f, s * 0.36f),
-            size = Size(s * 0.40f, s * 0.30f),
-            style = Stroke(line, cap = StrokeCap.Round),
-        )
-    }
+private fun LevelIcon(@DrawableRes id: Int) {
+    Image(
+        painterResource(id),
+        contentDescription = null,
+        contentScale = ContentScale.Fit,
+        modifier = Modifier.size(60.dp),
+    )
 }
 
 /**
