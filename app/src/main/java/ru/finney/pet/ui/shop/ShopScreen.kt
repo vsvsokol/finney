@@ -22,6 +22,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import ru.finney.pet.domain.model.Category
+import ru.finney.pet.ui.components.FinneyIcon
+import ru.finney.pet.ui.components.categoryIcon
 import ru.finney.pet.domain.game.PurchasePreview
 import ru.finney.pet.domain.game.Rejection
 import ru.finney.pet.ui.components.CoinAmount
@@ -34,9 +37,8 @@ import ru.finney.pet.ui.room.CarePanel
 import ru.finney.pet.ui.room.ItemPicture
 import ru.finney.pet.ui.room.PickHint
 import ru.finney.pet.ui.room.itemFallback
-import ru.finney.pet.ui.theme.FinneyGreen
+import ru.finney.pet.ui.theme.FinneyCream
 import ru.finney.pet.ui.theme.FinneyInk
-import ru.finney.pet.ui.theme.FinneyPink
 import ru.finney.pet.ui.theme.RadiusField
 import ru.finney.pet.ui.theme.StrokeRegular
 
@@ -171,10 +173,12 @@ private fun ShopSection(
  */
 @Composable
 private fun CategoryBanner(kind: SectionKind, planLeft: Int?) {
-    val (color, why) = when (kind) {
-        SectionKind.NEEDS -> FinneyGreen to "Без этого Финни плохо"
-        SectionKind.WANTS -> FinneyPink to "Для радости. Можно и потом"
-        SectionKind.TOYS -> FinneyPink to "Это «хочется». Игрушка лежит в зале"
+    // Категория — значком, а не цветом полосы: зелёное «нужное» и розовое «хочется»
+    // читались как «правильно» и «неправильно».
+    val (icon, why) = when (kind) {
+        SectionKind.NEEDS -> categoryIcon(Category.NEEDS) to "Без этого Финни плохо"
+        SectionKind.WANTS -> categoryIcon(Category.WANTS) to "Для радости. Можно и потом"
+        SectionKind.TOYS -> categoryIcon(Category.WANTS) to "Это «хочется». Игрушка лежит в зале"
     }
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -182,11 +186,12 @@ private fun CategoryBanner(kind: SectionKind, planLeft: Int?) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(RadiusField))
-            .background(color)
+            .background(FinneyCream)
             .border(StrokeRegular, FinneyInk, RoundedCornerShape(RadiusField))
             .padding(horizontal = 12.dp, vertical = 8.dp)
             .semantics(mergeDescendants = true) {},
     ) {
+        FinneyIcon(icon, size = 28.dp)
         Text(why, style = MaterialTheme.typography.titleMedium, color = FinneyInk, modifier = Modifier.weight(1f))
         planLeft?.let {
             Column(horizontalAlignment = Alignment.End) {

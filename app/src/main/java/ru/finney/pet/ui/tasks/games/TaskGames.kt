@@ -41,15 +41,13 @@ import ru.finney.pet.domain.tasks.TaskDetails
 import ru.finney.pet.domain.tasks.TaskEngines
 import ru.finney.pet.domain.tasks.TaskInput
 import ru.finney.pet.domain.tasks.TaskInputError
+import ru.finney.pet.ui.components.StableOutlinedText
 import ru.finney.pet.ui.components.StableText
 import ru.finney.pet.ui.components.AlertBadge
 import ru.finney.pet.ui.components.CheckBadge
 import ru.finney.pet.ui.components.FillBar
-import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.components.SpendBar
-import ru.finney.pet.ui.theme.FinneyGreen
 import ru.finney.pet.ui.theme.FinneyInk
-import ru.finney.pet.ui.theme.FinneyInkFaded
 import ru.finney.pet.ui.theme.FinneyPeach
 import ru.finney.pet.ui.theme.FinneyPink
 import ru.finney.pet.ui.theme.FinneyYellow
@@ -218,10 +216,14 @@ fun ColumnScope.ResultBody(task: TaskDefinition, details: TaskDetails, input: Ta
 
         is TaskDetails.Stand -> {
             val stand = task as? StandTask
-            LedgerRow("+", FinneyGreen, "Продал ${cupCount(details.sold)}", "+${details.earned}")
+            val amounts = listOf("+${details.earned}", "−${details.spent}", details.kept.toString())
+            // Столбец сумм — одной ширины по самой длинной, числа прижаты вправо:
+            // так «+40», «−12» и «28» стоят разряд под разрядом, как в чеке.
+            val widest = amounts.maxBy { it.length }
+            LedgerRow("+", FinneyYellow, "Продал ${cupCount(details.sold)}", amounts[0], widest)
             // Название сырья приходит из контента в одной форме, поэтому «× 7», а не «7 лимон».
-            LedgerRow("−", FinneyPeach, "Купил: ${stand?.ingredient?.label?.lowercase().orEmpty()} × ${details.spent / (stand?.ingredient?.price ?: 1)}", "−${details.spent}")
-            LedgerRow("=", Color.White, "Заработал", details.kept.toString(), highlight = true)
+            LedgerRow("−", FinneyPeach, "Купил: ${stand?.ingredient?.label?.lowercase().orEmpty()} × ${details.spent / (stand?.ingredient?.price ?: 1)}", amounts[1], widest)
+            LedgerRow("=", Color.White, "Заработал", amounts[2], widest, highlight = true)
             val notes = listOfNotNull(
                 details.leftover.takeIf { it > 0 }?.let { "${cupCount(it)} не купили" },
                 details.missed.takeIf { it > 0 }?.let { "${plural(it, "гостю", "гостям", "гостям")} не хватило" },
@@ -290,9 +292,12 @@ fun ColumnScope.ResultBody(task: TaskDefinition, details: TaskDetails, input: Ta
 }
 
 /**
- * Строка итога. Удачное — тихо: без подложки, бледным текстом и маленьким «✓».
+ * Строка итога. Удачное — тихо: без подложки, обычным текстом и маленьким «✓».
  * Неудачное — заметно: розовая подложка в рамке, крупнее и с «!». Отметка дублирует
  * цвет знаком (ТЗ п. 3.6).
+ *
+ * Бледным удачное больше не пишется: на плейтесте полупрозрачные верные строки
+ * приняли за ошибку отрисовки. Тише — значит без подложки, а не без цвета.
  */
 @Composable
 private fun ResultRow(art: ItemArt?, text: String, ok: Boolean, note: String? = null) {
@@ -303,7 +308,7 @@ private fun ResultRow(art: ItemArt?, text: String, ok: Boolean, note: String? = 
             modifier = Modifier.padding(horizontal = 4.dp),
         ) {
             art?.let { ItemPicture(it, text, 28.dp) }
-            Text(text, style = MaterialTheme.typography.bodyLarge, color = FinneyInkFaded, modifier = Modifier.weight(1f))
+            Text(text, style = MaterialTheme.typography.bodyLarge, color = FinneyInk, modifier = Modifier.weight(1f))
             CheckBadge(size = 24.dp)
         }
         return
@@ -324,7 +329,8 @@ private fun ResultRow(art: ItemArt?, text: String, ok: Boolean, note: String? = 
 
 /**
  * Раунд кассы: что купили и какие монеты дали — монетами, а не «2 + 1», и сумма.
- * Ошибка — как любая неудачная строка итога, и под ней сколько было нужно.
+ * Верный — обычной строкой с «✓» и словом «верно»; ошибка — как любая неудачная
+ * строка итога, и под ней сколько было нужно.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -346,14 +352,18 @@ private fun ChangeRow(round: ChangeRound, coins: List<Int>, diff: Int) {
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                coins.forEach { DenominationCoin(it, size = 28.dp, faded = ok) }
+                coins.forEach { DenominationCoin(it, size = 28.dp) }
                 Text(
                     "= ${coins.sum()}",
                     style = if (ok) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.titleMedium,
-                    color = if (ok) FinneyInkFaded else FinneyInk,
+                    color = FinneyInk,
                 )
             }
-            if (!ok) Text("нужно было ${round.target}", style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
+            Text(
+                if (ok) "верно" else "нужно было ${round.target}",
+                style = MaterialTheme.typography.bodyLarge,
+                color = FinneyInk,
+            )
         }
         if (ok) CheckBadge(size = 24.dp) else AlertBadge(size = 30.dp)
     }
@@ -381,7 +391,7 @@ private fun Modifier.problemCard(): Modifier = this
 
 /** Строка «истории», как в ките: значок операции, подпись, сумма. */
 @Composable
-private fun LedgerRow(sign: String, color: Color, text: String, amount: String, highlight: Boolean = false) {
+private fun LedgerRow(sign: String, color: Color, text: String, amount: String, widest: String, highlight: Boolean = false) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -396,7 +406,15 @@ private fun LedgerRow(sign: String, color: Color, text: String, amount: String, 
             contentAlignment = Alignment.Center,
         ) { Text(sign, style = MaterialTheme.typography.titleMedium, color = FinneyInk) }
         Text(text, style = MaterialTheme.typography.titleMedium, color = FinneyInk, modifier = Modifier.weight(1f))
-        OutlinedText(amount, style = MaterialTheme.typography.titleLarge)
+        // Сумма — по правому краю столбца одной ширины. Раньше она стояла как есть и
+        // вместе с контуром упиралась в край панели: на плейтесте числа срезало справа.
+        StableOutlinedText(
+            amount,
+            widest = widest,
+            style = MaterialTheme.typography.titleLarge,
+            contentAlignment = Alignment.CenterEnd,
+            modifier = Modifier.padding(end = 4.dp),
+        )
     }
 }
 

@@ -51,6 +51,17 @@ sealed interface BudgetUiState {
         /** ТЗ п. 2.5.5: сумма разложена минимум по трём направлениям — в каждом хоть что-то. */
         val allDirections: Boolean get() = listOf(needs, wants, savings).count { it > 0 } >= directions
         val canConfirm: Boolean get() = remainder >= 0 && allDirections && !isSaving
+
+        /**
+         * Чего не хватает, чтобы подтвердить, — пунктами для подписи у погашенной кнопки.
+         * Плейтест: серую кнопку жали и не понимали, что не так. Пусто — подтверждать можно.
+         */
+        val missing: List<String> get() = buildList {
+            if (remainder < 0) add("Убавь: разложено больше, чем есть")
+            if (needs == 0) add("Положи монетки в «Нужное»")
+            if (wants == 0) add("Положи монетки в «Желаемое»")
+            if (goalLabel == null) add("Выбери цель для копилки") else if (savings == 0) add("Положи монетки в копилку")
+        }
     }
 
     /** План подтверждён: план против факта до закрытия периода. */

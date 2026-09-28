@@ -50,10 +50,11 @@ import ru.finney.pet.domain.tasks.TaskEngines
 import ru.finney.pet.domain.tasks.TaskInput
 import ru.finney.pet.ui.components.FinneyButton
 import ru.finney.pet.ui.components.fadingScroll
+import ru.finney.pet.ui.theme.FinneyPeach
 import ru.finney.pet.ui.theme.FinneyCream
 import ru.finney.pet.ui.theme.FinneyGreen
 import ru.finney.pet.ui.theme.FinneyInk
-import ru.finney.pet.ui.theme.FinneyPink
+import ru.finney.pet.ui.theme.FinneyYellow
 import ru.finney.pet.ui.sound.LocalSounds
 import ru.finney.pet.ui.sound.Sfx
 
@@ -179,7 +180,11 @@ private fun ownLine(price: Int, sum: Int, checked: Int?): String = when {
     else -> "Тут $sum — не хватает ${-checked}"
 }
 
-/** Табло кассы: тёмный экран с зелёными цифрами. */
+/**
+ * Табло кассы: тёмный экран, цифры кремовые. Зелёный у нас значит «получилось»,
+ * а «Цена» и «Дали» — просто числа; на плейтесте зелёное табло читали как оценку.
+ * Выделена «Сдача» — её ребёнок и считает: крупнее и жёлтым, цветом денег.
+ */
 @Composable
 private fun Display(price: Int, paid: Int, change: String) {
     val mono = TextStyle(fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 16.sp, lineHeight = 22.sp)
@@ -189,9 +194,9 @@ private fun Display(price: Int, paid: Int, change: String) {
             .background(FinneyInk)
             .padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
-        Text("Цена  $price", style = mono, color = Color(0xFF9FF0A8))
-        Text("Дали  $paid", style = mono, color = Color(0xFF9FF0A8))
-        Text("Сдача $change", style = mono, color = Color.White)
+        Text("Цена  $price", style = mono, color = FinneyCream)
+        Text("Дали  $paid", style = mono, color = FinneyCream)
+        Text("Сдача $change", style = mono.copy(fontSize = 20.sp, lineHeight = 26.sp), color = FinneyYellow)
     }
 }
 
@@ -274,7 +279,7 @@ private fun Wallet(wallet: List<Int>, tray: List<Int>, enabled: Boolean, onTake:
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 24.dp, bottomEnd = 24.dp))
-            .background(FinneyPink)
+            .background(FinneyPeach)
             .border(4.dp, FinneyInk, RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 24.dp, bottomEnd = 24.dp))
             .padding(10.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),

@@ -3,6 +3,8 @@ package ru.finney.pet.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -24,10 +27,13 @@ import ru.finney.pet.domain.game.Rejection
 import ru.finney.pet.domain.model.GameState
 import ru.finney.pet.ui.sound.LocalSounds
 import ru.finney.pet.ui.sound.Sfx
-import ru.finney.pet.ui.theme.FinneyGreen
+import ru.finney.pet.ui.room.ItemPicture
+import ru.finney.pet.ui.room.itemFallback
+import ru.finney.pet.ui.theme.FinneyCream
 import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneyPink
 import ru.finney.pet.ui.theme.FinneyTheme
+import ru.finney.pet.ui.theme.StrokeRegular
 
 // Обратная связь после действия — ТЗ п. 2.5.9: ребёнок видит, что изменилось
 // (деньги, копилка, шкала питомца), почему и что делать дальше. Отказ устроен
@@ -133,12 +139,16 @@ data class ChangeLine(val label: String, val before: Int, val after: Int) {
     val delta: Int get() = after - before
 }
 
-/** Что произошло после действия: заголовок, изменения, причина и следующий шаг. */
+/**
+ * Что произошло после действия: заголовок, изменения, причина и следующий шаг.
+ * [itemId] — купленный предмет: его рисунок стоит в карточке рядом с заголовком.
+ */
 data class ActionFeedback(
     val title: String,
     val lines: List<ChangeLine>,
     val why: String,
     val next: String,
+    val itemId: String? = null,
 )
 
 /**
@@ -183,32 +193,69 @@ fun FeedbackSound(feedback: ActionFeedback?, rejection: Rejection?) {
     }
 }
 
+/**
+ * Итог действия: рисунок предмета и заголовок одной строкой, под ними — что сдвинулось,
+ * значком и числом: «[вилка] +20», а не «Сытость: 40 → 60 (+20)».
+ *
+ * Карточка кремовая, а не зелёная: плейтест назвал прежнюю «полотном на зелёном,
+ * как из логов», а зелёный у нас — только «получилось» в игре. Покупка — не оценка.
+ *
+ * [compact] — всплывашка на главном: только заголовок и изменения, она сама уходит
+ * через несколько секунд. Полная — в окне магазина: там ещё причина и следующий шаг
+ * словами (ТЗ п. 2.5.9).
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun ActionFeedbackCard(feedback: ActionFeedback, modifier: Modifier = Modifier) {
-    FeedbackBox(color = FinneyGreen, modifier = modifier) {
-        Text(feedback.title, style = MaterialTheme.typography.titleMedium, color = FinneyInk)
-        feedback.lines.forEach { line ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clearAndSetSemantics {
-                        contentDescription = "${line.label}: было ${line.before}, стало ${line.after}"
-                    },
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+fun ActionFeedbackCard(feedback: ActionFeedback, modifier: Modifier = Modifier, compact: Boolean = false) {
+    FeedbackBox(color = FinneyCream, modifier = modifier) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            feedback.itemId?.let { ItemPicture(it, itemFallback(it), size = 44.dp) }
+            Text(
+                feedback.title,
+                style = MaterialTheme.typography.titleMedium,
+                color = FinneyInk,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        if (feedback.lines.isNotEmpty()) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                // Подпись — значком: монета, копилка, вилка, ванна, лампа, лицо. Слово
-                // осталось для TalkBack. Причина и следующий шаг ниже — словами (ТЗ п. 2.5.9).
-                ChangeIcon(line.label)
-                Text(
-                    text = "${line.before} → ${line.after}  (${if (line.delta > 0) "+" else ""}${line.delta})",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = FinneyInk,
-                )
+                feedback.lines.forEach { ChangeChip(it) }
             }
         }
-        Text(feedback.why, style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
-        Text(feedback.next, style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
+        if (!compact) {
+            Text(feedback.why, style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
+            Text(feedback.next, style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
+        }
+    }
+}
+
+/**
+ * Одно изменение: значок шкалы и «+20». Знак — словом, а не цветом (ТЗ п. 3.6);
+ * «было → стало» целиком — для TalkBack.
+ */
+@Composable
+private fun ChangeChip(line: ChangeLine) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.clearAndSetSemantics {
+            contentDescription = "${line.label}: было ${line.before}, стало ${line.after}"
+        },
+    ) {
+        ChangeIcon(line.label)
+        OutlinedText(
+            if (line.delta > 0) "+${line.delta}" else "−${-line.delta}",
+            style = MaterialTheme.typography.titleLarge,
+        )
     }
 }
 
@@ -270,7 +317,7 @@ private fun FeedbackBox(
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(color)
-            .border(2.dp, FinneyInk, RoundedCornerShape(16.dp))
+            .border(StrokeRegular, FinneyInk, RoundedCornerShape(16.dp))
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -285,7 +332,7 @@ private fun FeedbackPreview() {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(16.dp)) {
             ActionFeedbackCard(
                 ActionFeedback(
-                    title = "Купили мячик",
+                    title = "Купили: мячик",
                     lines = listOf(ChangeLine("Деньги", 40, 25), ChangeLine("Радость", 50, 80)),
                     why = "Это «хочется»: радует, но можно и без него.",
                     next = "Хватит ли на нужное?",

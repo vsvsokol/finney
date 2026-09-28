@@ -26,6 +26,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -205,6 +206,10 @@ fun FinneyButton(
     ) {
         Box(
             modifier = Modifier
+                // Погашенная — бледная: раньше она ничем не отличалась от рабочей,
+                // и на плейтесте «Подтвердить план» жали, не понимая, что не так.
+                // Почему погашена, экран пишет рядом словами — цвет не единственный признак.
+                .alpha(if (enabled) 1f else DisabledAlpha)
                 .clip(shape)
                 .buttonFill(pressed, round = false)
                 .padding(horizontal = 24.dp, vertical = 12.dp),
@@ -217,6 +222,9 @@ fun FinneyButton(
         }
     }
 }
+
+/** Непрозрачность погашенной кнопки. */
+private const val DisabledAlpha = 0.45f
 
 /** Высота второстепенной кнопки: ниже основной, но с запасом над 48 dp из ТЗ п. 3.6. */
 private val QuietButtonHeight = 56.dp

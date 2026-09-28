@@ -57,7 +57,6 @@ import ru.finney.pet.ui.theme.FinneyGreen
 import ru.finney.pet.ui.theme.FinneyGreenDark
 import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneyPeach
-import ru.finney.pet.ui.theme.FinneyPink
 import ru.finney.pet.ui.theme.FinneyYellow
 
 // «Список покупок», как магазин в Pou и Tom, но с тележкой и списком. Товары
@@ -185,7 +184,7 @@ private fun ShoppingList(task: BasketTask, rules: List<BasketRule>, cart: Set<St
     }
 }
 
-/** Товар на полке: рисунок и ценник «монетка · 2 шт · 10». В тележке — розовая подсветка и галочка. */
+/** Товар на полке: рисунок и ценник «монетка · 2 шт · 10». В тележке — жёлтая подсветка и галочка. */
 @Composable
 private fun Goods(item: ShelfItem, inCart: Boolean, modifier: Modifier, onToggle: () -> Unit) {
     Column(
@@ -193,7 +192,7 @@ private fun Goods(item: ShelfItem, inCart: Boolean, modifier: Modifier, onToggle
         verticalArrangement = Arrangement.spacedBy(3.dp),
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(if (inCart) FinneyPink.copy(alpha = 0.18f) else Color.Transparent)
+            .background(if (inCart) FinneyYellow.copy(alpha = 0.6f) else Color.Transparent)
             .toggleable(value = inCart, role = Role.Checkbox, onValueChange = { onToggle() })
             .padding(4.dp),
     ) {
@@ -214,7 +213,7 @@ private fun Goods(item: ShelfItem, inCart: Boolean, modifier: Modifier, onToggle
             }
         }
         Text(item.label, style = MaterialTheme.typography.labelMedium, color = FinneyInk, textAlign = TextAlign.Center)
-        item.promo?.let { OutlinedText(it, style = MaterialTheme.typography.labelLarge, fill = FinneyPink) }
+        item.promo?.let { OutlinedText(it, style = MaterialTheme.typography.labelLarge) }
         PriceTag(if (item.qty > 1) "${item.qty} шт · ${item.price}" else item.price.toString())
     }
 }
@@ -274,7 +273,7 @@ private fun CartBar(total: Int, limit: Int, enabled: Boolean, onCheckout: () -> 
                 OutlinedText("$total / $limit", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
                 if (total > limit) OutlinedText("! −${total - limit}", style = MaterialTheme.typography.titleLarge, fill = FinneyPeach)
             }
-            Meter(total.toFloat() / limit, Modifier.height(14.dp), color = if (total <= limit) FinneyGreen else FinneyPeach)
+            Meter(total.toFloat() / limit, Modifier.height(14.dp), color = if (total <= limit) FinneyYellow else FinneyPeach)
         }
         // «На кассу» — значком тележки.
         FinneyIconButton(onClick = onCheckout, contentDescription = "На кассу", size = 64.dp, enabled = enabled) {

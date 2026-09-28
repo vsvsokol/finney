@@ -50,15 +50,11 @@ sealed interface PeriodResultUiState {
         val level: Int,
         /** Уровень вырос именно за этот период; на последнем уровне расти некуда. */
         val leveledUp: Boolean,
-        /** Названия игр, которые с новым уровнем стали сложнее или открылись. */
-        val harderGames: List<String>,
         val balance: Int,
         /** Название игры уровня; null — в этом периоде её не было. */
         val levelGame: String? = null,
         /** Картинка игры уровня — та же, что в её сцене. */
         val levelGameIcon: ItemArt? = null,
-        /** Картинки к [harderGames], по порядку. */
-        val harderGameIcons: List<ItemArt?> = emptyList(),
         /** Игра уровня пройдена. */
         val gamePassed: Boolean = true,
         /** Игра уровня обязательна; в демо-режиме — нет. */
@@ -96,8 +92,6 @@ class PeriodResultViewModel(
 
         val before = game.levelAfter(state, period.number - 1)
         val after = game.levelAfter(state, period.number)
-        // Одна строка на игру: у трёх вариантов «Кассы» название одно.
-        val harder = game.tasksUnlockedBetween(before, after).distinctBy { it.title }
         val levelTask = period.levelTaskId?.let { content.task(it) }
         return PeriodResultUiState.Ready(
             periodNumber = period.number,
@@ -111,11 +105,9 @@ class PeriodResultViewModel(
             passed = game.isPassed(period) == true,
             level = after,
             leveledUp = after > before,
-            harderGames = harder.map { it.title },
             balance = state.balance,
             levelGame = levelTask?.title,
             levelGameIcon = levelTask?.let(::taskIcon),
-            harderGameIcons = harder.map(::taskIcon),
             gamePassed = result.gamePassed,
             gameRequired = game.levelCheck(state).gameRequired,
         )

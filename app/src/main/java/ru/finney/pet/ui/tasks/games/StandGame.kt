@@ -63,7 +63,6 @@ import ru.finney.pet.ui.theme.FinneyCream
 import ru.finney.pet.ui.theme.FinneyGreen
 import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneyPeach
-import ru.finney.pet.ui.theme.FinneyPink
 import ru.finney.pet.ui.theme.FinneyYellow
 import ru.finney.pet.ui.theme.StrokeRegular
 import ru.finney.pet.ui.sound.LocalSounds
@@ -286,7 +285,7 @@ private fun Stall(character: PetCharacter, cupPrice: Int) {
                 .background(Color.White)
                 .border(4.dp, FinneyInk, RoundedCornerShape(10.dp)),
             contentAlignment = Alignment.Center,
-        ) { OutlinedText("Лимонад · $cupPrice", style = MaterialTheme.typography.headlineMedium, fill = FinneyPink) }
+        ) { OutlinedText("Лимонад · $cupPrice", style = MaterialTheme.typography.headlineMedium) }
     }
 }
 
@@ -301,7 +300,7 @@ private fun PourPop(served: Int, cupPrice: Int, modifier: Modifier) {
         visible = false
     }
     AnimatedVisibility(visible, modifier, exit = fadeOut() + slideOutVertically { -it }) {
-        OutlinedText("+$cupPrice", style = MaterialTheme.typography.headlineMedium, fill = FinneyGreen)
+        OutlinedText("+$cupPrice", style = MaterialTheme.typography.headlineMedium, fill = FinneyYellow)
     }
 }
 

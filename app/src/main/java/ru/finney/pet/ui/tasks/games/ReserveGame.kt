@@ -52,12 +52,11 @@ import ru.finney.pet.ui.components.FinneyButton
 import ru.finney.pet.ui.components.FinneyIcon
 import ru.finney.pet.ui.components.FinneyIcons
 import ru.finney.pet.ui.components.OutlinedText
+import ru.finney.pet.ui.theme.StrokeThin
 import ru.finney.pet.ui.theme.FinneyBlue
 import ru.finney.pet.ui.theme.FinneyCream
-import ru.finney.pet.ui.theme.FinneyGreen
 import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneyPeach
-import ru.finney.pet.ui.theme.FinneyPink
 import ru.finney.pet.ui.theme.FinneyYellow
 import ru.finney.pet.ui.theme.StrokeBold
 import ru.finney.pet.ui.theme.StrokeRegular
@@ -248,7 +247,7 @@ private fun ReserveJar(amount: Int) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .background(FinneyGreen)
+            .background(FinneyYellow)
             .border(3.dp, FinneyInk, RoundedCornerShape(14.dp))
             .padding(horizontal = 10.dp, vertical = 8.dp),
     ) {
@@ -269,7 +268,7 @@ private fun ReserveJar(amount: Int) {
     }
 }
 
-/** Полоса: синяя — разложено по тратам, зелёная — запас. */
+/** Полоса: синяя — разложено по тратам, жёлтая — запас (деньги, а не «успех»). */
 @Composable
 private fun TwoPartMeter(spent: Int, total: Int) {
     Canvas(
@@ -281,7 +280,7 @@ private fun TwoPartMeter(spent: Int, total: Int) {
     ) {
         val split = size.width * (spent.toFloat() / total).coerceIn(0f, 1f)
         drawRect(FinneyBlue, size = size.copy(width = split))
-        drawRect(FinneyGreen, Offset(split, 0f), size.copy(width = size.width - split))
+        drawRect(FinneyYellow, Offset(split, 0f), size.copy(width = size.width - split))
     }
 }
 
@@ -317,10 +316,11 @@ private fun PostponeRow(spending: Spending, checked: Boolean, onChange: (Boolean
         Text(
             if (locked) "нужное" else "хочется",
             style = MaterialTheme.typography.labelMedium,
-            color = if (locked) FinneyInk else Color.White,
+            color = FinneyInk,
             modifier = Modifier
                 .clip(RoundedCornerShape(6.dp))
-                .background(if (locked) FinneyGreen else FinneyPink)
+                .background(FinneyCream)
+                .border(StrokeThin, FinneyInk, RoundedCornerShape(6.dp))
                 .padding(horizontal = 6.dp),
         )
         OutlinedText(spending.price.toString(), style = MaterialTheme.typography.titleLarge)

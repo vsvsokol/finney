@@ -1,5 +1,7 @@
 package ru.finney.pet.ui.home
 
+import kotlinx.coroutines.delay
+import ru.finney.pet.ui.motion.motionEnabled
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -82,7 +84,13 @@ fun HeartBurstLayer(burst: HeartBurst) {
                 val t = remember { Animatable(0f) }
                 val drift = remember { (Random.nextFloat() - 0.5f) * half * 3 }
                 LaunchedEffect(Unit) {
-                    t.animateTo(1f, tween(HEART_RISE_MS, easing = LinearEasing))
+                    // Без анимаций сердечко мелькнуло бы кадром: стоит над питомцем, пока летело бы.
+                    if (motionEnabled()) {
+                        t.animateTo(1f, tween(HEART_RISE_MS, easing = LinearEasing))
+                    } else {
+                        t.snapTo(0.3f)
+                        delay(HEART_RISE_MS.toLong())
+                    }
                     burst.remove(heart)
                 }
                 HeartIcon(

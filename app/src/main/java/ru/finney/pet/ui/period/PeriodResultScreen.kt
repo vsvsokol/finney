@@ -1,7 +1,6 @@
 package ru.finney.pet.ui.period
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,15 +23,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import ru.finney.pet.domain.model.Category
 import ru.finney.pet.domain.model.ItemArt
 import ru.finney.pet.domain.model.PeriodFacts
 import ru.finney.pet.domain.model.Plan
+import ru.finney.pet.ui.components.CheckBadge
 import ru.finney.pet.ui.components.CoinAmount
+import ru.finney.pet.ui.components.FinneyIcon
+import ru.finney.pet.ui.components.FinneyIcons
+import ru.finney.pet.ui.components.SavingsIcon
+import ru.finney.pet.ui.components.categoryIcon
 import ru.finney.pet.ui.components.FillBar
 import ru.finney.pet.ui.components.FinneyButton
 import ru.finney.pet.ui.components.SpendBar
@@ -43,10 +48,11 @@ import ru.finney.pet.ui.components.LevelBadge
 import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.sound.LocalSounds
 import ru.finney.pet.ui.sound.Sfx
+import ru.finney.pet.ui.theme.FinneyCream
 import ru.finney.pet.ui.theme.FinneyGreen
 import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneyTheme
-import ru.finney.pet.ui.theme.FinneyYellow
+import ru.finney.pet.ui.theme.RadiusCard
 
 // Черновик под вёрстку @zYafALL: разметка простая, контракт ViewModel останется.
 // Что показывать, решает PeriodResultViewModel — экран только раскладывает готовое.
@@ -118,9 +124,9 @@ private fun PeriodResultContent(state: PeriodResultUiState.Ready, onBack: () -> 
         FinneyPanel(title = "Как вышло") {
             // Траты — полосой «из плана» без зелёного: потратить больше — не успех.
             // Копилка — полосой прогресса: отложить сколько задумал — хорошо.
-            FactRow("Нужное", state.facts.needs, state.plan.needs)
-            FactRow("Желаемое", state.facts.wants, state.plan.wants)
-            FactRow("Копилка", state.facts.savings, state.plan.savings, progress = true)
+            FactRow(categoryIcon(Category.NEEDS), "Нужное", state.facts.needs, state.plan.needs)
+            FactRow(categoryIcon(Category.WANTS), "Желаемое", state.facts.wants, state.plan.wants)
+            FactRow(SavingsIcon, "Копилка", state.facts.savings, state.plan.savings, progress = true)
             if (state.facts.unplannedIncome > 0) {
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text("Пришло сверх плана", style = MaterialTheme.typography.bodyLarge, color = FinneyInk, modifier = Modifier.weight(1f))
@@ -141,44 +147,66 @@ private fun PeriodResultContent(state: PeriodResultUiState.Ready, onBack: () -> 
             ScoreRow("Копилка", state.savingsAdded, "Отложено в копилку")
         }
 
-        // Какие игры усложнились — картинками игр, как в их сценах, а не списком названий.
-        if (state.harderGames.isNotEmpty()) {
-            FinneyPanel(title = "Новое в мини-играх") {
-                state.harderGames.forEachIndexed { i, title ->
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        state.harderGameIcons.getOrNull(i)?.let { ItemPicture(it, title, 40.dp) }
-                        Text(title, style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
-                    }
-                }
-            }
-        }
+        // Панели «Новое в мини-играх» здесь больше нет: ребёнок играет одну игру уровня
+        // и списка остальных не видит — анонс того, что выбрать нельзя, только путал.
 
         CoinAmount(amount = state.balance)
 
         // План отдельно: это главный навык игры (ТЗ п. 2.5.5).
-        Text(
-            text = if (state.planMatched) "План выполнен!" else "В следующий раз получится точнее",
-            style = MaterialTheme.typography.titleLarge,
-            color = FinneyInk,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(20.dp))
-                .background(if (state.planMatched) FinneyGreen else FinneyYellow)
-                .border(3.dp, FinneyInk, RoundedCornerShape(20.dp))
-                .padding(14.dp),
-            textAlign = TextAlign.Center,
-        )
+        PlanVerdict(state.planMatched)
+    }
+}
+
+/**
+ * Итог по плану — плашкой, а не кнопкой: без толстой обводки и блика, значок слева.
+ * На плейтесте прежняя плашка выглядела как кнопка, и её пытались нажать.
+ * Выполнен — зелёная с «✓»: это итог действия ребёнка. Не выполнен — без красного,
+ * кремовая, с тетрадью плана и советом, что сделать иначе.
+ */
+@Composable
+private fun PlanVerdict(matched: Boolean) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(RadiusCard))
+            .background(if (matched) FinneyGreen else FinneyCream)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .semantics(mergeDescendants = true) {},
+    ) {
+        if (matched) CheckBadge(size = 36.dp) else FinneyIcon(FinneyIcons.Plan, size = 36.dp)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                if (matched) "План выполнен!" else "План пока не вышел",
+                style = MaterialTheme.typography.titleMedium,
+                color = FinneyInk,
+            )
+            if (!matched) {
+                Text(
+                    "Перед покупкой загляни в план: сколько ещё можно.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = FinneyInk,
+                )
+            }
+        }
     }
 }
 
 /**
  * Строка «потрачено из запланированного» и полоса под ней. [progress] — это
- * накопление, а не трата: полоса идёт от розового к зелёному и отмечает «✓».
+ * накопление, а не трата: полная полоса отмечена «✓». Направление узнаётся по
+ * значку [icon], а не по цвету полосы.
  */
 @Composable
-private fun FactRow(label: String, fact: Int, planned: Int, progress: Boolean = false) {
+private fun FactRow(icon: FinneyIcons, label: String, fact: Int, planned: Int, progress: Boolean = false) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            FinneyIcon(icon, size = 28.dp)
             Text(
                 text = label,
                 style = MaterialTheme.typography.bodyLarge,
@@ -214,7 +242,7 @@ private fun ScoreRow(label: String, earned: Boolean, description: String, icon: 
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFFFDF0D5)
+@Preview(showBackground = true, backgroundColor = 0xFFFFEDCD)
 @Composable
 private fun PeriodResultPreview() {
     FinneyTheme {
@@ -231,7 +259,6 @@ private fun PeriodResultPreview() {
                 passed = true,
                 level = 2,
                 leveledUp = true,
-                harderGames = listOf("Касса Финни"),
                 balance = 15,
             ),
             onBack = {},

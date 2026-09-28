@@ -1,5 +1,6 @@
 package ru.finney.pet.ui.tasks.games
 
+import ru.finney.pet.ui.motion.motionEnabled
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
@@ -81,7 +82,6 @@ import ru.finney.pet.ui.pet.PetMood
 import ru.finney.pet.ui.sound.LocalSounds
 import ru.finney.pet.ui.sound.Sfx
 import ru.finney.pet.ui.theme.FinneyCream
-import ru.finney.pet.ui.theme.FinneyGreen
 import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneyPeach
 import ru.finney.pet.ui.theme.FinneyYellow
@@ -235,7 +235,7 @@ private fun DayHeader(day: Int, days: Int, income: Int) {
                     scaleY = pop.value
                 }
                 .clip(RoundedCornerShape(50))
-                .background(FinneyGreen)
+                .background(FinneyYellow)
                 .border(StrokeRegular, FinneyInk, RoundedCornerShape(50))
                 .padding(horizontal = 10.dp, vertical = 2.dp)
                 .clearAndSetSemantics { contentDescription = "Сегодня пришло $income монет" },
@@ -525,7 +525,13 @@ private fun DepositPop(amount: Int?, count: Int) {
     LaunchedEffect(count) {
         if (count == 0 || (amount ?: 0) <= 0) return@LaunchedEffect
         rise.snapTo(0f)
-        rise.animateTo(1f, tween(durationMillis = 1000))
+        // Без анимаций «+N» пропал бы в тот же кадр: стоит на месте, пока всплывал бы.
+        if (motionEnabled()) {
+            rise.animateTo(1f, tween(durationMillis = 1000))
+        } else {
+            delay(1_000)
+            rise.snapTo(1f)
+        }
     }
     if (rise.value < 1f && amount != null) {
         OutlinedText(

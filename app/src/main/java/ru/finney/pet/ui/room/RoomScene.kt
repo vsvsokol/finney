@@ -1,5 +1,7 @@
 package ru.finney.pet.ui.room
 
+import ru.finney.pet.ui.motion.motionEnabled
+import ru.finney.pet.ui.motion.LocalAnimations
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.FastOutLinearInEasing
@@ -230,6 +232,7 @@ fun RoomScene(
     val sounds = LocalSounds.current
     val currentSpot by rememberUpdatedState(spot)
     LaunchedEffect(ufo) { ufo.fly(onStart = { if (currentSpot.hasWindow) sounds.play(Sfx.Ufo) }) }
+    val animations = LocalAnimations.current
 
     // Отход ко сну: питомец прыгает в капсулу (walk 0 → 1), камера наезжает,
     // закрывается дверь, гаснет свет. Живёт на всю сцену, а не на зал:
@@ -304,7 +307,8 @@ fun RoomScene(
             appear.snapTo(0f)
         }
 
-        val canWander = wander && spot == RoomSpot.LIVING && shown == RoomSpot.LIVING && !asleep
+        // Без анимаций не гуляет: прыжки по залу стали бы телепортом с места на место.
+        val canWander = wander && spot == RoomSpot.LIVING && shown == RoomSpot.LIVING && !asleep && animations
         LaunchedEffect(canWander, strollMin, strollMax) {
             if (!canWander || strollMax <= strollMin) return@LaunchedEffect
             while (true) {
@@ -405,6 +409,11 @@ fun RoomScene(
  */
 private suspend fun jump(walk: Animatable<Float, AnimationVector1D>, to: Float, onHop: () -> Unit) {
     if (walk.value == to) return
+    // Без анимаций — сразу на месте: иначе присед и дуга мелькнули бы по кадру.
+    if (!motionEnabled()) {
+        walk.snapTo(to)
+        return
+    }
     onHop()
     delay(HOP_CROUCH_MS)
     walk.animateTo(to, tween(WALK_MS - HOP_CROUCH_MS.toInt(), easing = FastOutSlowInEasing))
@@ -567,12 +576,14 @@ private fun Pet(
 private fun Window(canvasW: Dp, canvasH: Dp, ufo: UfoState) {
     val hole = Room.WindowHole
     val sky = ImageBitmap.imageResource(Room.WindowSky.image)
-    val drift by rememberInfiniteTransition(label = "sky").animateFloat(
+    val animations = LocalAnimations.current
+    val driftAnim by rememberInfiniteTransition(label = "sky").animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(tween(SKY_LOOP_MS, easing = LinearEasing)),
         label = "drift",
     )
+    val drift = if (animations) driftAnim else 0f
 
     Box(
         modifier = Modifier
@@ -639,6 +650,8 @@ private class UfoState {
         var pause = UfoFirstPauseMs
         while (true) {
             delay(Random.nextLong(pause.first, pause.last))
+            // Без анимаций пролёт — один кадр НЛО у края окна: не летит вовсе.
+            if (!motionEnabled()) continue
             val next = Random.nextUfoFlight()
             flight = next
             onStart()
@@ -780,7 +793,8 @@ private fun Random.between(from: Float, until: Float): Float = from + nextFloat(
 @Composable
 private fun Foam(layer: RoomLayer, canvasW: Dp, canvasH: Dp, lighting: RoomLighting, phase: Float) {
     val breath = rememberInfiniteTransition(label = "foam")
-    val swell by breath.animateFloat(
+    val animations = LocalAnimations.current
+    val swellAnim by breath.animateFloat(
         initialValue = -FOAM_SWELL,
         targetValue = FOAM_SWELL,
         animationSpec = infiniteRepeatable(
@@ -790,6 +804,8 @@ private fun Foam(layer: RoomLayer, canvasW: Dp, canvasH: Dp, lighting: RoomLight
         ),
         label = "swell",
     )
+    // Без анимаций бесконечная встаёт в крайнее положение — пена стоит посередине.
+    val swell = if (animations) swellAnim else 0f
 
     LitBody(
         lighting = lighting,

@@ -1,5 +1,6 @@
 package ru.finney.pet.ui.tasks.games
 
+import ru.finney.pet.ui.motion.LocalAnimations
 import android.annotation.SuppressLint
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -45,8 +46,8 @@ import ru.finney.pet.domain.model.Category
 import ru.finney.pet.domain.model.ItemArt
 import ru.finney.pet.domain.tasks.TaskInputError
 import ru.finney.pet.ui.components.FinneyIcon
+import ru.finney.pet.ui.components.categoryIcon
 import ru.finney.pet.ui.components.HoldStepper
-import ru.finney.pet.ui.components.FinneyIcons
 import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.components.fadingScroll
 import ru.finney.pet.ui.theme.FinneyBlue
@@ -54,7 +55,6 @@ import ru.finney.pet.ui.theme.FinneyCream
 import ru.finney.pet.ui.theme.FinneyGreen
 import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneyPeach
-import ru.finney.pet.ui.theme.FinneyPink
 import ru.finney.pet.ui.theme.FinneySand
 import ru.finney.pet.ui.theme.FinneyYellow
 import ru.finney.pet.ui.theme.RadiusCard
@@ -138,13 +138,11 @@ internal fun ItemPicture(art: ItemArt, label: String, size: Dp, modifier: Modifi
     }
 }
 
-/** Подпись категории. Цвет дублируется словом и значком: ТЗ п. 3.6. */
+/** Подпись категории: значок и слово на кремовом. Цвет категорию не несёт — см. ui/components/Categories.kt. */
 @Composable
 internal fun CategoryChip(category: Category, modifier: Modifier = Modifier) {
-    val (text, color) = when (category) {
-        Category.NEEDS -> "нужное" to FinneyGreen
-        Category.WANTS -> "хочется" to FinneyPink
-    }
+    val text = categoryWord(category)
+    val color = FinneyCream
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -306,12 +304,14 @@ internal fun inputErrorText(error: TaskInputError): String = when (error) {
 /** Стрелка вниз, которая подпрыгивает: «тяни сюда». */
 @Composable
 internal fun BouncingArrow(modifier: Modifier = Modifier, description: String = "Смахни вещь вниз, в корзину") {
-    val bounce by rememberInfiniteTransition(label = "arrow").animateFloat(
+    val bounceAnim by rememberInfiniteTransition(label = "arrow").animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(tween(600), RepeatMode.Reverse),
         label = "bounce",
     )
+    // Без анимаций — на месте, а не съехавшей на крайнюю точку прыжка.
+    val bounce = if (LocalAnimations.current) bounceAnim else 0f
     OutlinedText(
         "↓",
         style = MaterialTheme.typography.headlineLarge,

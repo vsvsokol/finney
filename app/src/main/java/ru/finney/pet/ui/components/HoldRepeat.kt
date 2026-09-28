@@ -2,7 +2,6 @@ package ru.finney.pet.ui.components
 
 import android.os.SystemClock
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.spring
@@ -17,6 +16,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.withFrameMillis
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -35,7 +35,6 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import ru.finney.pet.ui.motion.LocalAnimations
 import ru.finney.pet.ui.sound.LocalSounds
 import ru.finney.pet.ui.sound.Sfx
 import ru.finney.pet.ui.theme.FinneyInk
@@ -107,9 +106,9 @@ private class Hold {
  * Одиночное касание, которое дошло до края, упором не считается: шаг ведь удался.
  *
  * Удержание видно и без вибрации (у многих она выключена): пока палец на кнопке,
- * вокруг неё заполняется кольцо — ровно за [RepeatDelayMs]. Замкнулось — шаги
- * пошли сами. Касание тоже успевает показать краешек кольца, и ребёнок
- * догадывается, что кнопку можно держать.
+ * вокруг неё заполняется кольцо — ровно за [RepeatDelayMs], и с выключенными
+ * анимациями тоже. Замкнулось — шаги пошли сами. Касание тоже успевает показать
+ * краешек кольца, и ребёнок догадывается, что кнопку можно держать.
  *
  * TalkBack нажимает кнопку действием, без касания, — это обычный [onStep].
  */
@@ -126,7 +125,6 @@ fun HoldRepeatButton(
     val haptics = LocalHapticFeedback.current
     val step by rememberUpdatedState(onStep)
     val canStep by rememberUpdatedState(enabled)
-    val animations by rememberUpdatedState(LocalAnimations.current)
     val interaction = remember { MutableInteractionSource() }
     val hold = remember { Hold() }
     val shake = remember { Animatable(0f) }
@@ -140,15 +138,15 @@ fun HoldRepeatButton(
                 is PressInteraction.Press -> {
                     hold.repeated = false
                     ring?.cancel()
+                    // Кольцо — не украшение, а часы до повтора: оно идёт по кадрам, а не
+                    // через animateTo. С выключенными анимациями animateTo встаёт в конец
+                    // сразу, и ребёнок видел полное кольцо, а не то, как оно набирается.
                     ring = launch {
+                        val start = withFrameMillis { it }
                         charge.snapTo(0f)
-                        if (animations) {
-                            charge.animateTo(1f, tween(RepeatDelayMs.toInt(), easing = LinearEasing))
-                        } else {
-                            // Без анимаций заполнение встало бы полным сразу, будто повтор уже идёт.
-                            // Кольцо появляется целиком ровно тогда, когда он начинается.
-                            delay(RepeatDelayMs)
-                            charge.snapTo(1f)
+                        while (charge.value < 1f) {
+                            val now = withFrameMillis { it }
+                            charge.snapTo(((now - start).toFloat() / RepeatDelayMs).coerceAtMost(1f))
                         }
                     }
                     repeat?.cancel()

@@ -1,14 +1,9 @@
 package ru.finney.pet.ui.tasks.games
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VectorConverter
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -49,7 +44,6 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -69,7 +63,7 @@ import ru.finney.pet.domain.model.SorterTask
 import ru.finney.pet.domain.tasks.TaskInput
 import ru.finney.pet.ui.components.FinneyButton
 import ru.finney.pet.ui.components.FinneyIcon
-import ru.finney.pet.ui.components.FinneyIcons
+import ru.finney.pet.ui.components.categoryIcon
 import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.theme.FinneyCream
 import ru.finney.pet.ui.theme.FinneyGreen
@@ -324,9 +318,6 @@ private fun MistakePanel(item: SortItem, onMove: () -> Unit) {
 
 internal fun categoryWord(category: Category) = if (category == Category.NEEDS) "нужное" else "хочется"
 
-/** Значок категории — тот же, что в панели покупки: тетрадь у нужного, звезда у желаемого. */
-internal fun categoryIcon(category: Category) = if (category == Category.NEEDS) FinneyIcons.Plan else FinneyIcons.Star
-
 /**
  * Корзина — она же кнопка. Сверху видно, что в ней уже лежит; вещь, попавшая не туда,
  * обведена, пока её не переложат. Подпись и значок, а не только цвет (ТЗ п. 3.6).
@@ -352,7 +343,9 @@ private fun Bin(
                 .fillMaxWidth()
                 .height(118.dp)
                 .clip(shape)
-                .background(if (needs) FinneyGreen else FinneyPink)
+                // Корзины различаются значком и словом, а не цветом: зелёная «нужное»
+                // рядом с розовой «хочется» подсказывала, какой ответ «правильный».
+                .background(FinneyCream)
                 .border(4.dp, FinneyInk, shape)
                 .clickable(role = Role.Button, onClickLabel = "Положить в «${categoryWord(category)}»", onClick = onClick)
                 .padding(bottom = 10.dp),

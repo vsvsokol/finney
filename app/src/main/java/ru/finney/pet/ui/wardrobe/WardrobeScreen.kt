@@ -49,7 +49,6 @@ import ru.finney.pet.ui.pet.accessoryArt
 import ru.finney.pet.ui.pet.rememberPetAnimation
 import ru.finney.pet.ui.pet.rememberPoseProvider
 import ru.finney.pet.ui.theme.FinneyCream
-import ru.finney.pet.ui.theme.FinneyGreen
 import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneySand
 import ru.finney.pet.ui.theme.FinneyYellow
@@ -190,7 +189,8 @@ private fun Tile(
             modifier = Modifier
                 .fillMaxSize()
                 .clip(shape)
-                .background(if (selected) FinneyGreen else if (enabled) FinneyYellow else FinneySand)
+                // Надето — жёлтое с толстой рамкой и «✓»: выбор, а не «получилось».
+                .background(if (selected) FinneyYellow else if (enabled) FinneyCream else FinneySand)
                 .border(if (selected) 3.dp else 2.dp, FinneyInk, shape)
                 // Название и «надето» — для TalkBack; на плитке — картинка и «✓».
                 .semantics(mergeDescendants = true) {

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
@@ -32,6 +33,7 @@ import ru.finney.pet.domain.model.TaskOutcome
 import ru.finney.pet.domain.model.TaskTheme
 import ru.finney.pet.ui.components.Coin
 import ru.finney.pet.ui.components.FinneyButton
+import ru.finney.pet.ui.components.FinneyQuietButton
 import ru.finney.pet.ui.components.FinneyScreen
 import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.tasks.games.Bubble
@@ -51,6 +53,7 @@ import ru.finney.pet.ui.tasks.games.backdropFor
 import ru.finney.pet.ui.theme.FinneyCream
 import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneyYellow
+import ru.finney.pet.ui.theme.GapBlock
 import ru.finney.pet.ui.theme.StrokeRegular
 import ru.finney.pet.ui.sound.LocalSounds
 import ru.finney.pet.ui.sound.Sfx
@@ -126,9 +129,13 @@ private fun TaskIntro(state: TaskUiState.Ready, onStart: () -> Unit, onBack: () 
             },
         ) {
             OutlinedText(state.task.title, style = MaterialTheme.typography.headlineLarge, textAlign = TextAlign.Center)
+            // Заголовок панели «Что делать» почти упирался в название игры и читался
+            // с ним одной строкой — между ними воздух раздела.
+            Spacer(Modifier.height(GapBlock))
             ScenePanel(title = "Что делать", modifier = Modifier.fillMaxWidth()) {
                 // Тема ребёнку ничего не говорит — она у взрослого, в «Пройденных темах».
-                Text(state.task.intro, style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
+                // Кеглем крупнее основного: это главное, что нужно прочитать до игры.
+                Text(state.task.intro, style = MaterialTheme.typography.titleMedium, color = FinneyInk)
             }
             Spacer(Modifier.weight(1f))
             // Сколько дадут — монеткой в пузыре, а не фразой. Уже пройдено — просто «ещё?».
@@ -188,10 +195,18 @@ private fun TaskResultScene(state: TaskUiState.Ready, onReplay: () -> Unit, onDo
         // Разбор бывает длиннее экрана — прокручивается он, а «Ещё раз» и «Дальше»
         // всегда видны: раньше они уезжали вниз, и ребёнок не знал, как выйти.
         SceneBody(
+            // Главная кнопка — та, что ведёт по игре дальше: после успеха «Дальше», после
+            // неудачи «Ещё раз». Вторая — спокойная, как «Взять» в копилке. Раньше обе были
+            // одинаковыми, и после победы ребёнок жал «Ещё раз» наугад (плейтест).
             bottom = {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    FinneyButton(text = "Ещё раз", onClick = onReplay, modifier = Modifier.weight(1f))
-                    FinneyButton(text = "Дальше", onClick = onDone, modifier = Modifier.weight(1f))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (success) {
+                        FinneyQuietButton(text = "Ещё раз", onClick = onReplay, modifier = Modifier.weight(1f))
+                        FinneyButton(text = "Дальше", onClick = onDone, modifier = Modifier.weight(1f))
+                    } else {
+                        FinneyQuietButton(text = "Дальше", onClick = onDone, modifier = Modifier.weight(1f))
+                        FinneyButton(text = "Ещё раз", onClick = onReplay, modifier = Modifier.weight(1f))
+                    }
                 }
             },
         ) {

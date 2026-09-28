@@ -116,6 +116,7 @@ class ShopViewModel(
             lines = changesBetween(before, after),
             why = why,
             next = next,
+            itemId = item.id,
         )
     }
 
