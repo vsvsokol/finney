@@ -25,6 +25,7 @@ class ProgressViewModelTest : ViewModelTest() {
         backgroundScope.launch { viewModel.uiState.collect {} }
         session.execute { selectGoal(it, "bike") }
         session.execute { confirmPlan(it, needs = 20, wants = 10, savings = 10) }
+        session.execute { deposit(it, 10) }
         session.execute { buy(it, "candy") }
         settle()
 

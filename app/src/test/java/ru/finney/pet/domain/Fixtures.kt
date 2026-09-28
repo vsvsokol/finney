@@ -133,6 +133,8 @@ fun Game.playPerfectPeriod(start: GameState): GameState {
     var s = start
     if (s.activeGoalId == null) s = selectGoal(s, "bike").state()
     s = confirmPlan(s, needs = needsHint(s)!!, wants = 0, savings = 10).state()
+    // Копилка в плане — обещание: отложить нужно самому.
+    s = deposit(s, 10).state()
     // Игра уровня — первое из двух новых заданий (если её уже проходили, новых добирается два).
     s = passLevelGame(s)
     val done = s.attempts.filter { it.periodNumber < s.currentPeriod.number }.map { it.taskId }.toSet()
@@ -142,7 +144,6 @@ fun Game.playPerfectPeriod(start: GameState): GameState {
         s = submitTask(s, it, Fixtures.success).submitted().state
     }
     s = coverNeeds(s)
-    // Отдельного пополнения нет: копилка в плане списывается при подтверждении.
     return closePeriod(s).state()
 }
 
