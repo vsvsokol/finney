@@ -94,6 +94,7 @@ import ru.finney.pet.ui.components.Coin
 import ru.finney.pet.ui.components.FeedbackSound
 import ru.finney.pet.ui.components.FillRing
 import ru.finney.pet.ui.components.FinneyButton
+import ru.finney.pet.ui.components.FinneyQuietButton
 import ru.finney.pet.ui.components.CheckBadge
 import ru.finney.pet.ui.components.FinneyIcon
 import ru.finney.pet.ui.components.FinneyIconButton
@@ -1226,12 +1227,12 @@ private fun LevelPanel(
                 textStyle = LevelSideButtonText,
                 modifier = Modifier.fillMaxWidth(SideButtonWidth),
             )
-            FinneyButton(
+            // «Ещё поиграю» — просто закрыть панель, звать к нему не нужно:
+            // спокойная кнопка, как «Назад» в знакомстве.
+            FinneyQuietButton(
                 text = "Ещё поиграю",
                 onClick = onDismiss,
-                fillWidth = false,
-                calm = true,
-                textStyle = LevelSideButtonText,
+                sound = Sfx.Back,
                 modifier = Modifier.fillMaxWidth(SideButtonWidth),
             )
         }
