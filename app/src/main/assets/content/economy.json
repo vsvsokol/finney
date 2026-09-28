@@ -14,22 +14,23 @@
   "conditionsToPass": 2,
   "demoConditionsToPass": 1,
   "demoLevelGameRequired": false,
-  "maxLevel": 6,
-  "stageStartLevels": [1, 2, 3, 4, 5, 6],
+  "maxLevel": 30,
+  "stageStartLevels": [1, 2, 4, 6, 12, 20],
   "pet": {
     "start": { "satiety": 70, "hygiene": 70, "mood": 70, "energy": 90 },
     "decayByStage": [
-      { "satiety": 40, "hygiene": 30, "mood": 20, "energy": 60 },
-      { "satiety": 45, "hygiene": 32, "mood": 22, "energy": 62 },
-      { "satiety": 50, "hygiene": 35, "mood": 25, "energy": 65 },
-      { "satiety": 55, "hygiene": 37, "mood": 27, "energy": 67 },
-      { "satiety": 60, "hygiene": 40, "mood": 30, "energy": 70 },
-      { "satiety": 60, "hygiene": 40, "mood": 30, "energy": 70 }
+      { "satiety": 40, "hygiene": 30, "mood": 20, "energy": 15 },
+      { "satiety": 45, "hygiene": 32, "mood": 22, "energy": 20 },
+      { "satiety": 50, "hygiene": 35, "mood": 25, "energy": 25 },
+      { "satiety": 55, "hygiene": 37, "mood": 27, "energy": 30 },
+      { "satiety": 60, "hygiene": 40, "mood": 30, "energy": 40 },
+      { "satiety": 60, "hygiene": 40, "mood": 30, "energy": 50 }
     ],
     "needsThreshold": 50,
     "emotionLow": 30,
     "emotionHappy": 60,
-    "sleepMinutes": 60,
+    "sleepMinutes": 30,
+    "sleepMinutesByStage": [4, 5, 8, 12, 20, 30],
     "demoSleepSeconds": 10
   },
   "reminders": {
@@ -39,6 +40,10 @@
     "quietToHour": 9,
     "skipIfOpenedHours": 6,
     "demoSkipIfOpenedMinutes": 1
+  },
+  "sleepCards": {
+    "energyPerCorrect": 15,
+    "maxPerSleep": 5
   },
   "play": {
     "moodPerShake": 2,

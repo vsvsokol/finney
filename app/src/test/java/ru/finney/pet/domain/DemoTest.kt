@@ -114,20 +114,22 @@ class DemoTest {
     }
 
     @Test
-    fun `настоящий контент — 6 уровней, стадия равна уровню, в демо все за 5 уровней`() {
+    fun `настоящий контент — 30 уровней, в демо за 5 периодов видны четыре стадии и три облика`() {
         val content = ContentParser.parse { File("src/main/assets/content", it).readText() }
         val real = Game(content, Random(1)) { now }
-        assertEquals(6, content.economy.maxLevel)
+        assertEquals(30, content.economy.maxLevel)
 
         var s = real.newGame(isDemo = true)
         val stages = mutableListOf(real.stage(s))
         repeat(5) {
             val withGoal = if (s.activeGoalId == null) real.selectGoal(s, content.goals.first().id).state() else s
             s = real.closePeriod(real.confirmPlan(withGoal, needs = 5, wants = 5, savings = 5).state()).state()
-            assertEquals(real.level(s), real.stage(s))
             stages += real.stage(s)
         }
         assertEquals(6, real.level(s))
-        assertEquals(listOf(1, 2, 3, 4, 5, 6), stages)
+        // ТЗ п. 2.5.10 — не менее трёх стадий; эксперт проходит 5 периодов (п. 2.6) и видит рост.
+        assertEquals(listOf(1, 2, 2, 3, 3, 4), stages)
+        // Облики питомца (ui/pet/PetGrowth.kt): 1, 2–3, 4+ — к концу демо виден «взрослый».
+        assertEquals(4, stages.last())
     }
 }

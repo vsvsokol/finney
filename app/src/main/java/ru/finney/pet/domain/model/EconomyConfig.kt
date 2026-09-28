@@ -22,6 +22,7 @@ data class EconomyConfig(
     val stageStartLevels: List<Int>,
     val pet: PetRule,
     val play: PlayRule = PlayRule(),
+    val sleepCards: SleepCardRule = SleepCardRule(),
     val reminders: ReminderRule = ReminderRule(),
 ) {
     fun income(stage: Int): Int = incomeByStage[stage - 1]
@@ -60,6 +61,11 @@ data class PetRule(
     val sleepMinutes: Int,
     /** Полный сон в демо-режиме, секунды. */
     val demoSleepSeconds: Int,
+    /**
+     * Полный сон по стадиям, минуты: малыш спит недолго, чтобы первый заход был игрой, а не
+     * ожиданием; взрослый — дольше, сон становится перерывом. null — у всех стадий [sleepMinutes].
+     */
+    val sleepMinutesByStage: List<Int>? = null,
 )
 
 /**
@@ -74,6 +80,17 @@ data class PlayRule(
     val sessionMoodCap: Int = 20,
     val sessionMinutes: Int = 60,
     val demoSessionSeconds: Int = 30,
+)
+
+/**
+ * Сон-загадка: пока питомец спит, ребёнок отвечает на карточки по справочнику. Верный
+ * ответ — плюс [energyPerCorrect] ко сну сразу, и питомец просыпается раньше; неверный
+ * ничего не отнимает. Карточек за один сон — не больше [maxPerSleep] (счёт ведёт экран).
+ */
+@Serializable
+data class SleepCardRule(
+    val energyPerCorrect: Int = 15,
+    val maxPerSleep: Int = 5,
 )
 
 /**

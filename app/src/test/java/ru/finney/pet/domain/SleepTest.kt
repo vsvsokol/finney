@@ -136,6 +136,54 @@ class SleepTest {
     }
 
     @Test
+    fun `сон-загадка — верный ответ сразу прибавляет сон, и питомец просыпается раньше`() {
+        val asleep = game.sleep(withEnergy(30)).state()
+        val per = Fixtures.economy.sleepCards.energyPerCorrect
+        now += hour / 10
+        val before = game.energyAt(asleep, now)
+
+        val answered = game.answerSleepCard(asleep, correct = true).state()
+
+        assertEquals(before + per, game.energyAt(answered, now))
+        assertEquals(game.sleepEndsAt(asleep)!! - hour * per / 100, game.sleepEndsAt(answered))
+        assertEquals(asleep.sleepingSince, answered.sleepingSince)
+        assertEquals(asleep.ledger, answered.ledger)
+    }
+
+    @Test
+    fun `сон-загадка — неверный ответ ничего не отнимает`() {
+        val asleep = game.sleep(withEnergy(30)).state()
+        assertEquals(asleep, game.answerSleepCard(asleep, correct = false).state())
+    }
+
+    @Test
+    fun `сон-загадка — сон не выше 100, а не спящему загадок нет`() {
+        val asleep = game.sleep(withEnergy(95)).state()
+        val answered = game.answerSleepCard(asleep, correct = true).state()
+        assertEquals(PetRules.STAT_MAX, answered.pet.energy)
+        assertEquals(PetRules.STAT_MAX, game.settleSleep(answered).pet.energy)
+        assertNull(game.settleSleep(answered).sleepingSince)
+
+        assertEquals(Rejection.NotAsleep, game.answerSleepCard(withEnergy(30), correct = true).reason())
+    }
+
+    @Test
+    fun `сон по стадиям — малыш спит меньше взрослого, демо не меняется`() {
+        val economy = Fixtures.economy.copy(pet = Fixtures.economy.pet.copy(sleepMinutesByStage = listOf(5, 20, 40)))
+        val staged = Game(Fixtures.content.copy(economy = economy)) { now }
+        val first = staged.newGame()
+        assertEquals(1, staged.stage(first))
+        assertEquals(5 * 60_000L, staged.fullSleepMillis(first))
+
+        var s = first
+        repeat(10) { if (staged.stage(s) < 3) s = staged.playPerfectPeriod(s) }
+        assertEquals(3, staged.stage(s))
+        assertEquals(40 * 60_000L, staged.fullSleepMillis(s))
+
+        assertEquals(10_000L, staged.fullSleepMillis(staged.newGame(isDemo = true)))
+    }
+
+    @Test
     fun `без сна нужное не закрыто и очков за него нет`() {
         var s = game.coverNeeds(game.confirmPlan(tired(), needs = 40, wants = 0, savings = 0).state())
         s = s.copy(pet = s.pet.copy(energy = 0))

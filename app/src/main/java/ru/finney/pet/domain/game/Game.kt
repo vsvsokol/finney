@@ -309,9 +309,17 @@ class Game(
 
     // ---------- Сон ----------
 
-    /** Сколько спать от 0 до 100: час, в демо-режиме — секунды, чтобы эксперт увидел весь цикл. */
-    fun fullSleepMillis(state: GameState): Long =
-        if (state.isDemo) economy.pet.demoSleepSeconds * 1_000L else economy.pet.sleepMinutes * 60_000L
+    /**
+     * Сколько спать от 0 до 100: по стадии ([PetRule.sleepMinutesByStage]) — малыш спит недолго,
+     * взрослый дольше; в демо-режиме — секунды, чтобы эксперт увидел весь цикл. Стадия во сне
+     * не меняется: уровень завершают только бодрствуя.
+     */
+    fun fullSleepMillis(state: GameState): Long {
+        if (state.isDemo) return economy.pet.demoSleepSeconds * 1_000L
+        val minutes = economy.pet.sleepMinutesByStage?.let { it[(stage(state) - 1).coerceIn(it.indices)] }
+            ?: economy.pet.sleepMinutes
+        return minutes * 60_000L
+    }
 
     /**
      * Сколько спать с того сна, с каким уснул, до 100: доля от [fullSleepMillis].
@@ -353,6 +361,19 @@ class Game(
     fun wake(state: GameState): GameResult {
         if (state.sleepingSince == null) return reject(Rejection.NotAsleep)
         return ok(state.copy(pet = state.pet.copy(energy = energyAt(state)), sleepingSince = null))
+    }
+
+    /**
+     * Ответ на карточку сна-загадки. Верно — сон сразу прибавляет [SleepCardRule.energyPerCorrect]:
+     * прибавка ложится в сон на момент засыпания, и питомец просыпается раньше на ту же долю
+     * [fullSleepMillis]. Неверно — ничего не меняется и не отнимается: это загадка во сне,
+     * не экзамен (ТЗ п. 8.1). Сколько карточек за сон — считает экран, до [SleepCardRule.maxPerSleep].
+     */
+    fun answerSleepCard(state: GameState, correct: Boolean): GameResult {
+        if (state.sleepingSince == null) return reject(Rejection.NotAsleep)
+        if (!correct) return ok(state)
+        val energy = (state.pet.energy + economy.sleepCards.energyPerCorrect).coerceAtMost(PetRules.STAT_MAX)
+        return ok(state.copy(pet = state.pet.copy(energy = energy)))
     }
 
     /** Если срок сна вышел, питомец уже проснулся. Хранилище вызывает перед каждой командой. */

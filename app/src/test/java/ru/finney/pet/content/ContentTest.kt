@@ -19,6 +19,7 @@ import ru.finney.pet.domain.model.TaskDefinition
 import ru.finney.pet.domain.model.TaskOutcome
 import ru.finney.pet.domain.model.TaskTheme
 import ru.finney.pet.domain.pet.PetRules
+import ru.finney.pet.domain.progress.Progression
 import ru.finney.pet.domain.tasks.TaskEngines
 import ru.finney.pet.domain.tasks.TaskEvaluation
 import ru.finney.pet.domain.tasks.TaskInput
@@ -98,14 +99,34 @@ class ContentTest {
         }
     }
 
-    /** Сон бесплатный, поэтому держится только на спаде: выспавшийся к концу периода снова хочет спать. */
+    /**
+     * Сон бесплатный, поэтому держится только на спаде: выспавшийся снова хочет спать
+     * не позже чем через 4 периода. Каждый период — уже не нужно (решение 28.09): первый
+     * заход должен быть игрой, а не ожиданием, а к концу спад растёт и сон снова частый.
+     */
     @Test
-    fun `сон нужен каждый период на каждой стадии`() {
+    fun `сон нужен хотя бы раз в 4 периода на каждой стадии`() {
         val pet = content.economy.pet
         for (stage in 1..content.economy.stageStartLevels.size) {
-            val left = PetRules.STAT_MAX - content.economy.decay(stage).energy
-            assertTrue("стадия $stage: после сна за период остаётся $left ≥ порога", left < pet.needsThreshold)
+            val decay = content.economy.decay(stage).energy
+            val periods = (PetRules.STAT_MAX - pet.needsThreshold) / decay + 1
+            assertTrue("стадия $stage: выспавшемуся сон нужен только через $periods периодов", periods <= 4)
         }
+    }
+
+    /** Первый заход (~15 минут): уровни 1 и 2 без сна, первый сон — короткий, на несколько минут. */
+    @Test
+    fun `первые два уровня без сна, первый сон короче 5 минут`() {
+        val e = content.economy
+        val pet = e.pet
+        var energy = pet.start.energy
+        for (level in 1..2) {
+            energy -= e.decay(Progression.stage(level, e)).energy
+            assertTrue("уровень $level: сон $energy — уже нужно спать", energy >= pet.needsThreshold)
+        }
+        val third = Progression.stage(3, e)
+        val minutes = pet.sleepMinutesByStage!![third - 1] * (PetRules.STAT_MAX - (energy - e.decay(third).energy)) / PetRules.STAT_MAX
+        assertTrue("первый сон — $minutes мин", minutes < 5)
     }
 
     /** Входы для успешного и неудачного прохождения. «Конвейер» и «Касса» — в тесте ниже, по самому контенту. */
@@ -154,11 +175,16 @@ class ContentTest {
     }
 
     @Test
-    fun `сложность растёт с уровнем — на каждом уровне с 2 по 9 что-то новое`() {
+    fun `сложность растёт с уровнем — на каждом уровне с 2 по 9 что-то новое, дальше не реже раза в 2 уровня`() {
         assertTrue("у каждой игры есть вариант первого уровня", content.taskSeries.all { it.first().unlockLevel == 1 })
         assertTrue("у каждой игры несколько вариантов", content.taskSeries.all { it.size >= 2 })
         val levels = content.tasks.map { it.unlockLevel }.toSet()
-        for (level in 2..content.economy.maxLevel) assertTrue("на уровне $level ничего не меняется", level in levels)
+        for (level in 2..minOf(9, content.economy.maxLevel)) assertTrue("на уровне $level ничего не меняется", level in levels)
+        // Уровней 30, вариантов меньше: после девятого новое реже, но без долгих пустот,
+        // и растянуто почти до конца — последние уровни не повторяют одно и то же с шестого.
+        val sorted = levels.sorted()
+        sorted.zipWithNext().forEach { (a, b) -> assertTrue("между уровнями $a и $b ничего нового", b - a <= 2) }
+        assertTrue("новое кончается на уровне ${sorted.last()} из ${content.economy.maxLevel}", sorted.last() >= content.economy.maxLevel - 6)
     }
 
     private fun outcome(task: TaskDefinition, input: TaskInput): TaskOutcome {
