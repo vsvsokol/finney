@@ -85,6 +85,10 @@ private const val PUSHISTIK_CANVAS = 2048f
 // Полосу глаз не снимают в редакторе: её печатает tools/split_pet_base.py, и уже
 // в пикселях слоя в ресурсах, а не холста. Центр рта он печатает сразу долями.
 private const val BLINK_LAYER = 512f
+
+// Голова в слоях опущена на 4 px из 512 (tools/split_pet_base.py, HEAD_DROP): в старших
+// обликах иначе между подбородком и туловищем виден зазор. Глаза, рот и шляпа — вслед за ней.
+private const val HEAD_DROP = 4f / BLINK_LAYER
 private const val ROGATIK_CANVAS = 2200f
 
 // Звёздочка, Бантик и Лучик рисовались по шаблону Рогатика, поэтому холст у них тот же.
@@ -115,10 +119,10 @@ private val PushistikSkin = PetSkin(
     rightLegPivot = TransformOrigin(1100f / PUSHISTIK_CANVAS, 1640f / PUSHISTIK_CANVAS),
     ground = TransformOrigin(0.5f, 1828f / PUSHISTIK_CANVAS),
     neck = 1690f / PUSHISTIK_CANVAS,
-    eyesTop = 234f / BLINK_LAYER,
-    eyesBottom = 342f / BLINK_LAYER,
-    mouthCenter = TransformOrigin(0.5022f, 0.6619f),
-    hat = HatFit(centerX = 0.50f, brim = 0.23f, width = 0.72f),
+    eyesTop = 234f / BLINK_LAYER + HEAD_DROP,
+    eyesBottom = 342f / BLINK_LAYER + HEAD_DROP,
+    mouthCenter = TransformOrigin(0.5022f, 0.6619f + HEAD_DROP),
+    hat = HatFit(centerX = 0.50f, brim = 0.23f + HEAD_DROP, width = 0.72f),
 )
 
 private val RogatikSkin = PetSkin(
@@ -141,10 +145,10 @@ private val RogatikSkin = PetSkin(
     rightLegPivot = TransformOrigin(1168f / ROGATIK_CANVAS, 1771f / ROGATIK_CANVAS),
     ground = TransformOrigin(0.5f, 1898f / ROGATIK_CANVAS),
     neck = 1545f / ROGATIK_CANVAS,
-    eyesTop = 223f / BLINK_LAYER,
-    eyesBottom = 337f / BLINK_LAYER,
-    mouthCenter = TransformOrigin(0.502f, 0.6395f),
-    hat = HatFit(centerX = 0.50f, brim = 0.24f, width = 0.70f),
+    eyesTop = 223f / BLINK_LAYER + HEAD_DROP,
+    eyesBottom = 337f / BLINK_LAYER + HEAD_DROP,
+    mouthCenter = TransformOrigin(0.502f, 0.6395f + HEAD_DROP),
+    hat = HatFit(centerX = 0.50f, brim = 0.24f + HEAD_DROP, width = 0.70f),
 )
 
 private val ZvezdochkaSkin = PetSkin(
@@ -167,10 +171,10 @@ private val ZvezdochkaSkin = PetSkin(
     rightLegPivot = TransformOrigin(1167f / ZVEZDOCHKA_CANVAS, 1765f / ZVEZDOCHKA_CANVAS),
     ground = TransformOrigin(0.5f, 1906f / ZVEZDOCHKA_CANVAS),
     neck = 1530f / ZVEZDOCHKA_CANVAS,
-    eyesTop = 201f / BLINK_LAYER,
-    eyesBottom = 325f / BLINK_LAYER,
-    mouthCenter = TransformOrigin(0.5043f, 0.6307f),
-    hat = HatFit(centerX = 0.50f, brim = 0.23f, width = 0.70f),
+    eyesTop = 201f / BLINK_LAYER + HEAD_DROP,
+    eyesBottom = 325f / BLINK_LAYER + HEAD_DROP,
+    mouthCenter = TransformOrigin(0.5043f, 0.6307f + HEAD_DROP),
+    hat = HatFit(centerX = 0.50f, brim = 0.23f + HEAD_DROP, width = 0.70f),
 )
 
 private val BantikSkin = PetSkin(
@@ -193,10 +197,10 @@ private val BantikSkin = PetSkin(
     rightLegPivot = TransformOrigin(1156f / BANTIK_CANVAS, 1789f / BANTIK_CANVAS),
     ground = TransformOrigin(0.5f, 1902f / BANTIK_CANVAS),
     neck = 1560f / BANTIK_CANVAS,
-    eyesTop = 227f / BLINK_LAYER,
-    eyesBottom = 335f / BLINK_LAYER,
-    mouthCenter = TransformOrigin(0.5043f, 0.6516f),
-    hat = HatFit(centerX = 0.50f, brim = 0.25f, width = 0.68f),
+    eyesTop = 227f / BLINK_LAYER + HEAD_DROP,
+    eyesBottom = 335f / BLINK_LAYER + HEAD_DROP,
+    mouthCenter = TransformOrigin(0.5043f, 0.6516f + HEAD_DROP),
+    hat = HatFit(centerX = 0.50f, brim = 0.25f + HEAD_DROP, width = 0.68f),
 )
 
 private val LuchikSkin = PetSkin(
@@ -219,10 +223,10 @@ private val LuchikSkin = PetSkin(
     rightLegPivot = TransformOrigin(1158f / LUCHIK_CANVAS, 1754f / LUCHIK_CANVAS),
     ground = TransformOrigin(0.5f, 1913f / LUCHIK_CANVAS),
     neck = 1547f / LUCHIK_CANVAS,
-    eyesTop = 215f / BLINK_LAYER,
-    eyesBottom = 330f / BLINK_LAYER,
-    mouthCenter = TransformOrigin(0.5036f, 0.638f),
-    hat = HatFit(centerX = 0.50f, brim = 0.27f, width = 0.68f),
+    eyesTop = 215f / BLINK_LAYER + HEAD_DROP,
+    eyesBottom = 330f / BLINK_LAYER + HEAD_DROP,
+    mouthCenter = TransformOrigin(0.5036f, 0.638f + HEAD_DROP),
+    hat = HatFit(centerX = 0.50f, brim = 0.27f + HEAD_DROP, width = 0.68f),
 )
 
 val PetCharacter.skin: PetSkin

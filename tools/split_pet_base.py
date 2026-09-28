@@ -66,8 +66,22 @@ def save(image: Image.Image, pet: str, name: str) -> None:
     out = RES / f"{pet}_{name}.webp"
     if max(image.size) > SIDE:
         image = image.resize((SIDE, SIDE), Image.LANCZOS)
+    if name.startswith(("base_", "blink_")) or name == "mouth":
+        image = drop_head(image)
     image.save(out, "WEBP", lossless=True, method=6)
     print(f"{out} — {out.stat().st_size // 1024} КБ")
+
+
+def drop_head(image: Image.Image) -> Image.Image:
+    """Голова в слоях ниже нарисованной на [HEAD_DROP] пикселей слоя: в старших обликах
+    иначе виден зазор под подбородком. В PetSkin.kt глаза, рот и шляпа сдвинуты так же."""
+    out = Image.new("RGBA", image.size, (0, 0, 0, 0))
+    out.paste(image.crop((0, 0, image.size[0], image.size[1] - HEAD_DROP)), (0, HEAD_DROP))
+    return out
+
+
+# Как HEAD_DROP в PetSkin.kt.
+HEAD_DROP = 4
 
 
 def uncomposite(state_alpha: Image.Image, limb_alpha: Image.Image) -> Image.Image:
