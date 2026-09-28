@@ -74,6 +74,9 @@ enum class FinneyIcons {
 
     /** Замок — нужное: из плана не убрать. */
     Lock,
+
+    /** Геймпад — игра уровня. */
+    Gamepad,
 }
 
 /**
@@ -103,6 +106,7 @@ fun FinneyIcon(
             FinneyIcons.Trophy -> drawTrophy(tint)
             FinneyIcons.Plan -> drawPlan(tint)
             FinneyIcons.Lock -> drawLock(tint)
+            FinneyIcons.Gamepad -> drawGamepad(tint)
         }
     }
 }
@@ -329,6 +333,19 @@ private fun DrawScope.drawPiggy(tint: Color) {
 }
 
 // Звезда о пяти лучах.
+// Геймпад из макета экрана условий уровня: корпус «стадионом», слева крест,
+// справа две кнопки. Крест и кнопки — не дырки, а цвет фона: значок стоит
+// на кремовом и жёлтом, поэтому просветы рисуются кремовым.
+private fun DrawScope.drawGamepad(tint: Color) {
+    val s = size.minDimension
+    drawRoundRectSolid(tint, s * 0.04f, s * 0.24f, s * 0.92f, s * 0.52f, radius = s * 0.26f)
+    val hole = FinneyCream
+    drawRoundRectSolid(hole, s * 0.18f, s * 0.46f, s * 0.26f, s * 0.08f, radius = s * 0.03f)
+    drawRoundRectSolid(hole, s * 0.27f, s * 0.37f, s * 0.08f, s * 0.26f, radius = s * 0.03f)
+    drawCircle(hole, s * 0.055f, Offset(s * 0.66f, s * 0.44f))
+    drawCircle(hole, s * 0.055f, Offset(s * 0.77f, s * 0.56f))
+}
+
 private fun DrawScope.drawStar(tint: Color) {
     val s = size.minDimension
     val cx = s / 2f

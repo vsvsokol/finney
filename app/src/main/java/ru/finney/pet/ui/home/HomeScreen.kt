@@ -1,5 +1,23 @@
 package ru.finney.pet.ui.home
 
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import ru.finney.pet.ui.components.buttonFill
+import ru.finney.pet.ui.theme.FinneyInkFaded
+import ru.finney.pet.ui.theme.FinneyYellow
+import ru.finney.pet.ui.theme.RadiusCard
+import ru.finney.pet.ui.theme.RadiusCheckbox
+import ru.finney.pet.ui.theme.RadiusPanel
+import ru.finney.pet.ui.theme.StrokeBold
+import ru.finney.pet.ui.theme.StrokeRegular
 import ru.finney.pet.ui.motion.motionEnabled
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -1085,6 +1103,10 @@ private fun SleepPanel(
  * «Завершить уровень» здесь «Составить план» — следующий шаг, а не отказ.
  * Вернуть уровень нельзя, и панель прямо говорит, что будет: пройден или
  * начнётся заново с новыми деньгами. Прогресс при этом не падает никогда.
+ *
+ * Вид — по макету экрана условий уровня (28.09): номер уровня плашкой-«стадионом»
+ * над панелью, игра уровня строкой-плашкой, три условия плитками с отметкой под
+ * каждой, второстепенные кнопки — спокойные зелёные.
  */
 @Composable
 private fun LevelPanel(
@@ -1098,118 +1120,251 @@ private fun LevelPanel(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    FinneyPanel(title = "Уровень $level", modifier = modifier) {
-        if (!check.planConfirmed) {
-            Text(
-                "Уровень начинается с плана: реши, сколько на нужное, сколько на «хочется» и сколько отложить.",
-                style = MaterialTheme.typography.bodyLarge,
-                color = FinneyInk,
-            )
-            FinneyButton(text = "Составить план", onClick = onOpenBudget)
-        } else {
-            if (levelGame != null && check.levelTaskId != null) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        LevelTitle(level)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(RadiusPanel))
+                .background(FinneyCream)
+                .border(StrokeBold, FinneyInk, RoundedCornerShape(RadiusPanel))
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            if (!check.planConfirmed) {
                 Text(
-                    if (check.gameRequired) "Обязательно пройди игру уровня:" else "Игра уровня — по желанию (демо):",
+                    "Уровень начинается с плана: реши, сколько на нужное, сколько на «хочется» и сколько отложить.",
                     style = MaterialTheme.typography.bodyLarge,
                     color = FinneyInk,
                 )
-                CheckRow(listOf(FinneyIcons.Star), "Игра «$levelGame»", check.gamePassed)
-            }
-            Text(
-                if (check.levelTaskId != null && check.gameRequired) {
-                    "И выполни ${check.toPass} из $LEVEL_CONDITIONS:"
-                } else {
-                    "Чтобы пройти уровень, выполни ${check.toPass} из $LEVEL_CONDITIONS:"
-                },
-                style = MaterialTheme.typography.bodyLarge,
-                color = FinneyInk,
-            )
-            CheckRow(listOf(FinneyIcons.Food, FinneyIcons.Bath, FinneyIcons.Lamp), "Сыт, чист и выспался", check.needsCovered)
-            // «По плану» — единственное условие, которое проверяют по числам на другом
-            // экране: строка ведёт туда, в «План и факт». Иначе этот экран ребёнок видел
-            // один раз — сразу после подтверждения плана.
-            CheckRow(listOf(FinneyIcons.Plan), "Траты по плану", check.planMatched, onClick = onOpenBudget)
-            CheckRow(listOf(FinneyIcons.Piggy), "Отложено в копилку", check.savingsAdded)
-            Text(
-                if (check.willPass) {
-                    "Готово! Уровень будет пройден, и придут новые деньги."
-                } else {
-                    "Если завершить сейчас, уровень начнётся заново — с новыми деньгами."
-                },
-                style = MaterialTheme.typography.bodyLarge,
-                color = FinneyInk,
-            )
-            // Во сне уровень не завершают: условия видно, а итог — утром.
-            if (asleep) {
+                FinneyButton(text = "Составить план", onClick = onOpenBudget)
+            } else {
+                if (levelGame != null && check.levelTaskId != null) {
+                    LevelGameRow(levelGame, check.gamePassed, required = check.gameRequired)
+                }
                 Text(
-                    "Питомец спит. Завершить уровень можно, когда он проснётся.",
+                    "Выполни ${check.toPass} из $LEVEL_CONDITIONS:",
                     style = MaterialTheme.typography.bodyLarge,
                     color = FinneyInk,
+                    textAlign = TextAlign.Center,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    ConditionTile(
+                        label = "Уход",
+                        spoken = "Сыт, чист и выспался",
+                        done = check.needsCovered,
+                        modifier = Modifier.weight(1f),
+                    ) { SmileFace(Modifier.fillMaxSize(0.66f)) }
+                    // «По плану» проверяют по числам на другом экране: плитка ведёт
+                    // туда, в «План и факт». Иначе этот экран ребёнок видел один
+                    // раз — сразу после подтверждения плана.
+                    ConditionTile(
+                        label = "План",
+                        spoken = "Траты по плану",
+                        done = check.planMatched,
+                        onClick = onOpenBudget,
+                        modifier = Modifier.weight(1f),
+                    ) { Coin(size = 56.dp) }
+                    ConditionTile(
+                        label = "Копилка",
+                        spoken = "Отложено в копилку",
+                        done = check.savingsAdded,
+                        modifier = Modifier.weight(1f),
+                    ) { FinneyIcon(FinneyIcons.Piggy, size = 56.dp) }
+                }
+                Text(
+                    if (check.willPass) {
+                        "Готово! Уровень будет пройден, и придут новые деньги."
+                    } else {
+                        "Если завершить сейчас, уровень начнётся заново — с новыми деньгами."
+                    },
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = FinneyInk,
+                    textAlign = TextAlign.Center,
+                )
+                // Во сне уровень не завершают: условия видно, а итог — утром.
+                if (asleep) {
+                    Text(
+                        "Питомец спит. Завершить уровень можно, когда он проснётся.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = FinneyInk,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+                FinneyButton(
+                    text = "Завершить уровень",
+                    onClick = onFinish,
+                    enabled = !asleep,
+                    modifier = Modifier.graphicsLayer { alpha = if (asleep) NightDim else 1f },
                 )
             }
+            // Уже основной: рядом с главным действием второстепенные не должны
+            // спорить с ним ни цветом, ни шириной.
             FinneyButton(
-                text = "Завершить уровень",
-                onClick = onFinish,
-                enabled = !asleep,
-                modifier = Modifier.graphicsLayer { alpha = if (asleep) NightDim else 1f },
+                text = "Итоги и история",
+                onClick = onOpenProgress,
+                fillWidth = false,
+                calm = true,
+                modifier = Modifier.fillMaxWidth(SideButtonWidth),
+            )
+            FinneyButton(
+                text = "Ещё поиграю",
+                onClick = onDismiss,
+                fillWidth = false,
+                calm = true,
+                modifier = Modifier.fillMaxWidth(SideButtonWidth),
             )
         }
-        FinneyButton(text = "Итоги и история", onClick = onOpenProgress)
-        FinneyButton(text = "Ещё поиграю", onClick = onDismiss)
+    }
+}
+
+/** Ширина второстепенных кнопок панели уровня — доля ширины панели, как в макете. */
+private const val SideButtonWidth = 0.82f
+
+/** Номер уровня плашкой-«стадионом» над панелью: та же заливка, что у кнопки, но не нажимается. */
+@Composable
+private fun LevelTitle(level: Int) {
+    Box(
+        modifier = Modifier
+            .defaultMinSize(minHeight = 72.dp)
+            .clip(RoundedCornerShape(percent = 50))
+            .buttonFill(pressed = false, round = false)
+            .semantics { heading() }
+            .padding(horizontal = 36.dp, vertical = 10.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        OutlinedText("Уровень $level", style = MaterialTheme.typography.headlineMedium)
     }
 }
 
 /**
- * Условие уровня строкой чек-листа: значок условия, подпись и крупная отметка —
- * кружок с галочкой или пустой кружок. Отличаются формой, а не цветом (ТЗ п. 3.6).
- * Прежний вид — «✓»/«—» перед текстом — на плейтесте читался как логи.
+ * Игра уровня строкой-плашкой: геймпад, название и отметка. Отметка обязательна —
+ * без неё не видно, пройдена ли игра (ТЗ п. 3.6), хотя в макете её нет.
  */
 @Composable
-private fun CheckRow(icons: List<FinneyIcons>, label: String, done: Boolean, onClick: (() -> Unit)? = null) {
-    val tap = if (onClick != null) {
-        Modifier
-            .clip(RoundedCornerShape(RadiusField))
-            .clickable(role = Role.Button, onClickLabel = "Посмотреть", onClick = onClick)
-    } else {
-        Modifier
-    }
+private fun LevelGameRow(game: String, passed: Boolean, required: Boolean) {
+    val note = if (required) "обязательно" else "по желанию"
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .defaultMinSize(minHeight = 48.dp)
-            .then(tap)
-            .clearAndSetSemantics { contentDescription = "$label: ${if (done) "да" else "пока нет"}" },
+            .defaultMinSize(minHeight = 64.dp)
+            .clip(RoundedCornerShape(percent = 50))
+            .buttonFill(pressed = false, round = false, glare = false)
+            .clearAndSetSemantics {
+                contentDescription = "Игра «$game», $note: ${if (passed) "пройдена" else "пока нет"}"
+            }
+            .padding(start = 20.dp, end = 14.dp, top = 8.dp, bottom = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        // Три значка у нужного — те же, что на кнопках комнат: видно, где это закрывают.
-        Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-            icons.forEach { FinneyIcon(it, size = if (icons.size > 1) 20.dp else 28.dp) }
+        FinneyIcon(FinneyIcons.Gamepad, size = 40.dp)
+        Column(Modifier.weight(1f)) {
+            Text("Игра «$game»", style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
+            Text(note, style = MaterialTheme.typography.bodyLarge, color = FinneyInkFaded)
         }
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyLarge,
-            color = FinneyInk,
-            modifier = Modifier.weight(1f),
-        )
-        // Строку можно открыть — это видно по стрелке, а не только по тому, что она нажимается.
-        if (onClick != null) OutlinedText("›", style = MaterialTheme.typography.headlineMedium)
-        CheckMark(done)
+        CheckSquare(passed)
     }
 }
 
-/** Отметка условия: выполнено — зелёный кружок с галочкой, нет — пустой кружок. */
+/**
+ * Условие уровня плиткой: крупный значок, подпись и отметка под ней.
+ *
+ * Выполненное — зелёная плитка, но главный признак — галочка в квадрате
+ * под ней: по ТЗ п. 3.6 цвет не может быть единственным. Подпись — наше
+ * добавление к макету: без неё смайлик и монету ребёнок не свяжет с условием.
+ */
 @Composable
-private fun CheckMark(done: Boolean) {
+private fun ConditionTile(
+    label: String,
+    spoken: String,
+    done: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    icon: @Composable () -> Unit,
+) {
+    val tap = if (onClick != null) {
+        Modifier.clickable(role = Role.Button, onClickLabel = "Посмотреть", onClick = onClick)
+    } else {
+        Modifier
+    }
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(RadiusCard))
+            .then(tap)
+            .clearAndSetSemantics { contentDescription = "$spoken: ${if (done) "да" else "пока нет"}" },
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .clip(RoundedCornerShape(RadiusCard))
+                .background(if (done) FinneyGreen else FinneyCream)
+                .border(StrokeRegular, FinneyInk, RoundedCornerShape(RadiusCard)),
+            contentAlignment = Alignment.Center,
+        ) { icon() }
+        Text(label, style = MaterialTheme.typography.bodyLarge, color = FinneyInk, maxLines = 1)
+        CheckSquare(done)
+    }
+}
+
+/** Отметка условия: квадрат с галочкой или пустой — отличаются формой, а не цветом. */
+@Composable
+private fun CheckSquare(done: Boolean) {
+    val shape = RoundedCornerShape(RadiusCheckbox)
     Box(
         modifier = Modifier
-            .size(36.dp)
-            .clip(CircleShape)
-            .background(if (done) FinneyGreen else FinneyCream)
-            .border(StrokeThin, FinneyInk, CircleShape),
+            .size(40.dp)
+            .clip(shape)
+            .background(if (done) FinneyYellow else FinneyCream)
+            .border(StrokeRegular, FinneyInk, shape),
         contentAlignment = Alignment.Center,
     ) {
-        if (done) OutlinedText("✓", style = MaterialTheme.typography.titleLarge)
+        if (done) {
+            Canvas(Modifier.size(24.dp)) {
+                val w = size.minDimension
+                drawPath(
+                    Path().apply {
+                        moveTo(w * 0.08f, w * 0.52f)
+                        lineTo(w * 0.38f, w * 0.82f)
+                        lineTo(w * 0.92f, w * 0.20f)
+                    },
+                    color = FinneyInk,
+                    style = Stroke(width = w * 0.18f, cap = StrokeCap.Round, join = StrokeJoin.Round),
+                )
+            }
+        }
+    }
+}
+
+/** Смайлик условия «уход»: питомец сыт, чист и выспался — значит, доволен. */
+@Composable
+private fun SmileFace(modifier: Modifier = Modifier) {
+    Canvas(modifier.aspectRatio(1f)) {
+        val s = size.minDimension
+        val line = s * 0.08f
+        drawCircle(FinneyYellow, s * 0.5f - line / 2f)
+        drawCircle(FinneyInk, s * 0.5f - line / 2f, style = Stroke(line))
+        drawCircle(FinneyInk, s * 0.06f, Offset(s * 0.36f, s * 0.40f))
+        drawCircle(FinneyInk, s * 0.06f, Offset(s * 0.64f, s * 0.40f))
+        drawArc(
+            color = FinneyInk,
+            startAngle = 20f,
+            sweepAngle = 140f,
+            useCenter = false,
+            topLeft = Offset(s * 0.30f, s * 0.36f),
+            size = Size(s * 0.40f, s * 0.30f),
+            style = Stroke(line, cap = StrokeCap.Round),
+        )
     }
 }
 

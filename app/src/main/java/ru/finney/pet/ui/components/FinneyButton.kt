@@ -47,7 +47,9 @@ import androidx.compose.ui.unit.dp
 import ru.finney.pet.ui.sound.LocalSounds
 import ru.finney.pet.ui.sound.Sfx
 import ru.finney.pet.ui.theme.strokeFor
+import ru.finney.pet.ui.theme.FinneyBlue
 import ru.finney.pet.ui.theme.FinneyCream
+import ru.finney.pet.ui.theme.FinneyGreen
 import ru.finney.pet.ui.theme.FinneyGlare
 import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneyStrokeRatio
@@ -166,6 +168,8 @@ private val BackLabels = setOf("Назад", "Закрыть", "Отмена", "
  * обязательна — значок подсказывает, а смысл несут слова.
  * [sound] null и свой [interactionSource] — для [ChargeButton]: звук и отклик на
  * палец у неё свои.
+ * [calm] — зелёная с голубой полосой вместо жёлтой: второстепенные пути в панели
+ * уровня («Итоги и история», «Ещё поиграю»), как в макете экрана условий уровня.
  */
 @Composable
 fun FinneyButton(
@@ -177,6 +181,7 @@ fun FinneyButton(
     sound: Sfx? = if (text in BackLabels) Sfx.Back else Sfx.Tap,
     icon: (@Composable () -> Unit)? = null,
     interactionSource: MutableInteractionSource? = null,
+    calm: Boolean = false,
 ) {
     val sounds = LocalSounds.current
     val interactionSource = interactionSource ?: remember { MutableInteractionSource() }
@@ -214,7 +219,7 @@ fun FinneyButton(
                 // Почему погашена, экран пишет рядом словами — цвет не единственный признак.
                 .alpha(if (enabled) 1f else DisabledAlpha)
                 .clip(shape)
-                .buttonFill(pressed, round = false)
+                .buttonFill(pressed, round = false, calm = calm)
                 .padding(horizontal = 24.dp, vertical = 12.dp),
             contentAlignment = Alignment.Center,
         ) {
@@ -488,6 +493,9 @@ fun FinneyNeedButton(
  * [glare] — рисовать ли блик. Кнопка денег на главном рисовалась без него,
  * и это так и оставлено: её в ките нет, она только собрана по его правилам.
  *
+ * [calm] — вторая пара из макета экрана условий уровня: зелёный на голубом,
+ * под пальцем так же шаг вниз — голубой на синем.
+ *
  * Обводка рисуется здесь, а не `BorderStroke` у `Surface`: `BorderStroke`
  * кладёт линию внутрь границ, а в макете `stroke position: outside`. Рисуем
  * сами с `Stroke` по краю — половина толщины уходит за границу формы и
@@ -498,9 +506,16 @@ internal fun Modifier.buttonFill(
     pressed: Boolean,
     round: Boolean,
     glare: Boolean = true,
+    calm: Boolean = false,
 ): Modifier = drawBehind {
-    val face = if (pressed) FinneyPeach else FinneyYellow
-    val band = if (pressed) FinneyPink else FinneyPeach
+    val face = when {
+        calm -> if (pressed) FinneyBlue else FinneyGreen
+        else -> if (pressed) FinneyPeach else FinneyYellow
+    }
+    val band = when {
+        calm -> if (pressed) FinneyInk else FinneyBlue
+        else -> if (pressed) FinneyPink else FinneyPeach
+    }
 
     // Полоса лежит подо всей кнопкой, а верхний цвет кладётся поверх
     // фигурой со скруглённым низом. Сбоку фигура идёт по краю заливки
