@@ -508,9 +508,9 @@
     "minRestDays": 1,
     "tiredCut": 10,
     "chores": [
-      { "id": "flowers", "label": "Полить цветы", "hours": 1, "reward": 5, "emoji": "🌱" },
-      { "id": "dishes", "label": "Помыть посуду", "hours": 1, "reward": 10, "emoji": "🍽️" },
-      { "id": "dog", "label": "Выгулять собаку", "hours": 2, "reward": 20, "emoji": "🐕" }
+      { "id": "flowers", "label": "Полить цветы", "hours": 1, "reward": 5, "art": "item_chore_flowers", "emoji": "🌱" },
+      { "id": "dishes", "label": "Помыть посуду", "hours": 1, "reward": 10, "art": "item_chore_dishes", "emoji": "🍽️" },
+      { "id": "dog", "label": "Выгулять собаку", "hours": 2, "reward": 20, "art": "item_chore_dog", "emoji": "🐕" }
     ],
     "explainOk": "Мяч заработан, и день отдыха есть! Чередовать дела выгоднее, чем делать одно.",
     "explainFail": "Не хватило монет или дня отдыха. Одно дело два дня подряд — платят на {tiredCut} меньше."
@@ -530,9 +530,9 @@
     "tiredCut": 10,
     "varietyBonus": 10,
     "chores": [
-      { "id": "flowers", "label": "Полить цветы", "hours": 1, "reward": 5, "emoji": "🌱" },
-      { "id": "dishes", "label": "Помыть посуду", "hours": 1, "reward": 10, "maxTimes": 3, "emoji": "🍽️" },
-      { "id": "dog", "label": "Собака соседа", "hours": 2, "reward": 20, "pay": [20, 20, 20, 20, 30, 30], "emoji": "🐕" },
+      { "id": "flowers", "label": "Полить цветы", "hours": 1, "reward": 5, "art": "item_chore_flowers", "emoji": "🌱" },
+      { "id": "dishes", "label": "Помыть посуду", "hours": 1, "reward": 10, "maxTimes": 3, "art": "item_chore_dishes", "emoji": "🍽️" },
+      { "id": "dog", "label": "Собака соседа", "hours": 2, "reward": 20, "pay": [20, 20, 20, 20, 30, 30], "art": "item_chore_dog", "emoji": "🐕" },
       { "id": "neighbor", "label": "Помочь соседке", "hours": 1, "reward": 15, "maxTimes": 2, "onDays": [2, 4], "emoji": "👵" }
     ],
     "explainOk": "Ты поймал выгодные дни и не устал! Смотри, когда за дело платят больше.",
@@ -554,10 +554,10 @@
     "varietyBonus": 10,
     "varietyCount": 4,
     "chores": [
-      { "id": "flowers", "label": "Полить цветы", "hours": 1, "reward": 5, "emoji": "🌱" },
-      { "id": "dishes", "label": "Помыть посуду", "hours": 1, "reward": 10, "maxTimes": 4, "emoji": "🍽️" },
-      { "id": "dog", "label": "Собака соседа", "hours": 2, "reward": 25, "maxTimes": 2, "emoji": "🐕" },
-      { "id": "cleaning", "label": "Большая уборка", "hours": 3, "reward": 30, "pay": [30, 30, 30, 40, 40], "emoji": "🧹" },
+      { "id": "flowers", "label": "Полить цветы", "hours": 1, "reward": 5, "art": "item_chore_flowers", "emoji": "🌱" },
+      { "id": "dishes", "label": "Помыть посуду", "hours": 1, "reward": 10, "maxTimes": 4, "art": "item_chore_dishes", "emoji": "🍽️" },
+      { "id": "dog", "label": "Собака соседа", "hours": 2, "reward": 25, "maxTimes": 2, "art": "item_chore_dog", "emoji": "🐕" },
+      { "id": "cleaning", "label": "Большая уборка", "hours": 3, "reward": 30, "pay": [30, 30, 30, 40, 40], "art": "item_chore_cleaning", "emoji": "🧹" },
       { "id": "neighbor", "label": "Помочь соседке", "hours": 1, "reward": 15, "maxTimes": 2, "onDays": [2, 4], "emoji": "👵" }
     ],
     "explainOk": "Ты сравнил дни и дела — и всё успел! Так решают, на что тратить время.",
