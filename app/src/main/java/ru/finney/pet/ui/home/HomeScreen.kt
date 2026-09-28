@@ -1,5 +1,6 @@
 package ru.finney.pet.ui.home
 
+import ru.finney.pet.ui.motion.motionEnabled
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import android.content.pm.ApplicationInfo
@@ -118,6 +119,10 @@ import ru.finney.pet.ui.theme.FinneySand
 import ru.finney.pet.ui.theme.RadiusField
 import ru.finney.pet.ui.theme.StrokeThin
 import ru.finney.pet.ui.theme.FinneyTheme
+import ru.finney.pet.ui.theme.FinneyGreen
+import ru.finney.pet.ui.motion.LocalAnimations
+import androidx.compose.ui.tooling.preview.PreviewParameter
+import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 
 // Главный экран по макету main_screen_layout: сверху деньги, уровень и «бургер»,
 // слева по центру шкала настроения, внизу три кнопки комнат. Больше в макете
@@ -378,6 +383,10 @@ private fun HomeContent(
     // Покупка — в конце игры, см. ui/room/CareGame.kt.
     var playing by rememberSaveable { mutableStateOf<String?>(null) }
 
+    // Выключены — питомец не прыгает и не хихикает: цепочка шагов при нулевой
+    // скорости мелькает по кадру на шаг, это хуже, чем стоять спокойно.
+    val animations = LocalAnimations.current
+
     // Анимация живёт здесь, а не внутри комнаты: игры ухода открывают питомцу рот
     // и заставляют его хихикать, а сами лежат поверх комнаты.
     val animation = rememberPetAnimation()
@@ -422,12 +431,12 @@ private fun HomeContent(
             pendingShakes++
             hearts.emit(Offset(pet.center.x, pet.top + pet.height * 0.2f), filled = joyful)
             if (joyful) {
-                animation.playGiggle()
+                if (animations) animation.playGiggle()
                 val now = System.currentTimeMillis()
                 if (now - lastHappySound > HappySoundGapMillis) {
                     lastHappySound = now
                     sounds.play(Sfx.PetHappy)
-                    animation.playJoy()
+                    if (animations) animation.playJoy()
                 }
             }
         }
@@ -442,8 +451,8 @@ private fun HomeContent(
 
     // Мало радости — питомец время от времени вздыхает и оседает: грусть видна
     // и без слов. Шкала при этом покачивается, зовёт на неё нажать.
-    LaunchedEffect(state.moodLow, sleeping) {
-        if (!state.moodLow || sleeping) return@LaunchedEffect
+    LaunchedEffect(state.moodLow, sleeping, animations) {
+        if (!state.moodLow || sleeping || !animations) return@LaunchedEffect
         while (true) {
             delay(Random.nextLong(SighPauseMs.first, SighPauseMs.last))
             animation.playSigh()
@@ -457,6 +466,25 @@ private fun HomeContent(
             delay(MoodHintMillis)
             moodHint = false
         }
+    }
+
+    // Подсказка следующего шага: где стоят кнопки-цели и вспышка «уровень готов».
+    val hintTargets = remember { HintTargets() }
+    val burst = remember { Animatable(0f) }
+    // Условия выполнены — дуга у значка закрылась. Вспышка — только на переходе:
+    // что уже видели, помнит rememberSaveable, и вернувшись с игры уровня, ребёнок
+    // видит вспышку, а при каждом входе на экран она не повторяется.
+    val ready = state.check.planConfirmed && state.check.willPass && !sleeping
+    var seenReady by rememberSaveable { mutableStateOf<Boolean?>(null) }
+    LaunchedEffect(ready) {
+        val before = seenReady
+        seenReady = ready
+        if (before != false || !ready) return@LaunchedEffect
+        sounds.play(Sfx.Correct)
+        if (!animations) return@LaunchedEffect
+        burst.snapTo(0f)
+        burst.animateTo(1f, tween(durationMillis = 1_000))
+        burst.snapTo(0f)
     }
 
     // Во время игры плашки и кнопки комнат гаснут: на их месте подсказка и
@@ -503,7 +531,8 @@ private fun HomeContent(
             asleep = sleeping,
             // Сам гуляет по залу, пока с ним ничего не делают — и не играют игрушкой.
             wander = playing == null && care == null && heldToy == null,
-            onHop = animation::playJoy,
+            // Без анимаций прыжок мелькнул бы по кадру на шаг — не прыгаем вовсе.
+            onHop = { if (animations) animation.playJoy() },
             toys = state.toys,
             toysEnabled = !sleeping && playing == null && care == null,
             onToyDrag = ::onToyDrag,
@@ -529,7 +558,7 @@ private fun HomeContent(
                         onClick = {
                             if (!sleeping) {
                                 sounds.play(Sfx.PetHappy)
-                                animation.playJoy()
+                                if (animations) animation.playJoy()
                             }
                         },
                     ),
@@ -574,7 +603,7 @@ private fun HomeContent(
                     level = state.level,
                     size = LevelBadgeSize,
                     progress = state.levelProgress,
-                    modifier = Modifier.combinedClickable(
+                    modifier = Modifier.hintTarget(hintTargets, NextStep.PLAN, NextStep.FINISH).combinedClickable(
                         onClickLabel = "Что нужно для уровня",
                         onLongClickLabel = if (isDebuggable) "Отладка" else null,
                         onLongClick = if (isDebuggable) ({ debugOpen = true }) else null,
@@ -650,7 +679,7 @@ private fun HomeContent(
                 onClick = onOpenGoals,
                 enabled = !sleeping,
                 progress = state.goal?.let { it.saved to it.goal.price },
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).hintTarget(hintTargets, NextStep.SAVE),
             )
 
             // Игра уровня — обязательное условие, поэтому вход в неё всегда на виду.
@@ -663,7 +692,7 @@ private fun HomeContent(
                     action = "Игра уровня",
                     onClick = { onOpenTask(levelTaskId) },
                     enabled = !sleeping,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).hintTarget(hintTargets, NextStep.LEVEL_GAME),
                 )
             }
         }
@@ -707,8 +736,10 @@ private fun HomeContent(
             val barHeight = maxHeight * 0.55f - barWidth
             // Мало радости — шкала покачивается: на неё стоит нажать.
             val wobble = remember { Animatable(0f) }
-            LaunchedEffect(state.moodLow, sleeping) {
-                if (!state.moodLow || sleeping) {
+            // Без анимаций покачивание было бы дрожью в пять кадров — шкала стоит, и зовёт
+            // на неё лицо-кружок внизу.
+            LaunchedEffect(state.moodLow, sleeping, animations) {
+                if (!state.moodLow || sleeping || !animations) {
                     wobble.snapTo(0f)
                     return@LaunchedEffect
                 }
@@ -751,7 +782,9 @@ private fun HomeContent(
                     petName = state.petName,
                     minutesLeft = ((sleep.endsAt - now + 59_999) / 60_000).toInt(),
                     secondsLeft = ((sleep.endsAt - now + 999) / 1_000).toInt(),
+                    enoughIn = (sleep.enoughAt - now).coerceAtLeast(0),
                     onWake = onWake,
+                    wakeModifier = Modifier.hintTarget(hintTargets, NextStep.WAKE),
                     modifier = Modifier.align(Alignment.BottomCenter),
                 )
             }
@@ -780,6 +813,7 @@ private fun HomeContent(
                 },
                 value = energyNow,
                 selected = spot == RoomSpot.LIVING,
+                modifier = Modifier.hintTarget(hintTargets, NextStep.SLEEP),
             )
             // Спящего не кормят и не моют: кнопки полупрозрачные и не нажимаются.
             FinneyNeedButton(
@@ -789,7 +823,7 @@ private fun HomeContent(
                 value = state.stats.satiety,
                 selected = spot == RoomSpot.KITCHEN,
                 enabled = !sleeping,
-                modifier = Modifier.graphicsLayer { alpha = if (sleeping) NightDim else 1f },
+                modifier = Modifier.hintTarget(hintTargets, NextStep.FEED).graphicsLayer { alpha = if (sleeping) NightDim else 1f },
             )
             FinneyNeedButton(
                 icon = FinneyIcons.Bath,
@@ -798,11 +832,30 @@ private fun HomeContent(
                 value = state.stats.hygiene,
                 selected = spot == RoomSpot.BATH,
                 enabled = !sleeping,
-                modifier = Modifier.graphicsLayer { alpha = if (sleeping) NightDim else 1f },
+                modifier = Modifier.hintTarget(hintTargets, NextStep.WASH).graphicsLayer { alpha = if (sleeping) NightDim else 1f },
             )
         }
 
         }
+
+        // Одна подсказка за раз и только когда ничего не открыто поверх: во время
+        // игры ухода и в панелях палец занят другим. Первый уровень — обучение:
+        // экран темнеет вокруг цели, и рядом пузырь с фразой.
+        //
+        // Спящего будить подсказываем здесь, а не в ViewModel: сон идёт по часам,
+        // а состояние игры за это время не меняется. Минуту, когда сна хватает,
+        // считает ViewModel (SleepInfo.enoughAt), экран только сверяет часы.
+        val step = if (sleep != null) NextStep.WAKE.takeIf { now >= sleep.enoughAt } else state.nextStep
+        val hint = step.takeIf { playing == null && care == null && !levelOpen && !debugOpen }
+        val tutorial = state.level == 1
+        NextStepOverlay(
+            step = hint,
+            targets = hintTargets,
+            bubble = hint?.takeIf { tutorial }?.bubble(),
+            spotlight = tutorial,
+            animate = animations,
+            burst = { burst.value },
+        )
 
         HeartBurstLayer(hearts)
 
@@ -886,7 +939,7 @@ private fun HomeContent(
                     onMouthOpen = animation::openMouth,
                     onEaten = {
                         onBuy(itemId)
-                        animation.playEat()
+                        if (animations) animation.playEat()
                         playing = null
                     },
                     onCancel = { playing = null },
@@ -894,10 +947,10 @@ private fun HomeContent(
                 RoomSpot.BATH -> WashingGame(
                     itemId = itemId,
                     pet = petBounds,
-                    onScrub = animation::playGiggle,
+                    onScrub = { if (animations) animation.playGiggle() },
                     onClean = {
                         onBuy(itemId)
-                        animation.playJoy()
+                        if (animations) animation.playJoy()
                         playing = null
                     },
                     onCancel = { playing = null },
@@ -973,8 +1026,10 @@ private fun SleepPanel(
     petName: String,
     minutesLeft: Int,
     secondsLeft: Int,
+    enoughIn: Long,
     onWake: () -> Unit,
     modifier: Modifier = Modifier,
+    wakeModifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier
@@ -991,7 +1046,20 @@ private fun SleepPanel(
             style = MaterialTheme.typography.titleMedium,
             color = FinneyInk,
         )
-        FinneyButton(text = "Разбудить", onClick = onWake, fillWidth = false)
+        // Ждать полного сна не обязательно: для уровня хватает порога, и панель говорит,
+        // когда он будет. Иначе ребёнок сидел перед капсулой весь час (плейтест).
+        Text(
+            text = if (enoughIn <= 0) {
+                "Сна уже хватает для уровня — можно будить"
+            } else if (enoughIn < 60_000) {
+                "Для уровня хватит через ${(enoughIn + 999) / 1_000} с"
+            } else {
+                "Для уровня хватит через ${(enoughIn + 59_999) / 60_000} мин"
+            },
+            style = MaterialTheme.typography.bodyLarge,
+            color = FinneyInk,
+        )
+        FinneyButton(text = "Разбудить", onClick = onWake, fillWidth = false, modifier = wakeModifier)
     }
 }
 
@@ -1031,7 +1099,7 @@ private fun LevelPanel(
                     style = MaterialTheme.typography.bodyLarge,
                     color = FinneyInk,
                 )
-                CheckRow("«$levelGame»", check.gamePassed)
+                CheckRow(listOf(FinneyIcons.Star), "Игра «$levelGame»", check.gamePassed)
             }
             Text(
                 if (check.levelTaskId != null && check.gameRequired) {
@@ -1042,9 +1110,9 @@ private fun LevelPanel(
                 style = MaterialTheme.typography.bodyLarge,
                 color = FinneyInk,
             )
-            CheckRow("Питомец сыт, чист и выспался", check.needsCovered)
-            CheckRow("Траты по плану", check.planMatched)
-            CheckRow("Отложено в копилку", check.savingsAdded)
+            CheckRow(listOf(FinneyIcons.Food, FinneyIcons.Bath, FinneyIcons.Lamp), "Сыт, чист и выспался", check.needsCovered)
+            CheckRow(listOf(FinneyIcons.Plan), "Траты по плану", check.planMatched)
+            CheckRow(listOf(FinneyIcons.Piggy), "Отложено в копилку", check.savingsAdded)
             Text(
                 if (check.willPass) {
                     "Готово! Уровень будет пройден, и придут новые деньги."
@@ -1074,22 +1142,47 @@ private fun LevelPanel(
     }
 }
 
-/** Условие уровня: галочка или прочерк словом — цвет тут ничего не решает (ТЗ п. 3.6). */
+/**
+ * Условие уровня строкой чек-листа: значок условия, подпись и крупная отметка —
+ * кружок с галочкой или пустой кружок. Отличаются формой, а не цветом (ТЗ п. 3.6).
+ * Прежний вид — «✓»/«—» перед текстом — на плейтесте читался как логи.
+ */
 @Composable
-private fun CheckRow(label: String, done: Boolean) {
+private fun CheckRow(icons: List<FinneyIcons>, label: String, done: Boolean) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .defaultMinSize(minHeight = 48.dp)
             .clearAndSetSemantics { contentDescription = "$label: ${if (done) "да" else "пока нет"}" },
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        // Три значка у нужного — те же, что на кнопках комнат: видно, где это закрывают.
+        Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            icons.forEach { FinneyIcon(it, size = if (icons.size > 1) 20.dp else 28.dp) }
+        }
         Text(
-            text = if (done) "✓" else "—",
-            style = MaterialTheme.typography.titleLarge,
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
             color = FinneyInk,
-            modifier = Modifier.padding(end = 12.dp),
+            modifier = Modifier.weight(1f),
         )
-        Text(text = label, style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
+        CheckMark(done)
+    }
+}
+
+/** Отметка условия: выполнено — зелёный кружок с галочкой, нет — пустой кружок. */
+@Composable
+private fun CheckMark(done: Boolean) {
+    Box(
+        modifier = Modifier
+            .size(36.dp)
+            .clip(CircleShape)
+            .background(if (done) FinneyGreen else FinneyCream)
+            .border(StrokeThin, FinneyInk, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (done) OutlinedText("✓", style = MaterialTheme.typography.titleLarge)
     }
 }
 
@@ -1168,11 +1261,18 @@ private fun MoneyButton(balance: Int, onClick: () -> Unit) {
         shown = balance
         if (before == null || balance <= before) return@LaunchedEffect
         gain = balance - before
+        rise.snapTo(0f)
+        // Без анимаций «поп» мелькнул бы кадром, а «+N» пропал бы сразу. Прибавку
+        // видно и так: «+N» стоит над монетой, пока шёл бы подъём.
+        if (!motionEnabled()) {
+            delay(1_100)
+            gain = 0
+            return@LaunchedEffect
+        }
         launch {
             pop.animateTo(1.35f, tween(durationMillis = 110))
             pop.animateTo(1f, spring(dampingRatio = 0.35f, stiffness = Spring.StiffnessMedium))
         }
-        rise.snapTo(0f)
         rise.animateTo(1f, tween(durationMillis = 1100))
         gain = 0
     }
@@ -1322,9 +1422,25 @@ private fun Emotion.toMood(): PetMood = when (this) {
     Emotion.DIRTY -> PetMood.DIRTY
 }
 
+/** Все шаги подсказки — по превью на каждый. */
+private class NextStepProvider : PreviewParameterProvider<NextStep> {
+    override val values = NextStep.entries.asSequence()
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFFFFEDCD, widthDp = 360, heightDp = 780)
+@Composable
+private fun HomeNextStepPreview(@PreviewParameter(NextStepProvider::class) step: NextStep) {
+    HomePreviewContent(step)
+}
+
 @Preview(showBackground = true, backgroundColor = 0xFFFFEDCD)
 @Composable
 private fun HomeContentPreview() {
+    HomePreviewContent(step = null)
+}
+
+@Composable
+private fun HomePreviewContent(step: NextStep?) {
     FinneyTheme {
         HomeContent(
             state = HomeUiState.Ready(
@@ -1353,6 +1469,7 @@ private fun HomeContentPreview() {
                 levelGame = "Касса Финни",
                 food = emptyList(),
                 care = emptyList(),
+                nextStep = step,
             ),
             onOpenBudget = {}, onOpenShop = {}, onOpenGoals = {}, onOpenTasks = {}, onOpenTask = {}, onOpenWardrobe = {},
             onOpenProgress = {}, onOpenSettings = {}, onOpenHelp = {},

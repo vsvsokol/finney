@@ -1,5 +1,7 @@
 package ru.finney.pet.ui.room
 
+import androidx.compose.runtime.mutableFloatStateOf
+import ru.finney.pet.ui.motion.LocalAnimations
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -435,7 +437,10 @@ internal fun rememberRoomLighting(
         ),
         label = "breath",
     )
-    return remember(lamp, breath, window, ceiling) { RoomLighting(lamp, breath, ufo, window, ceiling) }
+    // Без анимаций дыхание застыло бы на пригашенной лампе — свет ровный.
+    val steady = remember { mutableFloatStateOf(1f) }
+    val light = if (LocalAnimations.current) breath else steady
+    return remember(lamp, light, window, ceiling) { RoomLighting(lamp, light, ufo, window, ceiling) }
 }
 
 /**

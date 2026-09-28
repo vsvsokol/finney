@@ -1,5 +1,6 @@
 package ru.finney.pet.ui.room
 
+import ru.finney.pet.ui.motion.LocalAnimations
 import androidx.activity.compose.BackHandler
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.core.LinearEasing
@@ -188,12 +189,15 @@ internal fun GestureGhost(
 ) {
     if (!visible) return
     val density = LocalDensity.current
-    val t by rememberInfiniteTransition(label = "ghost").animateFloat(
+    val tAnim by rememberInfiniteTransition(label = "ghost").animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(tween(periodMs, easing = LinearEasing)),
         label = "t",
     )
+    // Без анимаций призрак застыл бы в конце пути, где он уже тает. Стоит на полпути —
+    // видно, откуда и куда вести.
+    val t = if (LocalAnimations.current) tAnim else 0.5f
     val half = with(density) { ItemSize.toPx() } / 2
     ItemPicture(
         itemId = itemId,

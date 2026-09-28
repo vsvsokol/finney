@@ -1,5 +1,6 @@
 package ru.finney.pet.ui.components
 
+import ru.finney.pet.ui.motion.LocalAnimations
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -26,6 +27,8 @@ private const val PulseMs = 650
  * Масштаб читается в graphicsLayer, на отрисовке: пульс не пересобирает элемент.
  */
 fun Modifier.pulse(active: Boolean): Modifier = if (!active) this else composed {
+    // Без анимаций пульс застыл бы на вдохе, увеличенным: элемент стоит как есть.
+    if (!LocalAnimations.current) return@composed Modifier
     val scale by rememberInfiniteTransition(label = "pulse").animateFloat(
         initialValue = 1f,
         targetValue = PulseScale,

@@ -1,5 +1,6 @@
 package ru.finney.pet.ui.tasks.games
 
+import ru.finney.pet.ui.motion.motionEnabled
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
@@ -524,7 +525,13 @@ private fun DepositPop(amount: Int?, count: Int) {
     LaunchedEffect(count) {
         if (count == 0 || (amount ?: 0) <= 0) return@LaunchedEffect
         rise.snapTo(0f)
-        rise.animateTo(1f, tween(durationMillis = 1000))
+        // Без анимаций «+N» пропал бы в тот же кадр: стоит на месте, пока всплывал бы.
+        if (motionEnabled()) {
+            rise.animateTo(1f, tween(durationMillis = 1000))
+        } else {
+            delay(1_000)
+            rise.snapTo(1f)
+        }
     }
     if (rise.value < 1f && amount != null) {
         OutlinedText(
