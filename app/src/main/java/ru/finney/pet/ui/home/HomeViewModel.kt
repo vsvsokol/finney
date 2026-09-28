@@ -114,6 +114,8 @@ sealed interface HomeUiState {
          * и в ванной — тот же магазин. null — плана ещё нет.
          */
         val needsLeft: Int? = null,
+        /** Сколько по плану осталось на «хочется» — полоса над конфетой на кухне. */
+        val wantsLeft: Int? = null,
         /** Справочник — для карточек во сне (SleepCards.kt). */
         val glossary: List<GlossaryTerm> = emptyList(),
         /** Сколько карточек сна-загадки за один сон и сколько сна даёт верный ответ — из economy.json. */
@@ -322,6 +324,7 @@ class HomeViewModel(
             sleepCardsPerSleep = content.economy.sleepCards.maxPerSleep,
             sleepPerCard = content.economy.sleepCards.energyPerCorrect,
             needsLeft = game.planReport(state)?.let { (it.plan.needs - it.facts.needs).coerceAtLeast(0) },
+            wantsLeft = game.planReport(state)?.let { (it.plan.wants - it.facts.wants).coerceAtLeast(0) },
             worn = state.worn,
             sleep = state.sleepingSince?.let { since ->
                 val endsAt = game.sleepEndsAt(state)!!

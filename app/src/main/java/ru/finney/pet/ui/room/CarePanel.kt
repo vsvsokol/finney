@@ -103,6 +103,9 @@ data class CareBlock(
  * [tiles] — товары плитками по два в ряд с крупной картинкой сверху: так в магазине
  * (плейтест 28.09: «уныленько», картинка терялась в строке). На главном панель
  * открывается поверх комнаты, и там строки ниже и короче — остаётся список.
+ *
+ * [groupBanner] — товары разных категорий идут группами, «нужное» первым, и над каждой
+ * группой её полоса: на кухне рядом с едой лежит конфета, а она — «хочется» (п. 2.5.6).
  */
 @Composable
 fun CarePanel(
@@ -119,6 +122,7 @@ fun CarePanel(
     header: (@Composable () -> Unit)? = null,
     withConfirm: Boolean = true,
     tiles: Boolean = false,
+    groupBanner: (@Composable (Category) -> Unit)? = null,
 ) {
     val selected = options.firstOrNull { it.isSelected }
 
@@ -133,19 +137,27 @@ fun CarePanel(
             return@FinneyPanel
         }
 
-        if (tiles) {
-            options.chunked(2).forEach { pair ->
-                // Высота ряда — по высокой плитке: у соседки с «не хватает» текста больше.
-                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    pair.forEach { option ->
-                        CareTile(option, onPick = { onPick(option.item.id) }, modifier = Modifier.weight(1f).fillMaxHeight())
-                    }
-                    if (pair.size == 1) Spacer(Modifier.weight(1f))
-                }
-            }
+        val groups = if (groupBanner == null) {
+            listOf(null to options)
         } else {
-            options.forEach { option ->
-                CareRow(option = option, onPick = { onPick(option.item.id) })
+            options.groupBy { it.item.category }.entries.sortedBy { it.key != Category.NEEDS }.map { it.key to it.value }
+        }
+        for ((category, group) in groups) {
+            if (category != null) groupBanner?.invoke(category)
+            if (tiles) {
+                group.chunked(2).forEach { pair ->
+                    // Высота ряда — по высокой плитке: у соседки с «не хватает» текста больше.
+                    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        pair.forEach { option ->
+                            CareTile(option, onPick = { onPick(option.item.id) }, modifier = Modifier.weight(1f).fillMaxHeight())
+                        }
+                        if (pair.size == 1) Spacer(Modifier.weight(1f))
+                    }
+                }
+            } else {
+                group.forEach { option ->
+                    CareRow(option = option, onPick = { onPick(option.item.id) })
+                }
             }
         }
 

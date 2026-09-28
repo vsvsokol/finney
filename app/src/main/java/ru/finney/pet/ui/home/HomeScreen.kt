@@ -1146,7 +1146,13 @@ private fun HomeContent(
                             Text("У тебя", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
                             CoinAmount(amount = state.balance)
                         }
-                        CategoryBanner(Category.NEEDS, "Без этого Финни плохо", state.needsLeft)
+                    },
+                    // Полосы — как в магазине. Конфета сытная, но она «хочется»: своя полоса.
+                    groupBanner = { category ->
+                        when (category) {
+                            Category.NEEDS -> CategoryBanner(Category.NEEDS, "Без этого Финни плохо", state.needsLeft)
+                            else -> CategoryBanner(category, "Для радости. Можно и потом", state.wantsLeft)
+                        }
                     },
                 )
             }
