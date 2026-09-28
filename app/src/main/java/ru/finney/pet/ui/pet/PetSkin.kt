@@ -85,7 +85,7 @@ private const val ZVEZDOCHKA_CANVAS = 2200f
 private const val BANTIK_CANVAS = 2200f
 private const val LUCHIK_CANVAS = 2200f
 
-private val ZalinaSkin = PetSkin(
+private val PushistikSkin = PetSkin(
     happy = R.drawable.pushistik_base_happy,
     sad = R.drawable.pushistik_base_sad,
     dirty = R.drawable.pushistik_base_dirty,
@@ -109,7 +109,7 @@ private val ZalinaSkin = PetSkin(
     hat = HatFit(centerX = 0.50f, brim = 0.23f, width = 0.72f),
 )
 
-private val VanyaSkin = PetSkin(
+private val RogatikSkin = PetSkin(
     happy = R.drawable.rogatik_base_happy,
     sad = R.drawable.rogatik_base_sad,
     dirty = R.drawable.rogatik_base_dirty,
@@ -133,7 +133,7 @@ private val VanyaSkin = PetSkin(
     hat = HatFit(centerX = 0.50f, brim = 0.24f, width = 0.70f),
 )
 
-private val IraSkin = PetSkin(
+private val ZvezdochkaSkin = PetSkin(
     happy = R.drawable.zvezdochka_base_happy,
     sad = R.drawable.zvezdochka_base_sad,
     dirty = R.drawable.zvezdochka_base_dirty,
@@ -157,7 +157,7 @@ private val IraSkin = PetSkin(
     hat = HatFit(centerX = 0.50f, brim = 0.23f, width = 0.70f),
 )
 
-private val SevaSkin = PetSkin(
+private val BantikSkin = PetSkin(
     happy = R.drawable.bantik_base_happy,
     sad = R.drawable.bantik_base_sad,
     dirty = R.drawable.bantik_base_dirty,
@@ -181,7 +181,7 @@ private val SevaSkin = PetSkin(
     hat = HatFit(centerX = 0.50f, brim = 0.25f, width = 0.68f),
 )
 
-private val YarikSkin = PetSkin(
+private val LuchikSkin = PetSkin(
     happy = R.drawable.luchik_base_happy,
     sad = R.drawable.luchik_base_sad,
     dirty = R.drawable.luchik_base_dirty,
@@ -207,9 +207,9 @@ private val YarikSkin = PetSkin(
 
 val PetCharacter.skin: PetSkin
     get() = when (this) {
-        PetCharacter.PUSHISTIK -> ZalinaSkin
-        PetCharacter.ROGATIK -> VanyaSkin
-        PetCharacter.ZVEZDOCHKA -> IraSkin
-        PetCharacter.BANTIK -> SevaSkin
-        PetCharacter.LUCHIK -> YarikSkin
+        PetCharacter.PUSHISTIK -> PushistikSkin
+        PetCharacter.ROGATIK -> RogatikSkin
+        PetCharacter.ZVEZDOCHKA -> ZvezdochkaSkin
+        PetCharacter.BANTIK -> BantikSkin
+        PetCharacter.LUCHIK -> LuchikSkin
     }

@@ -42,9 +42,7 @@ import ru.finney.pet.domain.model.PetCharacter
 // Чем один питомец отличается от другого — только набором слоёв и точками
 // вращения: всё это в PetSkin, а сборка и анимация общие.
 //
-// Сейчас только обычный размер тела. Файлы стадий роста (_middle, _big) лежат в
-// design/exports/pet и в ресурсы пока не конвертируются: добавить стадию — это
-// параметр у Limb и у базового слоя плюс строка в tools/split_pet_base.py.
+// Стадии роста — масштаб всего питомца от ступней, см. PetGrowth.kt.
 
 /** Мгновенное положение всех частей. Анимации только заполняют эту структуру. */
 data class PetPose(
@@ -82,16 +80,19 @@ fun PetView(
     bodyColor: BodyColor = BodyColor.A,
     /** Надетое — id из магазина: шляпа и очки. Двигается вместе с питомцем: лежит внутри позы. */
     accessories: List<String> = emptyList(),
+    /** Стадия роста = уровень: чем выше, тем крупнее облик ([growthScale]). */
+    stage: Int = GROWN_STAGE,
 ) {
     val skin = character.skin
     val tint = bodyColor.colorFilter
+    val growth = growthScale(stage)
     Box(
         modifier = modifier
             .aspectRatio(1f)
             .graphicsLayer {
                 val current = pose()
-                scaleX = current.scaleX
-                scaleY = current.scaleY
+                scaleX = current.scaleX * growth
+                scaleY = current.scaleY * growth
                 translationY = current.offsetY.toPx()
                 rotationZ = current.tilt
                 transformOrigin = skin.ground

@@ -84,6 +84,7 @@ import ru.finney.pet.ui.components.FinneyPanel
 import ru.finney.pet.ui.components.HappinessBar
 import ru.finney.pet.ui.pet.PetMood
 import ru.finney.pet.ui.pet.PetView
+import ru.finney.pet.ui.pet.grownPet
 import ru.finney.pet.ui.pet.rememberPoseProvider
 import ru.finney.pet.ui.pet.rememberPetAnimation
 import ru.finney.pet.ui.debug.DebugPanel
@@ -390,7 +391,7 @@ private fun HomeContent(
     val animation = rememberPetAnimation()
 
     // Где питомец на экране — игры целятся в него и в его рот.
-    var petBounds by remember { mutableStateOf(Rect.Zero) }
+    var petLayout by remember { mutableStateOf(Rect.Zero) }
 
     // Игра с игрушкой: ребёнок водит игрушкой рядом с питомцем. Каждые ShakeTravel
     // пути пальца рядом с ним — одно потряхивание. Потряхивания копятся и уходят
@@ -402,6 +403,9 @@ private fun HomeContent(
     var heldToy by remember { mutableStateOf<String?>(null) }
     var lastHappySound by remember { mutableLongStateOf(0L) }
     val currentState by rememberUpdatedState(state)
+
+    // Место PetView — с поправкой на стадию роста: облик меньше рамки и стоит у её низа.
+    fun petBounds(): Rect = currentState.let { petLayout.grownPet(it.appearance.character.skin, it.stage) }
     fun flushPlay() {
         val toy = heldToy ?: return
         if (pendingShakes > 0) onPlay(toy, pendingShakes)
@@ -415,7 +419,7 @@ private fun HomeContent(
     }
     fun onToyDrag(toyId: String, centre: Offset, delta: Offset) {
         heldToy = toyId
-        val pet = petBounds
+        val pet = petBounds()
         if (pet == Rect.Zero) return
         // Тянется к игрушке, где бы она ни была: следит за ней.
         animation.lookAt((centre.x - pet.center.x) / pet.width)
@@ -539,11 +543,12 @@ private fun HomeContent(
                 character = state.appearance.character,
                 bodyColor = state.appearance.bodyColor,
                 accessories = state.worn,
+                stage = state.stage,
                 mood = if (eyesClosed) PetMood.SLEEP else state.emotion.toMood(),
                 pose = rememberPoseProvider(animation),
                 modifier = Modifier
                     .fillMaxSize()
-                    .onGloballyPositioned { petBounds = it.boundsInRoot() }
+                    .onGloballyPositioned { petLayout = it.boundsInRoot() }
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
@@ -939,13 +944,14 @@ private fun HomeContent(
 
         playing?.let { itemId ->
             val mouth = state.appearance.character.skin.mouthCenter
+            val pet = petBounds()
             when (spot) {
                 RoomSpot.KITCHEN -> FeedingGame(
                     itemId = itemId,
-                    pet = petBounds,
+                    pet = pet,
                     mouth = Offset(
-                        petBounds.left + petBounds.width * mouth.pivotFractionX,
-                        petBounds.top + petBounds.height * mouth.pivotFractionY,
+                        pet.left + pet.width * mouth.pivotFractionX,
+                        pet.top + pet.height * mouth.pivotFractionY,
                     ),
                     onMouthOpen = animation::openMouth,
                     onEaten = {
@@ -957,7 +963,7 @@ private fun HomeContent(
                 )
                 RoomSpot.BATH -> WashingGame(
                     itemId = itemId,
-                    pet = petBounds,
+                    pet = pet,
                     onScrub = { if (animations) animation.playGiggle() },
                     onClean = {
                         onBuy(itemId)
