@@ -40,7 +40,8 @@ sealed interface WardrobeUiState {
 
     data class Ready(
         val appearance: PetAppearance,
-        val worn: String?,
+        /** Что надето: шляпа и очки носятся вместе. */
+        val worn: List<String>,
         val items: List<WardrobeItem>,
         val rejection: Rejection? = null,
     ) : WardrobeUiState
@@ -61,7 +62,8 @@ class WardrobeViewModel(
 
     fun wear(itemId: String) = run { session.execute { wear(it, itemId) } }
 
-    fun takeOff() = run { session.execute { takeOff(it) } }
+    /** Снять вещь; null — снять всё. */
+    fun takeOff(itemId: String? = null) = run { session.execute { takeOff(it, itemId) } }
 
     fun dismissRejection() {
         rejection.value = null
@@ -78,7 +80,7 @@ class WardrobeViewModel(
         val owned = game.wardrobe(state).map { it.id }.toSet()
         return WardrobeUiState.Ready(
             appearance = saved.profile.appearance,
-            worn = state.wornItemId,
+            worn = state.worn,
             items = content.shop.filter { it.kind == ItemKind.ACCESSORY }.map { item ->
                 val goal = content.goalFor(item.id)
                 WardrobeItem(

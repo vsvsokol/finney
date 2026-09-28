@@ -77,9 +77,14 @@ internal fun itemArt(itemId: String): Int? = when (itemId) {
     "toy_book" -> R.drawable.item_toy_book
     "toy_blocks" -> R.drawable.item_toy_blocks
     "toy_bear" -> R.drawable.item_toy_bear
+    "toy_duck" -> R.drawable.item_toy_duck
+    "toy_cube" -> R.drawable.item_toy_cube
     "hat_cowboy" -> R.drawable.acc_hat_cowboy
     "hat_pirate" -> R.drawable.acc_hat_pirate
     "hat_wizard" -> R.drawable.acc_hat_wizard
+    "glasses_black" -> R.drawable.acc_glasses_black
+    "glasses_star" -> R.drawable.acc_glasses_star
+    "glasses_pineapple" -> R.drawable.acc_glasses_pineapple
     else -> null
 }
 

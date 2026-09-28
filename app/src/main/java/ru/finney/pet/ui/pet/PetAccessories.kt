@@ -7,8 +7,17 @@ import androidx.compose.ui.unit.Constraints
 import ru.finney.pet.R
 import kotlin.math.roundToInt
 
-/** Рисунок аксессуара и где на нём линия полей — доля высоты рисунка. */
-data class AccessoryArt(@DrawableRes val res: Int, val brim: Float)
+/**
+ * Рисунок аксессуара и линия, которой он прикладывается к питомцу, — доля высоты рисунка:
+ * у шляпы это поля, у очков [onEyes] — середина стёкол. [widthScale] — во сколько раз очки
+ * шире самых простых: художник рисует их в одном масштабе, и оправа-звезда шире обычной.
+ */
+data class AccessoryArt(
+    @DrawableRes val res: Int,
+    val brim: Float,
+    val onEyes: Boolean = false,
+    val widthScale: Float = 1f,
+)
 
 /**
  * Рисунок аксессуара по id из магазина. Файлы кладёт tools/pack_items.py
@@ -20,7 +29,32 @@ fun accessoryArt(itemId: String): AccessoryArt? = when (itemId) {
     "hat_cowboy" -> AccessoryArt(R.drawable.acc_hat_cowboy, brim = 0.53f)
     "hat_pirate" -> AccessoryArt(R.drawable.acc_hat_pirate, brim = 0.62f)
     "hat_wizard" -> AccessoryArt(R.drawable.acc_hat_wizard, brim = 0.71f)
+    // Середина стёкол и ширина оправы замерены по design/exports/items/acc_glasses_*.png.
+    "glasses_black" -> AccessoryArt(R.drawable.acc_glasses_black, brim = 0.46f, onEyes = true)
+    "glasses_star" -> AccessoryArt(R.drawable.acc_glasses_star, brim = 0.44f, onEyes = true, widthScale = 1.10f)
+    "glasses_pineapple" -> AccessoryArt(R.drawable.acc_glasses_pineapple, brim = 0.68f, onEyes = true, widthScale = 1.12f)
     else -> null
+}
+
+/** Очки уже шляпы: шляпа накрывает всю голову, очки — только глаза. Доля ширины шляпы. */
+private const val GLASSES_WIDTH = 0.62f
+
+/**
+ * Поставить очки: середина стёкол [art] ложится на середину глаз питомца
+ * ([PetSkin.eyesTop]…[PetSkin.eyesBottom]), по ширине — доля посадки шляпы.
+ * Как и шляпа, слой занимает весь холст и соседей не сдвигает.
+ */
+internal fun Modifier.glassesPlacement(skin: PetSkin, art: AccessoryArt): Modifier = layout { measurable, constraints ->
+    val side = constraints.maxWidth
+    val width = (side * skin.hat.width * HAT_SCALE * GLASSES_WIDTH * art.widthScale).roundToInt()
+    val placeable = measurable.measure(Constraints.fixedWidth(width))
+    val eyes = (skin.eyesTop + skin.eyesBottom) / 2f
+    layout(side, constraints.maxHeight) {
+        placeable.place(
+            x = (side * skin.hat.centerX - width / 2f).roundToInt(),
+            y = (constraints.maxHeight * eyes - placeable.height * art.brim).roundToInt(),
+        )
+    }
 }
 
 /** Шляпы крупнее замера по голове: по [HatFit.width] они выглядели маленькими и не налезали. */

@@ -53,6 +53,20 @@ class WardrobeTest {
     }
 
     @Test
+    fun `очки носятся вместе со шляпой, снимаются по одной`() {
+        val both = game.buy(game.buy(active(), "hat").state(), "glasses").state()
+        assertEquals("hat", both.wornItemId)
+        assertEquals("glasses", both.wornEyesId)
+        assertEquals(listOf("hat", "glasses"), both.worn)
+
+        val noGlasses = game.takeOff(both, "glasses").state()
+        assertEquals(listOf("hat"), noGlasses.worn)
+        assertEquals(listOf("hat", "glasses"), game.wear(noGlasses, "glasses").state().worn)
+
+        assertEquals("без id — снять всё", emptyList<String>(), game.takeOff(both).state().worn)
+    }
+
+    @Test
     fun `обычная покупка не снимает шапку`() {
         val withHat = game.buy(active(), "hat").state()
         val fed = game.buy(withHat, "candy").state()

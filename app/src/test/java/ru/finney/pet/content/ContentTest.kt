@@ -63,8 +63,8 @@ class ContentTest {
     @Test
     fun `у каждой игрушки магазина есть рисунок`() {
         val toys = content.shop.filter { it.kind == ItemKind.TOY }
-        // Больше четырёх в зале не помещается: посередине пола кнопка уровня (RoomToys.MAX_ROOM_TOYS).
-        assertEquals(4, toys.size)
+        // Больше шести в зале не помещается: мест на полу столько (RoomToys.MAX_ROOM_TOYS).
+        assertTrue("игрушек ${toys.size}, мест в зале 6", toys.size <= 6)
         val missing = toys.map { it.id }.filterNot { File("src/main/res/drawable-nodpi/item_$it.webp").exists() }
         assertEquals(emptyList<String>(), missing)
     }

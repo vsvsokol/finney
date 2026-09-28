@@ -1,6 +1,7 @@
 package ru.finney.pet.domain.game
 
 import ru.finney.pet.domain.economy.SavingsRules
+import ru.finney.pet.domain.model.AccessorySlot
 import ru.finney.pet.domain.model.EconomyConfig
 import ru.finney.pet.domain.model.EntryType
 import ru.finney.pet.domain.model.GameContent
@@ -301,11 +302,9 @@ class Game(
         if (item.price > state.balance) return reject(Rejection.InsufficientFunds(item.price, state.balance))
         val entry = entry(state, EntryType.PURCHASE, balanceDelta = -item.price)
             .copy(category = item.category, itemId = item.id)
+        val bought = state.copy(pet = PetRules.apply(state.pet, item.effect), ledger = state.ledger + entry)
         // Купленный аксессуар сразу надевается: ребёнок видит покупку на питомце.
-        val worn = if (item.kind == ItemKind.ACCESSORY) item.id else state.wornItemId
-        return ok(
-            state.copy(pet = PetRules.apply(state.pet, item.effect), ledger = state.ledger + entry, wornItemId = worn),
-        )
+        return ok(if (item.kind == ItemKind.ACCESSORY) bought.wearing(item) else bought)
     }
 
     // ---------- Сон ----------
@@ -364,15 +363,29 @@ class Game(
 
     // ---------- Гардероб ----------
 
-    /** Надеть купленный аксессуар вместо текущего. Бесплатно и в любой фазе периода. */
+    /**
+     * Надеть купленный аксессуар. Он сменяет то, что было в его слоте, а вещь из другого
+     * слота остаётся: шляпа и очки носятся вместе. Бесплатно и в любой фазе периода.
+     */
     fun wear(state: GameState, itemId: String): GameResult {
         val item = content.item(itemId) ?: return reject(Rejection.UnknownItem(itemId))
         if (item.kind != ItemKind.ACCESSORY) return reject(Rejection.NotWearable(itemId))
         if (!state.owns(itemId)) return reject(Rejection.NotOwned(itemId))
-        return ok(state.copy(wornItemId = itemId))
+        return ok(state.wearing(item))
     }
 
-    fun takeOff(state: GameState): GameResult = ok(state.copy(wornItemId = null))
+    /** Снять [itemId]; null — снять всё. */
+    fun takeOff(state: GameState, itemId: String? = null): GameResult = ok(
+        state.copy(
+            wornItemId = state.wornItemId.takeUnless { itemId == null || it == itemId },
+            wornEyesId = state.wornEyesId.takeUnless { itemId == null || it == itemId },
+        ),
+    )
+
+    private fun GameState.wearing(item: ShopItem): GameState = when (item.slot) {
+        AccessorySlot.HEAD -> copy(wornItemId = item.id)
+        AccessorySlot.EYES -> copy(wornEyesId = item.id)
+    }
 
     /** Купленные и заработанные целями аксессуары в порядке магазина. */
     fun wardrobe(state: GameState): List<ShopItem> =
@@ -469,14 +482,12 @@ class Game(
             .copy(goalId = goal.id, itemId = goal.reward)
         // Награда сразу на питомце, как купленная шляпа: ребёнок видит, на что копил.
         val reward = goal.reward?.let(content::item)?.takeIf { it.kind == ItemKind.ACCESSORY }
-        return ok(
-            state.copy(
-                pet = PetRules.apply(state.pet, StatEffect(mood = goal.moodBonus)),
-                activeGoalId = null,
-                ledger = state.ledger + entry,
-                wornItemId = reward?.id ?: state.wornItemId,
-            ),
+        val completed = state.copy(
+            pet = PetRules.apply(state.pet, StatEffect(mood = goal.moodBonus)),
+            activeGoalId = null,
+            ledger = state.ledger + entry,
         )
+        return ok(reward?.let { completed.wearing(it) } ?: completed)
     }
 
     // ---------- Доход ----------

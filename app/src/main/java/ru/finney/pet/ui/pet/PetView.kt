@@ -80,8 +80,8 @@ fun PetView(
     pose: () -> PetPose,
     modifier: Modifier = Modifier,
     bodyColor: BodyColor = BodyColor.A,
-    /** Надетый аксессуар — id из магазина. Двигается вместе с питомцем: лежит внутри позы. */
-    accessory: String? = null,
+    /** Надетое — id из магазина: шляпа и очки. Двигается вместе с питомцем: лежит внутри позы. */
+    accessories: List<String> = emptyList(),
 ) {
     val skin = character.skin
     val tint = bodyColor.colorFilter
@@ -146,12 +146,13 @@ fun PetView(
             )
         }
 
-        accessory?.let(::accessoryArt)?.let { art ->
+        // Очки раньше шляпы: поля шляпы и листья ананаса ложатся поверх оправы, а не под неё.
+        accessories.mapNotNull(::accessoryArt).sortedBy { !it.onEyes }.forEach { art ->
             Image(
                 painter = painterResource(art.res),
                 contentDescription = null,
                 contentScale = ContentScale.FillWidth,
-                modifier = Modifier.hatPlacement(skin.hat, art.brim),
+                modifier = if (art.onEyes) Modifier.glassesPlacement(skin, art) else Modifier.hatPlacement(skin.hat, art.brim),
             )
         }
     }

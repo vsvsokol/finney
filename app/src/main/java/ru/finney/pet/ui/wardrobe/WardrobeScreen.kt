@@ -85,7 +85,7 @@ fun WardrobeScreen(
 private fun WardrobeContent(
     state: WardrobeUiState.Ready,
     onWear: (String) -> Unit,
-    onTakeOff: () -> Unit,
+    onTakeOff: (String?) -> Unit,
     onOpenGoals: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -109,7 +109,7 @@ private fun WardrobeContent(
             PetView(
                 character = state.appearance.character,
                 bodyColor = state.appearance.bodyColor,
-                accessory = state.worn,
+                accessories = state.worn,
                 mood = PetMood.HAPPY,
                 pose = rememberPoseProvider(animation),
                 modifier = Modifier
@@ -127,16 +127,16 @@ private fun WardrobeContent(
         Tile(
             label = "Без шляпы",
             status = null,
-            selected = state.worn == null,
+            selected = state.worn.isEmpty(),
             enabled = true,
-            onClick = onTakeOff,
+            onClick = { onTakeOff(null) },
         )
         state.items.chunked(2).forEach { pair ->
             // Плитки в ряду одной высоты: подпись «как получить» у одной не растягивает
             // соседку, и сетка не перестраивается, когда шляпу получили.
             Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 pair.forEach { entry ->
-                    val worn = entry.item.id == state.worn
+                    val worn = entry.item.id in state.worn
                     Tile(
                         label = entry.item.label,
                         // Слова остались только у ещё не полученной шляпы — как её получить.
@@ -145,7 +145,7 @@ private fun WardrobeContent(
                         art = accessoryArt(entry.item.id)?.res,
                         selected = worn,
                         enabled = entry.owned,
-                        onClick = { if (worn) onTakeOff() else onWear(entry.item.id) },
+                        onClick = { if (worn) onTakeOff(entry.item.id) else onWear(entry.item.id) },
                         modifier = Modifier.weight(1f).fillMaxHeight(),
                     )
                 }

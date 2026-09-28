@@ -546,7 +546,7 @@ private fun HomeContent(
             PetView(
                 character = state.appearance.character,
                 bodyColor = state.appearance.bodyColor,
-                accessory = state.worn,
+                accessories = state.worn,
                 mood = if (eyesClosed) PetMood.SLEEP else state.emotion.toMood(),
                 pose = rememberPoseProvider(animation),
                 modifier = Modifier
