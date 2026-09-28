@@ -18,9 +18,13 @@ import ru.finney.pet.domain.game.GameResult
 import ru.finney.pet.domain.game.PlanReport
 import ru.finney.pet.domain.game.Rejection
 import ru.finney.pet.domain.game.Session
+import ru.finney.pet.domain.model.Category
 import ru.finney.pet.domain.model.GameContent
 import ru.finney.pet.domain.model.Goal
+import ru.finney.pet.domain.model.ItemKind
+import ru.finney.pet.domain.model.Plan
 import ru.finney.pet.domain.model.SavedGame
+import ru.finney.pet.ui.room.itemArt
 
 sealed interface BudgetUiState {
     data object Loading : BudgetUiState
@@ -45,6 +49,19 @@ sealed interface BudgetUiState {
         val directions: Int = 3,
         val rejection: Rejection?,
         val isSaving: Boolean,
+        /**
+         * Что покупают на каждую часть — id товаров магазина, у которых есть рисунок.
+         * Плейтест: «нужное» и «желаемое» словами не объяснить, нужно показать еду и мыло.
+         */
+        val needsItems: List<String> = emptyList(),
+        val wantsItems: List<String> = emptyList(),
+        /** Вещь цели — рисунок у копилки; null — цели нет или она без рисунка. */
+        val goalReward: String? = null,
+        /**
+         * План прошлого уровня, если он ещё помещается в бюджет, — для «Как в прошлый раз».
+         * null — прошлого плана нет, он не помещается или копить пока не на что.
+         */
+        val lastPlan: Plan? = null,
     ) : BudgetUiState {
         val planned: Int get() = needs + wants + savings
         val remainder: Int get() = budget - planned
@@ -62,6 +79,10 @@ sealed interface BudgetUiState {
             if (wants == 0) add("Положи монетки в «Желаемое»")
             if (goalLabel == null) add("Выбери цель для копилки") else if (savings == 0) add("Положи монетки в копилку")
         }
+
+        /** Кнопку «Как в прошлый раз» прячем, когда черновик уже такой же. */
+        val canRepeatLast: Boolean
+            get() = lastPlan != null && (lastPlan.needs != needs || lastPlan.wants != wants || lastPlan.savings != savings)
     }
 
     /** План подтверждён: план против факта до закрытия периода. */
@@ -70,7 +91,29 @@ sealed interface BudgetUiState {
         val level: Int,
         val report: PlanReport,
         val balance: Int,
-    ) : BudgetUiState
+    ) : BudgetUiState {
+        /**
+         * Одна фраза-итог вместо «10 из 10» по строкам (плейтест: «что я должен понять
+         * из того, что копилка 10/10?»). Засчитан ли план — решает ядро ([PlanReport.onTrack]);
+         * здесь только выбирается, какими словами сказать почему.
+         */
+        val verdict: PlanVerdict get() = when {
+            report.onTrack -> PlanVerdict.OnTrack
+            report.overspend > 0 -> PlanVerdict.Overspent(report.overspend)
+            report.facts.savings < report.plan.savings -> PlanVerdict.SavingsShort(report.plan.savings - report.facts.savings)
+            else -> PlanVerdict.OffTrack
+        }
+    }
+}
+
+/** Итог «План и факт» одной фразой. */
+sealed interface PlanVerdict {
+    data object OnTrack : PlanVerdict
+    /** Потрачено сверх плана — перерасход по нужному и желаемому от ядра. */
+    data class Overspent(val amount: Int) : PlanVerdict
+    /** В копилку отложено меньше задуманного. */
+    data class SavingsShort(val amount: Int) : PlanVerdict
+    data object OffTrack : PlanVerdict
 }
 
 class BudgetViewModel(
@@ -97,6 +140,12 @@ class BudgetViewModel(
     fun setWants(amount: Int) = draft.update { it.copy(wants = amount.coerceAtLeast(0), rejection = null) }
 
     fun setSavings(amount: Int) = draft.update { it.copy(savings = amount.coerceAtLeast(0), rejection = null) }
+
+    /** «Как в прошлый раз»: черновик становится планом прошлого уровня, дальше его можно менять. */
+    fun repeatLastPlan() {
+        val last = (uiState.value as? BudgetUiState.Planning)?.lastPlan ?: return
+        draft.update { it.copy(needs = last.needs, wants = last.wants, savings = last.savings, rejection = null) }
+    }
 
     fun selectGoal(goalId: String) {
         viewModelScope.launch {
@@ -128,6 +177,11 @@ class BudgetViewModel(
         if (report != null) {
             return BudgetUiState.Active(state.currentPeriod.number, game.level(state), report, state.balance)
         }
+        val goal = game.goalProgress(state)?.goal
+        // Прошлый план берётся как есть из истории уровней; предлагаем его, только если он
+        // ещё помещается в бюджет и есть цель — иначе половину плана всё равно пришлось бы менять.
+        val lastPlan = state.periods.dropLast(1).lastOrNull()?.plan
+            ?.takeIf { it.planned <= state.balance && goal != null }
         return BudgetUiState.Planning(
             periodNumber = state.currentPeriod.number,
             level = game.level(state),
@@ -136,7 +190,7 @@ class BudgetViewModel(
             wants = draft.wants,
             savings = draft.savings,
             needsHint = game.needsHint(state),
-            goalLabel = game.goalProgress(state)?.goal?.label,
+            goalLabel = goal?.label,
             goals = if (state.activeGoalId == null) {
                 content.goals.filterNot { state.isGoalCompleted(it.id) }
             } else {
@@ -145,10 +199,25 @@ class BudgetViewModel(
             directions = content.economy.planDirections,
             rejection = draft.rejection,
             isSaving = draft.isSaving,
+            needsItems = pictured(Category.NEEDS),
+            wantsItems = pictured(Category.WANTS),
+            goalReward = goal?.reward,
+            lastPlan = lastPlan,
         )
     }
 
+    /**
+     * Товары части, у которых есть рисунок, — первые [ItemsShown] по порядку магазина.
+     * Шляпы не берём: это вещи целей, а желаемое показываем тем, что радует сразу.
+     */
+    private fun pictured(category: Category): List<String> =
+        content.shop.filter { it.category == category && it.kind != ItemKind.ACCESSORY && itemArt(it.id) != null }
+            .map { it.id }
+            .take(ItemsShown)
+
     companion object {
+        private const val ItemsShown = 3
+
         val Factory = viewModelFactory {
             initializer { appContainer().let { BudgetViewModel(it.session, it.game, it.content) } }
         }

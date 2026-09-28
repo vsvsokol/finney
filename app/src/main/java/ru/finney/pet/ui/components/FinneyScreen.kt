@@ -53,6 +53,11 @@ fun FinneyScreen(
     backdrop: MenuBackdrop = MenuBackdrop.DOTS,
     bottom: (@Composable ColumnScope.() -> Unit)? = null,
     /**
+     * Шапка над прокруткой: всегда на экране, как [bottom] внизу. Для того, на что
+     * смотрят, пока листают, — круг плана, пока раскладывают монеты по частям.
+     */
+    top: (@Composable ColumnScope.() -> Unit)? = null,
+    /**
      * Выход с экрана — круглый «✕» в правом верхнем углу, один на все экраны:
      * ТЗ п. 3.6 требует, чтобы кнопка возврата стояла единообразно. Раньше на
      * каждом экране внизу была длинная кнопка «Назад».
@@ -60,7 +65,7 @@ fun FinneyScreen(
     onClose: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    if (bottom == null && onClose == null) {
+    if (bottom == null && onClose == null && top == null) {
         val scroll = if (scrollable) Modifier.verticalScroll(rememberScrollState()) else Modifier
         Column(
             modifier = modifier
@@ -87,6 +92,7 @@ fun FinneyScreen(
         horizontalAlignment = horizontalAlignment,
     ) {
         onClose?.let { CloseButton(it, Modifier.align(Alignment.End)) }
+        top?.invoke(this)
         val scroll = if (scrollable) Modifier.fadingScroll(rememberScrollState()) else Modifier
         Column(
             modifier = Modifier.weight(1f).fillMaxWidth().then(scroll),

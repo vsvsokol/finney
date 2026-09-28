@@ -1,6 +1,28 @@
 package ru.finney.pet.ui.budget
 
 import androidx.compose.foundation.Image
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.text.style.TextAlign
+import ru.finney.pet.domain.model.Category
+import ru.finney.pet.ui.components.Coin
+import ru.finney.pet.ui.components.FinneyIcon
+import ru.finney.pet.ui.components.FinneyIcons
+import ru.finney.pet.ui.components.FinneyQuietButton
+import ru.finney.pet.ui.components.PlanDonut
+import ru.finney.pet.ui.components.SavingsIcon
+import ru.finney.pet.ui.components.StableText
+import ru.finney.pet.ui.components.categoryIcon
+import ru.finney.pet.ui.room.itemArt
+import ru.finney.pet.ui.theme.FinneyPeach
+import ru.finney.pet.ui.theme.FinneyYellow
+import ru.finney.pet.ui.theme.StrokeBold
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -100,6 +122,7 @@ fun BudgetScreen(
             onWantsChange = viewModel::setWants,
             onSavingsChange = viewModel::setSavings,
             onSelectGoal = viewModel::selectGoal,
+            onRepeatLast = viewModel::repeatLastPlan,
             onConfirm = viewModel::confirm,
             onBack = onBack,
         )
@@ -114,6 +137,7 @@ private fun PlanningContent(
     onWantsChange: (Int) -> Unit,
     onSavingsChange: (Int) -> Unit,
     onSelectGoal: (String) -> Unit,
+    onRepeatLast: () -> Unit,
     onConfirm: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -121,51 +145,72 @@ private fun PlanningContent(
         scrollable = true,
         verticalArrangement = Arrangement.spacedBy(16.dp),
         onClose = onBack,
+        // Круг — в шапке, а не в прокрутке: на него смотрят, пока жмут «+» в части
+        // внизу, и он должен быть виден всегда (плейтест).
+        top = { PlanHeader(state) },
     ) {
-        OutlinedText("План", style = MaterialTheme.typography.headlineLarge)
+        // Пока ничего не разложено — одна строка, что делать. Дальше её место
+        // занимают сами части: круг уже показывает, что происходит.
+        if (state.planned == 0) {
+            Text(
+                "Жми «+» в каждой части — монетки лягут в круг.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = FinneyInk,
+            )
+        }
 
-        // Сколько можно распределить — крупно и сверху: это главное число экрана.
-        // Подпись «Есть:» и подсказка «Разложи на три части…» убраны: монетка с
-        // числом понятна сама, а правило «в каждую хоть немного» написано внизу,
-        // когда кнопка ещё погашена.
-        CoinAmount(amount = state.budget)
+        // Каждый уровень план собирается заново, и на плейтесте это было скучно:
+        // одной кнопкой — как в прошлый раз, а дальше подправить «−/+».
+        if (state.canRepeatLast) {
+            FinneyQuietButton(
+                text = "Как в прошлый раз",
+                onClick = onRepeatLast,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
 
         // Шаг помещается в остаток — значит, добавлять ещё можно.
         val canAdd = state.remainder >= STEP
 
         AmountRow(
+            icon = categoryIcon(Category.NEEDS),
             label = "Нужное",
-            hint = state.needsHint?.takeIf { it > 0 }?.let { "нужно хотя бы $it" },
+            pictures = state.needsItems.mapNotNull(::itemArt),
             value = state.needs,
             onChange = onNeedsChange,
             canAdd = canAdd,
+            budget = state.budget,
+            minimum = state.needsHint?.takeIf { it > 0 },
         )
         AmountRow(
+            icon = categoryIcon(Category.WANTS),
             label = "Желаемое",
-            hint = null,
+            pictures = state.wantsItems.mapNotNull(::itemArt),
             value = state.wants,
             onChange = onWantsChange,
             canAdd = canAdd,
+            budget = state.budget,
         )
         // Без выбранной цели откладывать некуда: цель выбирается прямо здесь,
         // а не на другом экране, — иначе план было бы не собрать.
         if (state.goalLabel == null) {
             FinneyCard {
-                Text("Копилка", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
+                CategoryTitle(SavingsIcon, "Копилка")
                 Text("На что копим? Выбери цель:", style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
                 state.goals.forEach { goal -> GoalChoice(goal, onClick = { onSelectGoal(goal.id) }) }
             }
         } else {
             AmountRow(
-                label = "Копилка: ${state.goalLabel}",
-                hint = null,
+                icon = SavingsIcon,
+                label = "Копилка",
+                pictures = listOfNotNull(state.goalReward?.let(::itemArt)),
                 value = state.savings,
                 onChange = onSavingsChange,
                 canAdd = canAdd,
+                budget = state.budget,
+                subtitle = "Цель: ${state.goalLabel}",
             )
         }
-
-        Remainder(remainder = state.remainder)
 
         FeedbackSound(feedback = null, rejection = state.rejection)
         state.rejection?.let { RejectionNote(it) }
@@ -182,8 +227,42 @@ private fun PlanningContent(
     }
 }
 
+/** Сумма в середине круга: монетка над числом — рядом в дырку круга они не влезают. */
+@Composable
+private fun BudgetCenter(budget: Int) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.clearAndSetSemantics { contentDescription = "Есть $budget финок" },
+    ) {
+        Coin(size = 26.dp)
+        OutlinedText(budget.toString(), style = MaterialTheme.typography.titleLarge)
+    }
+}
+
+/** Заголовок части: значок части (тот же, что на круге) и слово. */
+@Composable
+private fun CategoryTitle(
+    icon: FinneyIcons,
+    label: String,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        FinneyIcon(icon, size = 30.dp)
+        Text(label, style = MaterialTheme.typography.titleMedium, color = FinneyInk, modifier = Modifier.weight(1f))
+    }
+}
+
 /**
- * Одна строка плана: подпись, подсказка и сумма с кнопками.
+ * Одна часть плана: значок и слово, ниже сумма с кнопками, а над суммой — рисунки
+ * того, что на неё покупают. Плейтест: «наглядно показать, что тут речь о еде, мыле»,
+ * поэтому у «Нужного» яблоко, суп и мыло, а у копилки — вещь цели.
+ *
+ * [minimum] — сколько нужно хотя бы: отметкой на шкале ([MinimumBar]), а не строкой
+ * текста, которая «плохо сидела» рядом с заголовком.
  *
  * [canAdd] — есть ли ещё нераспределённые деньги. Когда бюджет разобран весь,
  * «плюс» гаснет во всех строках сразу: ребёнок не составит план, который
@@ -191,18 +270,87 @@ private fun PlanningContent(
  */
 @Composable
 private fun AmountRow(
+    icon: FinneyIcons,
     label: String,
-    hint: String?,
+    pictures: List<Int>,
     value: Int,
     onChange: (Int) -> Unit,
     canAdd: Boolean,
+    budget: Int,
+    minimum: Int? = null,
+    subtitle: String? = null,
 ) {
     FinneyCard {
-        Text(label, style = MaterialTheme.typography.titleMedium, color = FinneyInk)
-        hint?.let {
-            Text(it, style = MaterialTheme.typography.bodyMedium, color = FinneyInk)
+        CategoryTitle(icon, label)
+        subtitle?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = FinneyInk) }
+        // Рисунки — над суммой, между «−» и «+»: что покупают на эти монеты, стоит
+        // прямо на них, а не у края карточки. Диктору они не нужны: слово он уже прочёл.
+        AmountStepper(label = label, value = value, onChange = onChange, canAdd = canAdd, step = STEP) {
+            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                pictures.forEach { art ->
+                    Image(painter = painterResource(art), contentDescription = null, modifier = Modifier.size(40.dp))
+                }
+            }
         }
-        AmountStepper(label = label, value = value, onChange = onChange, canAdd = canAdd, step = STEP)
+        minimum?.let { MinimumBar(value = value, minimum = it, budget = budget) }
+    }
+}
+
+/**
+ * Шкала части с отметкой «хотя бы»: заливка — сколько положено из всего бюджета,
+ * черта — минимум, под ней число. Дотянул до черты — в конце «✓», не дотянул — «!»:
+ * не только цветом (ТЗ п. 3.6).
+ */
+@Composable
+private fun MinimumBar(value: Int, minimum: Int, budget: Int) {
+    val total = budget.coerceAtLeast(1)
+    val shown by animateFloatAsState((value.toFloat() / total).coerceIn(0f, 1f), label = "part")
+    val mark = (minimum.toFloat() / total).coerceIn(0f, 1f)
+    val enough = value >= minimum
+    Row(
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clearAndSetSemantics {
+                contentDescription = if (enough) "Хватает: нужно хотя бы $minimum" else "Нужно хотя бы $minimum, положено $value"
+            },
+    ) {
+        BoxWithConstraints(Modifier.weight(1f)) {
+            val barHeight = 16.dp
+            Canvas(
+                Modifier
+                    .fillMaxWidth()
+                    .height(barHeight)
+                    .clip(RoundedCornerShape(50))
+                    .background(FinneyCream)
+                    .border(StrokeRegular, FinneyInk, RoundedCornerShape(50)),
+            ) {
+                drawRect(FinneyYellow, size = size.copy(width = size.width * shown))
+            }
+            // Черта минимума выходит за полосу сверху и снизу — её видно и поверх заливки.
+            val x = maxWidth * mark
+            Box(
+                Modifier
+                    .offset(x = x - StrokeBold / 2, y = (-4).dp)
+                    .size(width = StrokeBold, height = barHeight + 8.dp)
+                    .background(FinneyInk, RoundedCornerShape(50)),
+            )
+            // Подпись под чертой, но не за краем шкалы: у самого края она сдвигается внутрь.
+            val labelWidth = 110.dp
+            Text(
+                text = "хотя бы $minimum",
+                style = MaterialTheme.typography.bodyMedium,
+                color = FinneyInk,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                modifier = Modifier
+                    .padding(top = barHeight + 6.dp)
+                    .offset(x = (x - labelWidth / 2).coerceIn(0.dp, (maxWidth - labelWidth).coerceAtLeast(0.dp)))
+                    .width(labelWidth),
+            )
+        }
+        if (enough) CheckBadge(size = 26.dp) else WarningBadge(size = 26.dp)
     }
 }
 
@@ -252,30 +400,62 @@ private fun MissingList(items: List<String>) {
 }
 
 /**
- * Остаток. «Останется» — просто число, поэтому панель нейтральная, кремовая:
- * зелёная читалась как похвала. «Не хватает» — предупреждение: голубое и с «!»
+ * Шапка плана: круг слева, справа — заголовок и сколько ещё не разложено.
+ * Сколько можно распределить — в середине круга: это главное число экрана.
+ * Круг меняется с каждым «−/+» — видно, какая часть от всего уходит куда
+ * (плейтест: «диаграмму прикольно сделать»).
+ */
+@Composable
+private fun PlanHeader(state: BudgetUiState.Planning) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        PlanDonut(
+            budget = state.budget,
+            needs = state.needs,
+            wants = state.wants,
+            savings = state.savings,
+            diameter = 148.dp,
+        ) { BudgetCenter(state.budget) }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedText("План", style = MaterialTheme.typography.headlineLarge)
+            RemainderNote(state.remainder)
+        }
+    }
+}
+
+/**
+ * Остаток — пустая дуга круга, словами. «Не разложено» — просто число, без цвета:
+ * зелёное читалось как похвала. «Не хватает» — предупреждение: голубое и с «!»
  * (ТЗ п. 3.6 — не только цветом).
  */
 @Composable
-private fun Remainder(remainder: Int) {
+private fun RemainderNote(remainder: Int) {
     val over = remainder < 0
-    Row(
+    Column(
+        verticalArrangement = Arrangement.spacedBy(2.dp),
         modifier = Modifier
-            .fillMaxWidth()
             .clip(RoundedCornerShape(RadiusCard))
             .background(if (over) FinneyBlue else FinneyCream)
             .border(StrokeRegular, FinneyInk, RoundedCornerShape(RadiusCard))
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .semantics(mergeDescendants = true) {},
     ) {
-        if (over) WarningBadge(size = 28.dp)
-        Text(
-            text = if (over) "Не хватает" else "Останется",
-            style = MaterialTheme.typography.titleMedium,
-            color = FinneyInk,
-            modifier = Modifier.weight(1f),
-        )
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (over) WarningBadge(size = 24.dp)
+            Text(
+                text = when {
+                    over -> "Не хватает"
+                    remainder == 0 -> "Всё разложено"
+                    else -> "Не разложено"
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = FinneyInk,
+            )
+        }
+        // Число — всегда, и ноль тоже: ТЗ п. 2.5.5 требует показывать остаток, а не только слова.
         CoinAmount(amount = if (over) -remainder else remainder)
     }
 }
@@ -319,63 +499,105 @@ private fun ActiveContent(state: BudgetUiState.Active, onBack: () -> Unit) {
     ) {
         OutlinedText("План и факт", style = MaterialTheme.typography.headlineLarge)
 
+        // Сначала вывод, потом подробности: плейтест спрашивал, «что я должен понять»
+        // из строк с числами, — вот это одной фразой.
+        VerdictNote(state.verdict)
+
         FinneyPanel(title = "Уровень ${state.level}") {
-            FactRow("Нужное", report.facts.needs, report.plan.needs)
-            FactRow("Желаемое", report.facts.wants, report.plan.wants)
-            FactRow("Копилка", report.facts.savings, report.plan.savings, progress = true)
+            PlanFact(categoryIcon(Category.NEEDS), "Нужное", report.plan.needs, report.facts.needs, done = "Потратил")
+            PlanFact(categoryIcon(Category.WANTS), "Желаемое", report.plan.wants, report.facts.wants, done = "Потратил")
+            PlanFact(SavingsIcon, "Копилка", report.plan.savings, report.facts.savings, done = "Отложил", saving = true)
         }
 
-        CoinAmount(amount = state.balance)
-
-        // По плану или нет — значком и словами. Уровень ещё идёт, это не итог, поэтому
-        // панель нейтральная: персиковое «План» на зелёной подложке читали как «красный
-        // текст на зелёном — будто я что-то сделал не так» (ТЗ п. 2.5.9, 3.6).
+        // Одна монетка с числом внизу была непонятно чем — подписываем словами.
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(RadiusCard))
-                .background(FinneyCream)
-                .border(StrokeRegular, FinneyInk, RoundedCornerShape(RadiusCard))
-                .padding(14.dp)
-                .semantics(mergeDescendants = true) {},
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.semantics(mergeDescendants = true) {},
         ) {
-            if (report.onTrack) CheckBadge(size = 32.dp) else WarningBadge(size = 32.dp)
-            Text(
-                if (report.onTrack) "Идёшь по плану" else "Пока не по плану",
-                style = MaterialTheme.typography.titleMedium,
-                color = FinneyInk,
-            )
+            Text("Сейчас у тебя", style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
+            CoinAmount(amount = state.balance)
         }
     }
 }
 
 /**
- * Строка «потрачено из запланированного» и полоса под ней. Траты — полосой без
- * зелёного (потратить больше — не успех), [progress] — копилка: там полоса
- * прогресса от розового к зелёному.
+ * Вывод «План и факт» одной фразой со значком. Уровень ещё идёт, это не итог,
+ * поэтому панель нейтральная: персиковое «План» на зелёной подложке читали как
+ * «красный текст на зелёном — будто я что-то сделал не так» (ТЗ п. 2.5.9, 3.6).
  */
 @Composable
-private fun FactRow(label: String, fact: Int, planned: Int, progress: Boolean = false) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyLarge,
-                color = FinneyInk,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                text = "$fact из $planned",
-                style = MaterialTheme.typography.titleMedium,
-                color = FinneyInk,
-            )
+private fun VerdictNote(verdict: PlanVerdict) {
+    val (title, line) = when (verdict) {
+        PlanVerdict.OnTrack -> "Идёшь по плану" to "Тратишь не больше, чем задумал."
+        is PlanVerdict.Overspent -> "Больше плана на ${verdict.amount}" to "Купил больше, чем задумал. Смотри, где полоса длиннее."
+        is PlanVerdict.SavingsShort -> "В копилку ещё ${verdict.amount}" to "Отложи их до конца уровня — так по плану."
+        PlanVerdict.OffTrack -> "Пока не по плану" to "Сравни полосы: что задумал и что вышло."
+    }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(RadiusCard))
+            .background(FinneyCream)
+            .border(StrokeRegular, FinneyInk, RoundedCornerShape(RadiusCard))
+            .padding(14.dp)
+            .semantics(mergeDescendants = true) {},
+    ) {
+        if (verdict == PlanVerdict.OnTrack) CheckBadge(size = 40.dp) else WarningBadge(size = 40.dp)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, color = FinneyInk)
+            Text(line, style = MaterialTheme.typography.bodyMedium, color = FinneyInk)
         }
-        if (progress) FillBar(fact, planned, Modifier.fillMaxWidth()) else SpendBar(fact, planned, Modifier.fillMaxWidth())
+    }
+}
+
+/**
+ * Часть плана двумя полосами: «Собирался» — сколько задумал, [done] — сколько вышло.
+ * Шкала у пары общая, поэтому длины сравниваются на глаз, без «10 из 10».
+ * Трата сверх плана — розовая полоса и «!» ([SpendBar]); у копилки [saving] —
+ * там больше плана не ошибка, и полоса обычная.
+ */
+@Composable
+private fun PlanFact(icon: FinneyIcons, label: String, planned: Int, fact: Int, done: String, saving: Boolean = false) {
+    val scale = maxOf(planned, fact).coerceAtLeast(1)
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        CategoryTitle(icon, label)
+        BarLine("Собирался", planned) { ScaleBar(planned, scale, FinneyPeach) }
+        BarLine(done, fact) {
+            if (saving || fact <= planned) ScaleBar(fact, scale, FinneyYellow) else SpendBar(fact, planned)
+        }
+    }
+}
+
+/** Строка полосы: слово слева, полоса, число справа. Слова и числа — колонками одной ширины. */
+@Composable
+private fun BarLine(word: String, amount: Int, bar: @Composable () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.clearAndSetSemantics { contentDescription = "$word $amount" },
+    ) {
+        StableText(word, widest = "Собирался", style = MaterialTheme.typography.bodyMedium)
+        Box(Modifier.weight(1f)) { bar() }
+        StableText(amount.toString(), widest = "000", style = MaterialTheme.typography.titleMedium)
+    }
+}
+
+/** Полоса [value] из [scale] одним цветом — без «✓» и «!»: это мерка, а не цель. */
+@Composable
+private fun ScaleBar(value: Int, scale: Int, color: Color) {
+    val shown by animateFloatAsState((value.toFloat() / scale).coerceIn(0f, 1f), label = "bar")
+    Canvas(
+        Modifier
+            .fillMaxWidth()
+            .height(14.dp)
+            .clip(RoundedCornerShape(50))
+            .background(FinneyCream)
+            .border(StrokeRegular, FinneyInk, RoundedCornerShape(50)),
+    ) {
+        drawRect(color, size = size.copy(width = size.width * shown))
     }
 }
 
@@ -386,9 +608,13 @@ private fun PlanningContentPreview() {
         PlanningContent(
             state = BudgetUiState.Planning(
                 periodNumber = 1, level = 1, budget = 50, needs = 30, wants = 10, savings = 10,
-                needsHint = 30, goalLabel = "Велосипед", rejection = null, isSaving = false,
+                needsHint = 30, goalLabel = "Ковбойская шляпа", rejection = null, isSaving = false,
+                needsItems = listOf("food_apple", "food_bowl", "care_soap"),
+                wantsItems = listOf("treat_candy", "toy_ball", "toy_book"),
+                goalReward = "hat_cowboy",
+                lastPlan = Plan(budget = 50, needs = 25, wants = 15, savings = 10),
             ),
-            onNeedsChange = {}, onWantsChange = {}, onSavingsChange = {}, onSelectGoal = {}, onConfirm = {}, onBack = {},
+            onNeedsChange = {}, onWantsChange = {}, onSavingsChange = {}, onSelectGoal = {}, onRepeatLast = {}, onConfirm = {}, onBack = {},
         )
     }
 }

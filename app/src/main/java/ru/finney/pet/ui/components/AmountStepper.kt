@@ -1,6 +1,6 @@
 package ru.finney.pet.ui.components
 
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -26,6 +26,8 @@ fun AmountStepper(
     modifier: Modifier = Modifier,
     canRemove: Boolean = value > 0,
     step: Int = AMOUNT_STEP,
+    /** Что над суммой между кнопками — например, рисунки того, на что эти монеты. */
+    above: (@Composable () -> Unit)? = null,
 ) {
     HoldStepper(
         onMinus = { onChange((value - step).coerceAtLeast(0)) },
@@ -36,7 +38,8 @@ fun AmountStepper(
         plusDescription = "$label: добавить",
         modifier = modifier.fillMaxWidth(),
     ) { bump ->
-        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+        Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+            above?.invoke()
             CoinAmount(amount = value, modifier = bump)
         }
     }
