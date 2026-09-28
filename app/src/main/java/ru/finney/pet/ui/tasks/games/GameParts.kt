@@ -1,5 +1,6 @@
 package ru.finney.pet.ui.tasks.games
 
+import ru.finney.pet.ui.motion.LocalAnimations
 import android.annotation.SuppressLint
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -303,12 +304,14 @@ internal fun inputErrorText(error: TaskInputError): String = when (error) {
 /** Стрелка вниз, которая подпрыгивает: «тяни сюда». */
 @Composable
 internal fun BouncingArrow(modifier: Modifier = Modifier, description: String = "Смахни вещь вниз, в корзину") {
-    val bounce by rememberInfiniteTransition(label = "arrow").animateFloat(
+    val bounceAnim by rememberInfiniteTransition(label = "arrow").animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(tween(600), RepeatMode.Reverse),
         label = "bounce",
     )
+    // Без анимаций — на месте, а не съехавшей на крайнюю точку прыжка.
+    val bounce = if (LocalAnimations.current) bounceAnim else 0f
     OutlinedText(
         "↓",
         style = MaterialTheme.typography.headlineLarge,

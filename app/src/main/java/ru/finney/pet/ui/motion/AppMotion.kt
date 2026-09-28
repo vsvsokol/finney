@@ -1,5 +1,6 @@
 package ru.finney.pet.ui.motion
 
+import kotlinx.coroutines.currentCoroutineContext
 import android.content.Context
 import android.provider.Settings
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -9,7 +10,12 @@ import androidx.compose.ui.MotionDurationScale
  * Скорость всех анимаций окна (ТЗ п. 3.6: анимации отключаются). Compose берёт её из
  * контекста корутин рекомпозера, поэтому `animateTo`, `animate*AsState`, переходы и
  * бесконечные анимации выключаются разом: при 0 они сразу встают в конечное значение.
- * Экранам ничего делать не нужно. Системная «скорость анимации» учитывается, как и без нас.
+ * Системная «скорость анимации» учитывается, как и без нас.
+ *
+ * Одиночному переходу этого хватает. Но при нуле каждый `animateTo` длится ровно кадр,
+ * и цепочка шагов (присел — подпрыгнул — приземлился) мелькает промежуточными положениями.
+ * Такие цепочки проверяют [motionEnabled] и не начинаются вовсе. А бесконечная анимация
+ * встаёт в крайнее положение, не в спокойное — её экран гасит сам по [LocalAnimations].
  *
  * Покадровые циклы на `withFrameNanos` — это игра (полёт еды, пена), а не украшение,
  * их множитель не трогает. Украшение на таком цикле проверяет [LocalAnimations].
@@ -35,3 +41,10 @@ class AppMotion(private val context: Context) : MotionDurationScale {
 
 /** Включены ли анимации — для украшений, которые идут своим циклом кадров или `delay`. */
 val LocalAnimations = staticCompositionLocalOf { true }
+
+/**
+ * Идут ли анимации — для корутины эффекта: множитель берётся из её контекста, как его
+ * берёт сам Compose, поэтому учтена и системная «скорость анимации».
+ */
+suspend fun motionEnabled(): Boolean =
+    (currentCoroutineContext()[MotionDurationScale]?.scaleFactor ?: 1f) > 0f

@@ -36,6 +36,50 @@ import ru.finney.pet.ui.components.changesBetween
 /** Условий у уровня три: нужное, план, копилка. */
 const val LEVEL_CONDITIONS = 3
 
+/**
+ * Одно действие, которое главный экран подсвечивает прямо сейчас (плейтест 28.09:
+ * «ничего не понятно, что делать»). Порядок — как проходится уровень: план, еда и мытьё,
+ * игра уровня, сон, завершение. Выбирает [nextStepFor].
+ */
+enum class NextStep {
+    /** Плана нет — значок уровня, внутри «Составить план». */
+    PLAN,
+    FEED,
+    WASH,
+    LEVEL_GAME,
+    SLEEP,
+    /** Спит, и сна уже хватает для уровня — «Разбудить». Выбирает экран: сон идёт по часам. */
+    WAKE,
+    /** Условия выполнены — значок уровня, внутри «Завершить уровень». */
+    FINISH,
+    /** Отложить в копилку — плашка копилки. */
+    SAVE,
+}
+
+/**
+ * Следующий шаг по чек-листу ядра и шкалам. null — подсказывать нечего: питомец спит
+ * или всё, что можно сделать руками, сделано, а условий не хватает (траты не по плану).
+ *
+ * Нужное — по порогу из конфига ядра, тому же, по которому [LevelCheck.needsCovered]:
+ * ниже порога еда и мытьё сразу — первой зовём самую низкую шкалу.
+ *
+ * Сон — последним перед завершением: пока питомец спит, остальное закрыто, и уложи
+ * его первым — ребёнок сидел бы перед капсулой, не сделав ничего другого (плейтест).
+ */
+internal fun nextStepFor(check: LevelCheck, stats: PetStats, needsThreshold: Int, asleep: Boolean): NextStep? {
+    if (asleep) return null
+    if (!check.planConfirmed) return NextStep.PLAN
+    listOf(NextStep.FEED to stats.satiety, NextStep.WASH to stats.hygiene)
+        .filter { it.second < needsThreshold }
+        .minByOrNull { it.second }
+        ?.let { return it.first }
+    if (check.levelTaskId != null && check.gameRequired && !check.gamePassed) return NextStep.LEVEL_GAME
+    if (stats.energy < needsThreshold) return NextStep.SLEEP
+    if (check.willPass) return NextStep.FINISH
+    if (!check.savingsAdded) return NextStep.SAVE
+    return null
+}
+
 sealed interface HomeUiState {
     data object Loading : HomeUiState
 
@@ -76,6 +120,8 @@ sealed interface HomeUiState {
         val moodPerShake: Int = 0,
         /** Настроение ниже порога грусти: питомец вздыхает, шкала зовёт на неё нажать. */
         val moodLow: Boolean = false,
+        /** Что подсветить сейчас; null — ничего. */
+        val nextStep: NextStep? = null,
     ) : HomeUiState {
         /** Уровень завершается только после подтверждения плана. */
         val canClosePeriod: Boolean get() = phase == PeriodPhase.ACTIVE
@@ -93,7 +139,13 @@ sealed interface HomeUiState {
  * Сон идёт по часам: [energyFrom] — с чем уснул, к [endsAt] сон дорастёт до 100.
  * Экран сам двигает кольцо сна по времени и будит питомца в [endsAt].
  */
-data class SleepInfo(val since: Long, val endsAt: Long, val energyFrom: Int) {
+data class SleepInfo(
+    val since: Long,
+    val endsAt: Long,
+    val energyFrom: Int,
+    /** С этой минуты сна хватает для уровня: будить можно, условие «выспался» выполнено. */
+    val enoughAt: Long = since,
+) {
     fun energyAt(now: Long): Int {
         val slept = ((now - since).toFloat() / (endsAt - since)).coerceIn(0f, 1f)
         return energyFrom + ((100 - energyFrom) * slept).toInt()
@@ -225,6 +277,7 @@ class HomeViewModel(
     private fun toUiState(saved: SavedGame): HomeUiState.Ready {
         val state = saved.state
         val level = game.level(state)
+        val check = game.levelCheck(state)
         return HomeUiState.Ready(
             petName = saved.profile.petName,
             appearance = saved.profile.appearance,
@@ -232,7 +285,7 @@ class HomeViewModel(
             stats = state.pet,
             emotion = game.emotion(state),
             level = level,
-            check = game.levelCheck(state),
+            check = check,
             stage = game.stage(state),
             balance = state.balance,
             totalSavings = state.totalSavings,
@@ -247,12 +300,33 @@ class HomeViewModel(
             care = previews(state) { it.effect.hygiene > 0 },
             worn = state.wornItemId,
             sleep = state.sleepingSince?.let { since ->
-                SleepInfo(since = since, endsAt = game.sleepEndsAt(state)!!, energyFrom = state.pet.energy)
+                val endsAt = game.sleepEndsAt(state)!!
+                val threshold = content.economy.pet.needsThreshold
+                val energy = state.pet.energy
+                SleepInfo(
+                    since = since,
+                    endsAt = endsAt,
+                    energyFrom = energy,
+                    // Сон растёт ровно, как в [SleepInfo.energyAt]: до порога — та же доля пути.
+                    // Секунда сверху — ядро округляет сон вниз, и разбуженный ровно в срок
+                    // получил бы на единицу меньше порога.
+                    enoughAt = if (energy >= threshold) {
+                        since
+                    } else {
+                        since + (endsAt - since) * (threshold - energy) / (100 - energy) + 1_000
+                    },
+                )
             },
             toys = game.toys(state).map { it.id },
             playLeft = game.playMoodLeft(state),
             moodPerShake = content.economy.play.moodPerShake,
             moodLow = state.pet.mood < content.economy.pet.emotionLow,
+            nextStep = nextStepFor(
+                check = check,
+                stats = state.pet,
+                needsThreshold = content.economy.pet.needsThreshold,
+                asleep = state.sleepingSince != null,
+            ),
         )
     }
 
