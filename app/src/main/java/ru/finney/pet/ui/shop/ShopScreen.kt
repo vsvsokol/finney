@@ -1,7 +1,5 @@
 package ru.finney.pet.ui.shop
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,7 +7,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -17,14 +14,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ru.finney.pet.domain.model.Category
-import ru.finney.pet.ui.components.FinneyIcon
-import ru.finney.pet.ui.components.categoryIcon
+import ru.finney.pet.ui.components.CategoryBanner
+import ru.finney.pet.ui.components.CloseButton
+import ru.finney.pet.ui.components.WalletButton
 import ru.finney.pet.domain.game.PurchasePreview
 import ru.finney.pet.domain.game.Rejection
 import ru.finney.pet.ui.components.CoinAmount
@@ -37,10 +33,7 @@ import ru.finney.pet.ui.room.CarePanel
 import ru.finney.pet.ui.room.ItemPicture
 import ru.finney.pet.ui.room.PickHint
 import ru.finney.pet.ui.room.itemFallback
-import ru.finney.pet.ui.theme.FinneyCream
 import ru.finney.pet.ui.theme.FinneyInk
-import ru.finney.pet.ui.theme.RadiusField
-import ru.finney.pet.ui.theme.StrokeRegular
 
 /**
  * Магазин: открывается кнопкой с деньгами на главном (так в макете — «при нажатии
@@ -89,15 +82,14 @@ private fun ShopContent(
     FinneyScreen(
         scrollable = true,
         verticalArrangement = Arrangement.spacedBy(16.dp),
-        onClose = onBack,
+        // Шапка как верхний ряд главного: кошелёк слева, по центру заголовок, справа «✕».
+        // Она над прокруткой и не уезжает (плейтест 28.09: сумма стояла под заголовком
+        // по центру и пропадала, пока листаешь товары, — а смотрят на неё как раз тогда).
+        top = { ShopHeader(balance = state.balance, onBack = onBack) },
         // Кнопка «Купить» одна на весь магазин и всегда на виду: раньше в каждой из трёх
         // панелей стояла своя, а в ней — подсказка «Выбери, что купить» вместо действия.
         bottom = { BuyBar(state, selected, onBuy, onOpenBudget) },
     ) {
-        OutlinedText("Магазин", style = MaterialTheme.typography.headlineLarge)
-
-        CoinAmount(amount = state.balance)
-
         FeedbackDialog(
             feedback = state.feedback,
             rejection = state.rejection,
@@ -158,49 +150,35 @@ private fun ShopSection(
         onConfirm = {},
         onDismiss = null,
         allowShortage = true,
-        header = { CategoryBanner(kind, planLeft) },
+        header = { SectionBanner(kind, planLeft) },
         withConfirm = false,
         tiles = true,
     )
 }
 
 /**
- * Цветная полоса категории во всю ширину панели: зачем это и сколько на это
- * осталось по плану. Плейтест: заголовок «Нужное» над панелью не замечали и видели
- * просто набор продуктов. Полоса стоит прямо над товарами; цвет в ней не
- * единственный признак — слово категории в заголовке панели, смысл — словами
- * в самой полосе (ТЗ п. 3.6). У игрушек заголовок «Игрушки», поэтому «хочется»
- * сказано в полосе.
+ * Верхний ряд магазина. Крайние слоты одинаковой ширины (weight 1), как на главном:
+ * заголовок стоит ровно по центру и не съезжает от длины суммы.
  */
 @Composable
-private fun CategoryBanner(kind: SectionKind, planLeft: Int?) {
-    // Категория — значком, а не цветом полосы: зелёное «нужное» и розовое «хочется»
-    // читались как «правильно» и «неправильно».
-    val (icon, why) = when (kind) {
-        SectionKind.NEEDS -> categoryIcon(Category.NEEDS) to "Без этого Финни плохо"
-        SectionKind.WANTS -> categoryIcon(Category.WANTS) to "Для радости. Можно и потом"
-        SectionKind.TOYS -> categoryIcon(Category.WANTS) to "Это «хочется». Игрушка лежит в зале"
-    }
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(RadiusField))
-            .background(FinneyCream)
-            .border(StrokeRegular, FinneyInk, RoundedCornerShape(RadiusField))
-            .padding(horizontal = 12.dp, vertical = 8.dp)
-            .semantics(mergeDescendants = true) {},
-    ) {
-        FinneyIcon(icon, size = 28.dp)
-        Text(why, style = MaterialTheme.typography.titleMedium, color = FinneyInk, modifier = Modifier.weight(1f))
-        planLeft?.let {
-            Column(horizontalAlignment = Alignment.End) {
-                Text("по плану", style = MaterialTheme.typography.labelMedium, color = FinneyInk)
-                CoinAmount(amount = it, coinSize = 22.dp)
-            }
+private fun ShopHeader(balance: Int, onBack: () -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+            WalletButton(balance = balance, onClick = null)
+        }
+        OutlinedText("Магазин", style = MaterialTheme.typography.headlineLarge)
+        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+            CloseButton(onBack)
         }
     }
+}
+
+/** Полоса раздела. У игрушек заголовок «Игрушки», поэтому «хочется» сказано в полосе. */
+@Composable
+private fun SectionBanner(kind: SectionKind, planLeft: Int?) = when (kind) {
+    SectionKind.NEEDS -> CategoryBanner(Category.NEEDS, "Без этого Финни плохо", planLeft)
+    SectionKind.WANTS -> CategoryBanner(Category.WANTS, "Для радости. Можно и потом", planLeft)
+    SectionKind.TOYS -> CategoryBanner(Category.WANTS, "Это «хочется». Игрушка лежит в зале", planLeft)
 }
 
 /**

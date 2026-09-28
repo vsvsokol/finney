@@ -166,6 +166,7 @@ fun FinneyNavHost(
             SettingsScreen(
                 onBack = { navController.back() },
                 onOpenAdult = { navController.go(AdultRoute) },
+                onOpenGlossary = { navController.go(GlossaryRoute) },
             )
         }
 

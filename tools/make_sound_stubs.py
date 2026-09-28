@@ -7,12 +7,16 @@ app/src/main/res/raw/ лежит заглушка — узнаваемый си�
 Скрипт пишет только те файлы, которых в res/raw ещё нет: готовые звуки он не
 перезапишет. Чтобы пересоздать заглушку, удалите её файл и запустите заново.
 
-Нужны numpy и ffmpeg в PATH. Запуск из корня репозитория:
+Нужен numpy; ffmpeg в PATH — для OGG. Без ffmpeg заглушка пишется WAV (16 бит, моно):
+Android играет его так же, а весит короткий звук ~20 КБ. Настоящий OGG кладётся
+вместо WAV — старый файл удалить, имя ресурса то же. Запуск из корня репозитория:
 
     python tools/make_sound_stubs.py
 """
 
+import shutil
 import subprocess
+import wave
 from pathlib import Path
 
 import numpy as np
@@ -125,6 +129,59 @@ def pour():
     return mix(stream, blips)
 
 
+# Игрушки (плейтест 28.09: «предметы валяются и не имеют функционала», звуков у них не было).
+# У каждой игрушки свой звук встряски, чтобы по звуку было слышно, что в руке.
+
+
+def sweep(f0, f1, ms, decay=5.0, harmonics=(1.0, 0.25)):
+    """Тон, плавно съезжающий с f0 на f1: «боинг», писк."""
+    t = np.arange(int(RATE * ms / 1000)) / RATE
+    freq = f0 + (f1 - f0) * (t / t[-1])
+    phase = 2 * np.pi * np.cumsum(freq) / RATE
+    wave_ = sum(a * np.sin(phase * (i + 1)) for i, a in enumerate(harmonics))
+    env = np.exp(-decay * t / (ms / 1000))
+    attack = int(RATE * 0.004)
+    env[:attack] *= np.linspace(0, 1, attack)
+    return wave_ * env
+
+
+def toy_pickup():
+    # Взял в руку — мягкий «поп» вверх.
+    return sweep(380, 720, 90, decay=4, harmonics=(1.0, 0.1)) * 0.8
+
+
+def toy_drop():
+    # Упала на пол — глухой «тук» с коротким стуком дерева.
+    knock = noise(25, 800, 3000, seed=7) * hump(int(RATE * 0.025), 0.05) * 0.25
+    return mix(tone(150, 170, decay=7, harmonics=(1.0, 0.4, 0.1)), knock)
+
+
+def toy_bounce():
+    # Мячик — «боинг»: тон падает, как мяч отскакивает.
+    return sweep(620, 240, 200, decay=4, harmonics=(1.0, 0.3, 0.1))
+
+
+def toy_squeak():
+    # Мишка, уточка — резиновая пищалка: вверх и чуть назад, с «носовыми» обертонами.
+    up = sweep(1150, 1650, 90, decay=0.5, harmonics=(1.0, 0.5, 0.35, 0.2))
+    down = sweep(1650, 1350, 90, decay=5, harmonics=(1.0, 0.5, 0.35, 0.2))
+    return seq(up, down) * 0.7
+
+
+def toy_click():
+    # Кубики, конструктор — два деревянных щелчка.
+    def clack(seed):
+        return mix(noise(18, 1800, 6000, seed=seed) * hump(int(RATE * 0.018), 0.05), tone(1900, 40, decay=8, harmonics=(1.0,)) * 0.4)
+    return seq(clack(8), silence(45), clack(9) * 0.7)
+
+
+def toy_rustle():
+    # Книжка — шелест страниц.
+    n = int(RATE * 0.26)
+    flutter = 0.6 + 0.4 * np.sin(2 * np.pi * 22 * np.arange(n) / RATE)
+    return noise(260, 2500, 9000, seed=10) * hump(n, 0.3) * flutter * 0.6
+
+
 STUBS = {
     "sfx_coin": coin,
     "sfx_purchase": purchase,
@@ -137,13 +194,28 @@ STUBS = {
     "sfx_capsule_door": capsule_door,
     "sfx_ufo": ufo,
     "sfx_pour": pour,
+    "sfx_toy_pickup": toy_pickup,
+    "sfx_toy_drop": toy_drop,
+    "sfx_toy_bounce": toy_bounce,
+    "sfx_toy_squeak": toy_squeak,
+    "sfx_toy_click": toy_click,
+    "sfx_toy_rustle": toy_rustle,
 }
 
+# Пик по таблице громкости в design/exports/sounds/README.md: эффекты интерфейса −9 dBFS,
+# остальные −4…−6. Игрушку трясут часто — чуть тише, чтобы серия не резала слух.
+PEAK_DB = {name: -7.0 for name in STUBS if name.startswith("sfx_toy_")}
 
-def write_ogg(samples, path, peak_db=-4.0):
+
+def prepare(samples, peak_db):
     samples = samples * (10 ** (peak_db / 20) / np.abs(samples).max())
     fade = min(len(samples) // 4, int(RATE * 0.01))
     samples[-fade:] *= np.linspace(1, 0, fade)
+    return samples
+
+
+def write_ogg(samples, path, peak_db=-4.0):
+    samples = prepare(samples, peak_db)
     subprocess.run(
         ["ffmpeg", "-v", "error", "-y", "-f", "f32le", "-ac", "1", "-ar", str(RATE), "-i", "-",
          "-c:a", "libvorbis", "-q:a", "4", "-map_metadata", "-1", str(path)],
@@ -152,14 +224,25 @@ def write_ogg(samples, path, peak_db=-4.0):
     )
 
 
+def write_wav(samples, path, peak_db=-4.0):
+    samples = prepare(samples, peak_db)
+    with wave.open(str(path), "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(RATE)
+        w.writeframes((samples * 32767).astype("<i2").tobytes())
+
+
 def main():
     RAW.mkdir(parents=True, exist_ok=True)
+    ogg = shutil.which("ffmpeg") is not None
     for name, make in STUBS.items():
-        path = RAW / f"{name}.ogg"
-        if path.exists():
-            print(f"есть     {path.name}")
+        existing = [p for p in (RAW / f"{name}.ogg", RAW / f"{name}.wav") if p.exists()]
+        if existing:
+            print(f"есть     {existing[0].name}")
             continue
-        write_ogg(make(), path)
+        path = RAW / f"{name}.{'ogg' if ogg else 'wav'}"
+        (write_ogg if ogg else write_wav)(make(), path, PEAK_DB.get(name, -4.0))
         print(f"заглушка {path.name}")
 
 

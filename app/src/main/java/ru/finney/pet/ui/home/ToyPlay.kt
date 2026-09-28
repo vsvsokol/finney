@@ -54,11 +54,23 @@ import ru.finney.pet.ui.theme.FinneyCream
 import ru.finney.pet.ui.theme.FinneyInk
 import kotlin.math.roundToInt
 import kotlin.random.Random
+import ru.finney.pet.ui.sound.Sfx
 
 // Игра с игрушкой на главном: сердечки над питомцем и подсказка к шкале настроения.
 // Обе — без слов: ребёнок 7 лет видит, что радость растёт, и видит, от чего.
 
 /** Одно сердечко над питомцем. [filled] false — питомец наигрался, радости не прибавилось. */
+/**
+ * Звук встряски у игрушки: по звуку слышно, что в руке (плейтест 28.09 — игрушки
+ * молчали, и их принимали за украшение). Новая игрушка без своего звука — «боинг» мячика.
+ */
+fun toyShakeSound(toyId: String): Sfx = when {
+    "bear" in toyId || "duck" in toyId -> Sfx.ToySqueak
+    "blocks" in toyId || "cube" in toyId || "dice" in toyId -> Sfx.ToyClick
+    "book" in toyId -> Sfx.ToyRustle
+    else -> Sfx.ToyBounce
+}
+
 internal data class FloatingHeart(val id: Long, val from: Offset, val filled: Boolean)
 
 private const val HEART_RISE_MS = 1_100

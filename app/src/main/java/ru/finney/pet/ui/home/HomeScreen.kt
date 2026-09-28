@@ -89,6 +89,14 @@ import ru.finney.pet.domain.model.PetAppearance
 import ru.finney.pet.domain.model.PetCharacter
 import ru.finney.pet.domain.model.PetStats
 import ru.finney.pet.domain.pet.Emotion
+import androidx.compose.ui.layout.layout
+import androidx.compose.animation.core.snap
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerEventPass
+import ru.finney.pet.domain.model.Category
+import ru.finney.pet.ui.components.CategoryBanner
+import ru.finney.pet.ui.components.CoinAmount
+import ru.finney.pet.ui.components.WalletButton
 import ru.finney.pet.ui.components.FeedbackDialog
 import ru.finney.pet.ui.components.ActionFeedbackCard
 import ru.finney.pet.ui.components.ActionFeedback
@@ -234,6 +242,7 @@ fun HomeScreen(
             onBuy = viewModel::buy,
             onSleep = viewModel::sleep,
             onWake = viewModel::wake,
+            onSleepCard = viewModel::answerSleepCard,
             onPlay = viewModel::play,
         )
     }
@@ -275,6 +284,9 @@ private const val PlayFlushMillis = 800L
 
 /** Не чаще раза в столько питомец смеётся вслух и подпрыгивает от игры. */
 private const val HappySoundGapMillis = 1_500L
+
+/** Самый частый звук встряски игрушки. */
+private const val ToySoundGapMillis = 140L
 
 /** Паузы между вздохами грустного питомца. */
 private val SighPauseMs = 4_000L..8_000L
@@ -326,6 +338,7 @@ private fun HomeContent(
     onBuy: (itemId: String) -> Unit,
     onSleep: () -> Unit = {},
     onWake: () -> Unit = {},
+    onSleepCard: (correct: Boolean) -> Unit = {},
     onPlay: (toyId: String, shakes: Int) -> Unit = { _, _ -> },
 ) {
     // Питомец спит — это ночь: он в капсуле, свет выключен, игра на паузе
@@ -448,8 +461,23 @@ private fun HomeContent(
             flushPlay()
         }
     }
+    // Звук игрушки: «поп» — взял, своя встряска на ходу, «тук» — отпустил. Встряска
+    // звучит где угодно, не только у питомца: игрушка живая сама по себе. Не чаще
+    // раза в ToySoundGapMillis и с разбросом тона — серия не звучит пулемётом.
+    var soundTravel by remember { mutableFloatStateOf(0f) }
+    var lastToySound by remember { mutableLongStateOf(0L) }
     fun onToyDrag(toyId: String, centre: Offset, delta: Offset) {
+        if (heldToy == null) sounds.play(Sfx.ToyPickup)
         heldToy = toyId
+        soundTravel += delta.getDistance()
+        if (soundTravel >= shakeTravelPx) {
+            soundTravel = 0f
+            val now = System.currentTimeMillis()
+            if (now - lastToySound > ToySoundGapMillis) {
+                lastToySound = now
+                sounds.play(toyShakeSound(toyId), 0.9f + Random.nextFloat() * 0.25f)
+            }
+        }
         val pet = petBounds()
         if (pet == Rect.Zero) return
         // Тянется к игрушке, где бы она ни была: следит за ней.
@@ -479,6 +507,8 @@ private fun HomeContent(
         flushPlay()
         heldToy = null
         travel = 0f
+        soundTravel = 0f
+        sounds.play(Sfx.ToyDrop)
         animation.lookAt(0f)
     }
 
@@ -491,6 +521,13 @@ private fun HomeContent(
             animation.playSigh()
         }
     }
+
+    // Сон-загадка: открытая карточка, выбранное слово и сколько карточек уже было за этот
+    // сон. Новый сон — счёт заново: ключ — минута, когда уснул.
+    var dreamCard by remember(sleep?.since) { mutableStateOf<SleepCard?>(null) }
+    var dreamPicked by remember(sleep?.since) { mutableStateOf<String?>(null) }
+    var dreamsAsked by rememberSaveable(sleep?.since) { mutableIntStateOf(0) }
+    var lastDream by remember { mutableStateOf<String?>(null) }
 
     // Подсказка к шкале радости: что её поднимает. Открывается нажатием на шкалу и
     // висит, пока не закроют: сама она пропадала, пока ребёнок её читал.
@@ -541,10 +578,28 @@ private fun HomeContent(
     }
 
 
+    // Касания по экрану — для подсказки шага: она гаснет от любого касания и
+    // возвращается, только если ребёнок замешкался (NextStepHint.kt, hintDelayMillis).
+    // Считаются одни нажатия, без движения пальца: каждое — одна рекомпозиция, не на кадр.
+    var touches by remember { mutableIntStateOf(0) }
+
     // FinneyScreen тут не подходит: он заливает фон кремовым и сам растит колонку,
     // а под интерфейсом должна быть видна комната. Свой корень — ровно поэтому,
     // сам FinneyScreen не трогаем, на нём держатся пять других экранов.
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            // Первым проходом, до детей, и ничего не поглощая: кнопки, питомец и игрушки
+            // получают касание как раньше, корень только замечает, что оно было.
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        if (event.type == PointerEventType.Press) touches++
+                    }
+                }
+            },
+    ) {
 
         RoomScene(
             spot = spot,
@@ -621,7 +676,7 @@ private fun HomeContent(
                 modifier = Modifier.weight(1f),
                 contentAlignment = Alignment.CenterStart,
             ) {
-                MoneyButton(balance = state.balance, onClick = onOpenShop)
+                WalletButton(balance = state.balance, onClick = onOpenShop)
             }
 
             // Уровень — главный показатель роста, поэтому в полтора раза крупнее кнопок по краям.
@@ -885,6 +940,29 @@ private fun HomeContent(
 
         }
 
+        // Облачко-мысль над спящим: сон-загадка по справочнику (SleepCards.kt).
+        // Ставится от головы питомца вправо-вверх и не выходит за край экрана.
+        if (eyesClosed && sleeping && petLayout != Rect.Zero && dreamCard == null && !levelOpen) {
+            DreamCloud(
+                done = dreamsAsked >= state.sleepCardsPerSleep,
+                animate = animations,
+                onClick = {
+                    sounds.play(Sfx.Tap)
+                    dreamCard = sleepCard(state.glossary, Random, avoid = lastDream)
+                    dreamPicked = null
+                },
+                modifier = Modifier.layout { measurable, constraints ->
+                    val pet = petBounds()
+                    val placeable = measurable.measure(constraints.copy(minWidth = 0, minHeight = 0))
+                    val margin = 8.dp.roundToPx()
+                    val x = (pet.center.x + pet.width * 0.08f).toInt()
+                        .coerceIn(margin, (constraints.maxWidth - placeable.width - margin).coerceAtLeast(margin))
+                    val y = (pet.top + pet.height * 0.18f - placeable.height).toInt().coerceAtLeast(margin)
+                    layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(x, y) }
+                },
+            )
+        }
+
         // Одна подсказка за раз и только когда ничего не открыто поверх: во время
         // игры ухода и в панелях палец занят другим. Первый уровень — обучение:
         // экран темнеет вокруг цели, и рядом пузырь с фразой.
@@ -895,13 +973,34 @@ private fun HomeContent(
         val step = if (sleep != null) NextStep.WAKE.takeIf { now >= sleep.enoughAt } else state.nextStep
         val hint = step.takeIf { playing == null && care == null && !levelOpen && !debugOpen }
         val tutorial = state.level == 1
+        // Подсказка проявляется, когда ребёнок замешкался, и гаснет от касания. Какой
+        // был последний шаг, помним отдельно: на угасании кольцо должно остаться на
+        // цели, а не пропасть кадром, когда шаг сменился на null.
+        var shownStep by remember { mutableStateOf<NextStep?>(null) }
+        if (hint != null) shownStep = hint
+        val wait = hint?.let { hintDelayMillis(it, state.level) }
+        var idle by remember { mutableStateOf(false) }
+        LaunchedEffect(touches, hint, wait) {
+            idle = false
+            if (wait == null) return@LaunchedEffect
+            delay(wait)
+            idle = true
+        }
+        val visible = hint != null && (wait == 0L || idle)
+        val visibility by animateFloatAsState(
+            targetValue = if (visible) 1f else 0f,
+            animationSpec = if (animations) tween(durationMillis = 300) else snap(),
+            label = "hintVisibility",
+        )
         NextStepOverlay(
-            step = hint,
+            step = if (visibility > 0f) shownStep else null,
             targets = hintTargets,
-            bubble = hint?.takeIf { tutorial }?.bubble(),
+            bubble = shownStep?.takeIf { tutorial }?.bubble(),
             spotlight = tutorial,
             animate = animations,
             burst = { burst.value },
+            hand = hintWithHand(state.level),
+            visibility = { visibility },
         )
 
         HeartBurstLayer(hearts)
@@ -969,6 +1068,69 @@ private fun HomeContent(
                         picked = null
                     },
                     onDismiss = { care = null; picked = null },
+                    // Окно покупки — тот же магазин в миниатюре (плейтест 28.09: еду покупали
+                    // двумя путями, и они выглядели как два разных магазина): те же плитки,
+                    // та же полоса «нужное» с остатком плана и кошелёк — комната под окном
+                    // приглушена, и сумма в углу главного читается плохо.
+                    tiles = true,
+                    header = {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.clearAndSetSemantics { contentDescription = "У тебя ${state.balance} финок" },
+                        ) {
+                            Text("У тебя", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
+                            CoinAmount(amount = state.balance)
+                        }
+                        CategoryBanner(Category.NEEDS, "Без этого Финни плохо", state.needsLeft)
+                    },
+                )
+            }
+        }
+
+        // Карточка сна поверх всего, как панель ухода: подложка приглушает комнату
+        // и закрывает карточку касанием мимо.
+        val card = dreamCard
+        if (card != null && sleeping) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(FinneyInk.copy(alpha = 0.45f))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClickLabel = "Закрыть",
+                        onClick = { dreamCard = null },
+                    )
+                    .systemBarsPadding()
+                    .padding(16.dp),
+                contentAlignment = Alignment.BottomCenter,
+            ) {
+                SleepCardPanel(
+                    petName = state.petName,
+                    card = card,
+                    picked = dreamPicked,
+                    cardsLeft = state.sleepCardsPerSleep - dreamsAsked,
+                    sleepGain = state.sleepPerCard,
+                    onPick = { word ->
+                        dreamPicked = word
+                        dreamsAsked++
+                        lastDream = card.termId
+                        onSleepCard(word == card.answer)
+                        if (word == card.answer) {
+                            sounds.play(Sfx.Correct)
+                            // Верно — над спящим всплывают сердечки, как когда его гладят.
+                            val pet = petBounds()
+                            val head = Offset(pet.center.x, pet.top + pet.height * 0.2f)
+                            repeat(3) { i -> hearts.emit(head + Offset((i - 1) * 40f, 0f), filled = true) }
+                        }
+                    },
+                    onNext = {
+                        dreamCard = sleepCard(state.glossary, Random, avoid = lastDream)
+                        dreamPicked = null
+                    },
+                    onClose = { dreamCard = null },
+                    modifier = Modifier.pointerInput(Unit) { detectTapGestures { } },
                 )
             }
         }
@@ -1459,125 +1621,6 @@ private fun HomeMenuItem(text: String, onClick: () -> Unit) {
         },
     )
 }
-
-/**
- * Деньги и вход в магазин одной кнопкой.
- *
- * Баланс и магазин объединены намеренно: ребёнок смотрит на сумму как раз
- * тогда, когда собирается что-то купить, и отдельный кружок «Магазин» внизу
- * после этого лишний. Сумма берётся из состояния и на экране не пересчитывается.
- *
- * Сама кнопка — монета-финка, круглая и того же размера, что «бургер» справа:
- * верхний ряд читается как три круга вокруг уровня. Сумма — плашкой в правом
- * нижнем углу монеты, как счётчик на значке: бежевая подложка, синяя обводка
- * и синий текст, как у плашек копилки и задания.
- */
-@Composable
-private fun MoneyButton(balance: Int, onClick: () -> Unit) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val pressed by interactionSource.collectIsPressedAsState()
-    val pressScale by animateFloatAsState(if (pressed) 0.92f else 1f, label = "coinPress")
-
-    // «Поп», когда монет стало больше: монета вздувается и пружинит обратно,
-    // над ней всплывает «+N». Какая сумма уже показана, помнит rememberSaveable:
-    // он переживает уход на другой экран, и вернувшись с мини-игры или итогов
-    // периода, ребёнок видит прибавку. При первом открытии и при тратах — без попа.
-    var shown by rememberSaveable { mutableStateOf<Int?>(null) }
-    val pop = remember { Animatable(1f) }
-    val rise = remember { Animatable(0f) }
-    var gain by remember { mutableIntStateOf(0) }
-    LaunchedEffect(balance) {
-        val before = shown
-        shown = balance
-        if (before == null || balance <= before) return@LaunchedEffect
-        gain = balance - before
-        rise.snapTo(0f)
-        // Без анимаций «поп» мелькнул бы кадром, а «+N» пропал бы сразу. Прибавку
-        // видно и так: «+N» стоит над монетой, пока шёл бы подъём.
-        if (!motionEnabled()) {
-            delay(1_100)
-            gain = 0
-            return@LaunchedEffect
-        }
-        launch {
-            pop.animateTo(1.35f, tween(durationMillis = 110))
-            pop.animateTo(1f, spring(dampingRatio = 0.35f, stiffness = Spring.StiffnessMedium))
-        }
-        rise.animateTo(1f, tween(durationMillis = 1100))
-        gain = 0
-    }
-    val scale = pressScale * pop.value
-
-    // Один контейнер размером с монету: плашка привязана к его правому нижнему
-    // углу и выходит за край смещением, поэтому ряд не раздвигается от длины суммы.
-    //
-    // Плашка и «+N» меряются без ограничения по ширине (wrapContentSize с unbounded):
-    // контейнер всего 56 dp, и раньше сумма от четырёх цифр в него не влезала —
-    // maxLines = 1 молча срезал хвост числа. Длинная сумма растёт влево, по монете.
-    // Предки кнопки не должны гасить её через graphicsLayer: alpha меньше 1 рисует
-    // слой вне экрана и обрезает всё, что вышло за контейнер, — так сумму и
-    // срезало во сне, когда верхний ряд приглушался.
-    Box(
-        modifier = Modifier
-            .size(MoneyCoinSize)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
-            .clearAndSetSemantics {
-                contentDescription = "$balance финок, открыть магазин"
-                role = Role.Button
-            },
-    ) {
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .clip(CircleShape)
-                .clickable(
-                    interactionSource = interactionSource,
-                    indication = null,
-                    onClick = onClick,
-                ),
-        ) {
-            Coin(size = MoneyCoinSize)
-        }
-        Text(
-            text = balance.toString(),
-            style = MaterialTheme.typography.titleMedium,
-            color = FinneyInk,
-            maxLines = 1,
-            softWrap = false,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .offset(x = 14.dp, y = 8.dp)
-                .wrapContentSize(Alignment.BottomEnd, unbounded = true)
-                .clip(RoundedCornerShape(percent = 50))
-                .background(FinneySand)
-                .border(StrokeThin, FinneyInk, RoundedCornerShape(percent = 50))
-                .clickable(onClick = onClick)
-                .padding(horizontal = 7.dp),
-        )
-        if (gain > 0) {
-            OutlinedText(
-                text = "+$gain",
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .offset(x = 24.dp, y = (-4).dp)
-                    .wrapContentSize(Alignment.TopStart, unbounded = true)
-                    .graphicsLayer {
-                        translationY = -rise.value * 28.dp.toPx()
-                        // Первую половину пути видна целиком, потом тает.
-                        alpha = (2f - rise.value * 2f).coerceIn(0f, 1f)
-                    }
-                    .clearAndSetSemantics { contentDescription = "Получено $gain финок" },
-            )
-        }
-    }
-}
-
-/** Монета того же размера, что «бургер» справа. */
-private val MoneyCoinSize = 56.dp
 
 /**
  * Уровень в полтора раза крупнее кнопок по краям верхнего ряда — вместе с кольцом

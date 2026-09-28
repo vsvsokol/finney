@@ -41,6 +41,14 @@ enum class Sfx(@RawRes val res: Int) {
     // Комната
     CapsuleDoor(R.raw.sfx_capsule_door),
     Ufo(R.raw.sfx_ufo),
+
+    // Игрушки: взял, уронил и у каждой своя встряска (см. toyShakeSound в ToyPlay.kt)
+    ToyPickup(R.raw.sfx_toy_pickup),
+    ToyDrop(R.raw.sfx_toy_drop),
+    ToyBounce(R.raw.sfx_toy_bounce),
+    ToySqueak(R.raw.sfx_toy_squeak),
+    ToyClick(R.raw.sfx_toy_click),
+    ToyRustle(R.raw.sfx_toy_rustle),
 }
 
 /**

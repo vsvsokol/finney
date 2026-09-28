@@ -22,6 +22,7 @@ import ru.finney.pet.domain.game.LevelCheck
 import ru.finney.pet.domain.game.PurchasePreview
 import ru.finney.pet.domain.game.Rejection
 import ru.finney.pet.domain.game.Session
+import ru.finney.pet.domain.model.GlossaryTerm
 import ru.finney.pet.domain.model.GameContent
 import ru.finney.pet.domain.model.GameState
 import ru.finney.pet.domain.model.PeriodPhase
@@ -108,6 +109,16 @@ sealed interface HomeUiState {
         val food: List<PurchasePreview>,
         /** Чем помыть: всё, что поднимает чистоту. */
         val care: List<PurchasePreview>,
+        /**
+         * Сколько на нужное осталось по плану — как в полосе магазина: окно покупки на кухне
+         * и в ванной — тот же магазин. null — плана ещё нет.
+         */
+        val needsLeft: Int? = null,
+        /** Справочник — для карточек во сне (SleepCards.kt). */
+        val glossary: List<GlossaryTerm> = emptyList(),
+        /** Сколько карточек сна-загадки за один сон и сколько сна даёт верный ответ — из economy.json. */
+        val sleepCardsPerSleep: Int = 5,
+        val sleepPerCard: Int = 15,
         /** Что надето сейчас — id аксессуара из магазина. */
         val worn: List<String> = emptyList(),
         /** Питомец спит; null — не спит. */
@@ -243,6 +254,11 @@ class HomeViewModel(
      * разбудило его перед командой (тогда `wake` отвечает NotAsleep). Итог в обоих
      * случаях считается от состояния до пробуждения.
      */
+    /** Ответ на карточку сна-загадки: верный — сон сразу прибавляется (Game.answerSleepCard). */
+    fun answerSleepCard(correct: Boolean) {
+        viewModelScope.launch { session.execute { answerSleepCard(it, correct) } }
+    }
+
     fun wake() {
         viewModelScope.launch {
             val before = session.activeGame.first()?.state?.takeIf { it.sleepingSince != null } ?: return@launch
@@ -298,6 +314,10 @@ class HomeViewModel(
             // предмета: добавят в контент новую еду — она появится на столе сама.
             food = previews(state) { it.effect.satiety > 0 },
             care = previews(state) { it.effect.hygiene > 0 },
+            glossary = content.glossary,
+            sleepCardsPerSleep = content.economy.sleepCards.maxPerSleep,
+            sleepPerCard = content.economy.sleepCards.energyPerCorrect,
+            needsLeft = game.planReport(state)?.let { (it.plan.needs - it.facts.needs).coerceAtLeast(0) },
             worn = state.worn,
             sleep = state.sleepingSince?.let { since ->
                 val endsAt = game.sleepEndsAt(state)!!

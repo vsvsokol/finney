@@ -113,7 +113,7 @@ private val Pictured = setOf(
     "remainder", "fact", "period", "reserve", "change", "receipt", "earned",
 )
 
-private fun hasPicture(id: String) = id in Pictured
+internal fun hasPicture(id: String) = id in Pictured
 
 /**
  * Рисунок к термину — то, что ребёнок видит в игре под этим словом:
@@ -121,7 +121,7 @@ private fun hasPicture(id: String) = id in Pictured
  * факт — полосы «собирался / потратил», запас — зонтик «на всякий случай».
  */
 @Composable
-private fun TermPicture(id: String) {
+internal fun TermPicture(id: String) {
     when (id) {
         "budget" -> Coins(count = 3)
         "balance" -> Coin(size = 48.dp)

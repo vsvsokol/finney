@@ -46,6 +46,7 @@ import ru.finney.pet.ui.theme.FinneyYellow
 fun SettingsScreen(
     onBack: () -> Unit,
     onOpenAdult: () -> Unit,
+    onOpenGlossary: () -> Unit,
     viewModel: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory),
 ) {
     val sounds = LocalSounds.current
@@ -65,6 +66,7 @@ fun SettingsScreen(
         onDemo = viewModel::setDemo,
         onBack = onBack,
         onOpenAdult = onOpenAdult,
+        onOpenGlossary = onOpenGlossary,
     )
 }
 
@@ -77,6 +79,7 @@ private fun SettingsContent(
     onMusic: (Boolean) -> Unit,
     onBack: () -> Unit,
     onOpenAdult: () -> Unit,
+    onOpenGlossary: () -> Unit = {},
     animations: Boolean = true,
     onAnimations: (Boolean) -> Unit = {},
     demo: Boolean? = null,
@@ -108,6 +111,17 @@ private fun SettingsContent(
             FinneyPanel(title = "Проверка") {
                 ToggleRow(if (on) "Демо: включено" else "Демо: выключено", on, onDemo, icon = FinneyIcons.Trophy)
             }
+        }
+
+        // Плейтест 28.09: справочник искали в настройках — «где объясняют слова».
+        // Из «Прогресса» он открывается по-прежнему, это второй вход.
+        FinneyPanel(title = "Справочник") {
+            Text(
+                "Что значат слова из игры: бюджет, план, копилка и другие.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = FinneyInk,
+            )
+            FinneyButton(text = "Открыть справочник", onClick = onOpenGlossary)
         }
 
         FinneyPanel(title = "Для взрослых") {

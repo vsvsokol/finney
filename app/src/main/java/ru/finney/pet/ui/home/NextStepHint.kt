@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -63,8 +64,14 @@ import ru.finney.pet.ui.theme.FinneyYellow
 //
 // На первом уровне это обучение: экран темнеет, светлой остаётся только цель,
 // и рядом пузырь с фразой. Затемнение нажатий тоже не ловит — ребёнок не заперт
-// в подсказке и может погладить питомца или открыть меню. Дальше — только кольцо
-// и рука: играющему уже не нужно, чтобы экран гас.
+// в подсказке и может погладить питомца или открыть меню.
+//
+// Дальше подсказка растворяется (плейтест 28.09: «постоянно показывают, что делать»):
+// со 2-го уровня она ждёт, пока ребёнок замешкается, и гаснет от любого касания,
+// с 4-го — ждёт дольше и приходит без руки, одним кольцом. Уровень и есть счётчик
+// минут: первый ~4 минуты, дальше по ~3, так что за первые 3–10 минут подсказка
+// уходит из виду у того, кто уже понял игру, и остаётся у того, кто застрял.
+// Сигналы «уровень можно завершить» и «выспался» — не обучение: они не ждут.
 //
 // Подсветка не только цветом (ТЗ п. 3.6): кольцо — форма, рука — направление,
 // нажатие и волна — движение. С выключенными анимациями (ТЗ п. 3.6) кольцо и рука
@@ -94,6 +101,20 @@ fun NextStep.bubble(): String = when (this) {
     NextStep.SAVE -> "Отложи в копилку"
 }
 
+/**
+ * Сколько ребёнок должен ничего не нажимать, чтобы пришла подсказка к [step] на уровне
+ * [level]. 0 — сразу и всегда. Правило растворения — в комментарии в начале файла.
+ */
+fun hintDelayMillis(step: NextStep, level: Int): Long = when {
+    step == NextStep.FINISH || step == NextStep.WAKE -> 0L
+    level <= 1 -> 0L
+    level <= 3 -> 6_000L
+    else -> 20_000L
+}
+
+/** Рука — пока учимся; дальше хватает кольца: куда нажать, играющий знает и так. */
+fun hintWithHand(level: Int): Boolean = level <= 3
+
 /** Зазор между целью и кольцом. */
 private val RingGap = 6.dp
 
@@ -113,6 +134,8 @@ private const val TapCycleMillis = 1_400
  * Слой подсказки. [step] — что подсветить, null — ничего. [bubble] — строка в пузыре
  * или null. [spotlight] — затемнить всё, кроме цели (обучение на первом уровне).
  * [animate] — выключенные анимации оставляют кольцо и руку на месте.
+ * [hand] — рисовать ли руку. [visibility] 0..1 — насколько подсказка проявлена:
+ * она приходит и уходит плавно (см. [hintDelayMillis]); вспышку уровня это не гасит.
  * [burst] 0..1 — вспышка у значка уровня, когда уровень стал готов к завершению.
  *
  * Анимация читается только при рисовании: кадры не пересобирают ни слой, ни главный экран.
@@ -126,6 +149,8 @@ fun NextStepOverlay(
     animate: Boolean,
     burst: () -> Float,
     modifier: Modifier = Modifier,
+    hand: Boolean = true,
+    visibility: () -> Float = { 1f },
 ) {
     var origin by remember { mutableStateOf(Offset.Zero) }
     val target = step?.let { targets.bounds[it] }?.translate(-origin)
@@ -144,15 +169,18 @@ fun NextStepOverlay(
             .fillMaxSize()
             .onGloballyPositioned { origin = it.positionInRoot() },
     ) {
+        // Вспышка — отдельным слоем: подсказку гасит простой, а вспышку гасить нечему.
         Canvas(Modifier.fillMaxSize()) {
-            if (target != null && spotlight) drawSpotlight(target)
             val b = burst()
             if (b > 0f && badge != null) drawBurst(badge, b)
+        }
+        Canvas(Modifier.fillMaxSize().graphicsLayer { alpha = visibility() }) {
             if (target == null) return@Canvas
+            if (spotlight) drawSpotlight(target)
             val tap = if (animate) TapPhase.at(cycle.value) else TapPhase.Still
             if (step == NextStep.FINISH) drawGlow(target, if (animate) 0.75f + 0.25f * (1f - tap.distance) else 1f)
             drawHintRing(target, tap.wave)
-            drawHand(target, tap)
+            if (hand) drawHand(target, tap)
         }
 
         if (target != null && bubble != null) {
@@ -176,6 +204,7 @@ fun NextStepOverlay(
                             placeable.place(IntOffset(x.roundToInt(), y.roundToInt()))
                         }
                     }
+                    .graphicsLayer { alpha = visibility() }
                     .clearAndSetSemantics { contentDescription = "Подсказка: $bubble" }
                     .background(FinneyCream, RoundedCornerShape(16.dp))
                     .border(2.dp, FinneyInk, RoundedCornerShape(16.dp))
