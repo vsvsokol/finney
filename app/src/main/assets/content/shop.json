@@ -11,5 +11,10 @@
   { "id": "toy_ball",    "label": "Мячик",       "price": 15, "category": "wants", "kind": "toy", "effect": { "mood": 10 } },
   { "id": "toy_book",    "label": "Книжка",      "price": 15, "category": "wants", "kind": "toy", "effect": { "mood": 10 } },
   { "id": "toy_blocks",  "label": "Конструктор", "price": 25, "category": "wants", "kind": "toy", "effect": { "mood": 15 } },
-  { "id": "toy_bear",    "label": "Мишка",       "price": 30, "category": "wants", "kind": "toy", "effect": { "mood": 15 } }
+  { "id": "toy_bear",    "label": "Мишка",       "price": 30, "category": "wants", "kind": "toy", "effect": { "mood": 15 } },
+  { "id": "toy_duck",    "label": "Уточка",      "price": 10, "category": "wants", "kind": "toy", "effect": { "mood": 10 } },
+  { "id": "toy_cube",    "label": "Кубик Рубика", "price": 20, "category": "wants", "kind": "toy", "effect": { "mood": 15 } },
+  { "id": "glasses_black",     "label": "Очки",           "price": 20, "category": "wants", "kind": "accessory", "slot": "eyes", "effect": { "mood": 15 } },
+  { "id": "glasses_star",      "label": "Очки-звёзды",    "price": 25, "category": "wants", "kind": "accessory", "slot": "eyes", "effect": { "mood": 20 } },
+  { "id": "glasses_pineapple", "label": "Очки-ананасы",   "price": 30, "category": "wants", "kind": "accessory", "slot": "eyes", "effect": { "mood": 25 } }
 ]

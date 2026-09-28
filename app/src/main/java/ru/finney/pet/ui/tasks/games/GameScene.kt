@@ -350,7 +350,7 @@ private fun Rain(amount: () -> Float) {
 internal val LocalPlayerBodyColor = staticCompositionLocalOf { BodyColor.A }
 
 /** Надетый аксессуар питомца игрока — тем же способом, что и цвет тела. */
-internal val LocalPlayerAccessory = staticCompositionLocalOf<String?> { null }
+internal val LocalPlayerAccessory = staticCompositionLocalOf<List<String>> { emptyList() }
 
 /** Питомец игрока в сцене: живой, дышит. */
 @Composable
@@ -359,7 +359,7 @@ internal fun ScenePet(character: PetCharacter, size: Dp, modifier: Modifier = Mo
     PetView(
         character = character,
         bodyColor = LocalPlayerBodyColor.current,
-        accessory = LocalPlayerAccessory.current,
+        accessories = LocalPlayerAccessory.current,
         mood = mood,
         pose = rememberPoseProvider(animation),
         modifier = modifier.widthIn(max = size).fillMaxWidth(),

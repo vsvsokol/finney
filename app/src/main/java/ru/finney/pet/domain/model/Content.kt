@@ -25,6 +25,16 @@ enum class ItemKind {
     @SerialName("toy") TOY,
 }
 
+/**
+ * Куда надевается аксессуар. Вещи из разных слотов носятся вместе — шляпа и очки, —
+ * а в одном слоте новая вещь сменяет прежнюю.
+ */
+@Serializable
+enum class AccessorySlot {
+    @SerialName("head") HEAD,
+    @SerialName("eyes") EYES,
+}
+
 /** Изменение шкал питомца. В снижении за период значения положительные и вычитаются. */
 @Serializable
 data class StatEffect(
@@ -42,6 +52,8 @@ data class ShopItem(
     val category: Category,
     val kind: ItemKind = ItemKind.CONSUMABLE,
     val effect: StatEffect = StatEffect(),
+    /** Только у аксессуара: куда он надевается. */
+    val slot: AccessorySlot = AccessorySlot.HEAD,
 )
 
 @Serializable

@@ -123,8 +123,10 @@ data class GameState(
     val periods: List<Period>,
     val ledger: List<LedgerEntry>,
     val attempts: List<TaskAttempt>,
-    /** Аксессуар, который сейчас на питомце. Только из купленных; null — ничего не надето. */
+    /** Что надето на голову (слот [AccessorySlot.HEAD]). Только из купленных; null — ничего. */
     val wornItemId: String? = null,
+    /** Что надето на глаза (слот [AccessorySlot.EYES]) — носится вместе со шляпой. База версии 11. */
+    val wornEyesId: String? = null,
     /** Когда питомец лёг спать, мс; null — не спит. Сколько он уже выспался — [ru.finney.pet.domain.game.Game.energyAt]. */
     val sleepingSince: Long? = null,
     /** Сколько настроения уже дала игра с игрушками в текущей сессии, см. [ru.finney.pet.domain.game.Game.play]. */
@@ -139,6 +141,9 @@ data class GameState(
     val totalSavings: Int get() = ledger.sumOf { it.savingsDelta }
 
     val points: Int get() = periods.sumOf { it.result?.points ?: 0 }
+
+    /** Всё, что сейчас на питомце: шляпа и очки. */
+    val worn: List<String> get() = listOfNotNull(wornItemId, wornEyesId)
 
     fun goalSaved(goalId: String): Int = ledger.filter { it.goalId == goalId }.sumOf { it.savingsDelta }
 

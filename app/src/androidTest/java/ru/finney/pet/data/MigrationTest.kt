@@ -193,4 +193,22 @@ class MigrationTest {
             }
         }
     }
+
+    @Test
+    fun migrate10To11KeepsHatAndAddsEmptyEyesSlot() {
+        helper.createDatabase(dbName, 10).use { db ->
+            db.execSQL(
+                "INSERT INTO profiles (id, petName, petCharacter, bodyColor, eyes, activeGoalId, isDemo, createdAt, wornItemId) " +
+                    "VALUES (1, 'Финни', 'PUSHISTIK', 'A', 'ROUND', NULL, 0, 1, 'hat_cowboy')",
+            )
+        }
+
+        helper.runMigrationsAndValidate(dbName, 11, true, FinneyDatabase.MIGRATION_10_11).use { db ->
+            db.query("SELECT wornItemId, wornEyesId FROM profiles WHERE id = 1").use { c ->
+                assertTrue(c.moveToFirst())
+                assertEquals("шляпа на месте", "hat_cowboy", c.getString(0))
+                assertTrue("очков у старого профиля нет", c.isNull(1))
+            }
+        }
+    }
 }

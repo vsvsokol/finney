@@ -4,6 +4,7 @@ import ru.finney.pet.domain.game.Game
 import ru.finney.pet.domain.game.GameResult
 import ru.finney.pet.domain.game.Rejection
 import ru.finney.pet.domain.game.TaskResult
+import ru.finney.pet.domain.model.AccessorySlot
 import ru.finney.pet.domain.model.Category
 import ru.finney.pet.domain.model.EconomyConfig
 import ru.finney.pet.domain.model.GameContent
@@ -66,6 +67,7 @@ object Fixtures {
         ShopItem("ball", "Мячик", 15, Category.WANTS, effect = StatEffect(mood = 30)),
         ShopItem("lamp", "Лампа", 25, Category.WANTS, effect = StatEffect(mood = 50)),
         ShopItem("hat", "Шапка", 30, Category.WANTS, ItemKind.ACCESSORY, StatEffect(mood = 20)),
+        ShopItem("glasses", "Очки", 10, Category.WANTS, ItemKind.ACCESSORY, StatEffect(mood = 10), AccessorySlot.EYES),
         ShopItem("teddy", "Мишка", 20, Category.WANTS, ItemKind.TOY, StatEffect(mood = 10)),
         // Награда за цель «Корона»: в магазине не продаётся.
         ShopItem("crown_hat", "Корона", 50, Category.WANTS, ItemKind.ACCESSORY, StatEffect(mood = 20)),

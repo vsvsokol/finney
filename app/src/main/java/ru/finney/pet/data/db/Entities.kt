@@ -30,6 +30,8 @@ data class ProfileEntity(
     val createdAt: Long,
     /** Надетый аксессуар. Колонка добавлена в версии 4 базы, см. [FinneyDatabase.MIGRATION_3_4]. */
     val wornItemId: String? = null,
+    /** Надетые очки — второй слот. Колонка добавлена в версии 11, см. [FinneyDatabase.MIGRATION_10_11]. */
+    val wornEyesId: String? = null,
 )
 
 @Entity(

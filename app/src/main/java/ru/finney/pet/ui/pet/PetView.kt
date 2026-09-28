@@ -42,9 +42,7 @@ import ru.finney.pet.domain.model.PetCharacter
 // Чем один питомец отличается от другого — только набором слоёв и точками
 // вращения: всё это в PetSkin, а сборка и анимация общие.
 //
-// Сейчас только обычный размер тела. Файлы стадий роста (_middle, _big) лежат в
-// design/exports/pet и в ресурсы пока не конвертируются: добавить стадию — это
-// параметр у Limb и у базового слоя плюс строка в tools/split_pet_base.py.
+// Стадии роста — масштаб всего питомца от ступней, см. PetGrowth.kt.
 
 /** Мгновенное положение всех частей. Анимации только заполняют эту структуру. */
 data class PetPose(
@@ -80,11 +78,16 @@ fun PetView(
     pose: () -> PetPose,
     modifier: Modifier = Modifier,
     bodyColor: BodyColor = BodyColor.A,
-    /** Надетый аксессуар — id из магазина. Двигается вместе с питомцем: лежит внутри позы. */
-    accessory: String? = null,
+    /** Надетое — id из магазина: шляпа и очки. Двигается вместе с питомцем: лежит внутри позы. */
+    accessories: List<String> = emptyList(),
+    /** Стадия роста = уровень: с ней растут туловище, руки и ноги ([lookFor]). Без стадии — как нарисован. */
+    stage: Int = 1,
 ) {
     val skin = character.skin
     val tint = bodyColor.colorFilter
+    val look = lookFor(stage)
+    val body = skin.bodies[look - 1]
+    val lift = skin.headLift(stage)
     Box(
         modifier = modifier
             .aspectRatio(1f)
@@ -97,10 +100,19 @@ fun PetView(
                 transformOrigin = skin.ground
             },
     ) {
-        Limb(skin.leftLeg, skin.leftLegPivot, tint) { pose().leftLeg }
-        Limb(skin.rightLeg, skin.rightLegPivot, tint) { pose().rightLeg }
-        Limb(skin.leftHand, skin.leftHandPivot, tint) { pose().leftHand }
-        Limb(skin.rightHand, skin.rightHandPivot, tint) { pose().rightHand }
+        Image(
+            painter = painterResource(body.torso),
+            contentDescription = null,
+            colorFilter = tint,
+            modifier = Modifier.matchParentSize(),
+        )
+        Limb(body.leftLeg, skin.grownPivot(skin.leftLegPivot, look), tint) { pose().leftLeg }
+        Limb(body.rightLeg, skin.grownPivot(skin.rightLegPivot, look), tint) { pose().rightLeg }
+        Limb(body.leftHand, skin.grownPivot(skin.leftHandPivot, look), tint) { pose().leftHand }
+        Limb(body.rightHand, skin.grownPivot(skin.rightHandPivot, look), tint) { pose().rightHand }
+
+        // Голова с лицом и тем, что на ней надето, — поднята на подросшее туловище.
+        Box(modifier = Modifier.matchParentSize().graphicsLayer { translationY = -size.height * lift }) {
 
         Crossfade(
             targetState = skin.face(mood),
@@ -146,13 +158,15 @@ fun PetView(
             )
         }
 
-        accessory?.let(::accessoryArt)?.let { art ->
+        // Очки раньше шляпы: поля шляпы и листья ананаса ложатся поверх оправы, а не под неё.
+        accessories.mapNotNull(::accessoryArt).sortedBy { !it.onEyes }.forEach { art ->
             Image(
                 painter = painterResource(art.res),
                 contentDescription = null,
                 contentScale = ContentScale.FillWidth,
-                modifier = Modifier.hatPlacement(skin.hat, art.brim),
+                modifier = if (art.onEyes) Modifier.glassesPlacement(skin, art) else Modifier.hatPlacement(skin.hat, art.brim),
             )
+        }
         }
     }
 }

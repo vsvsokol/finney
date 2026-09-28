@@ -109,7 +109,7 @@ sealed interface HomeUiState {
         /** Чем помыть: всё, что поднимает чистоту. */
         val care: List<PurchasePreview>,
         /** Что надето сейчас — id аксессуара из магазина. */
-        val worn: String? = null,
+        val worn: List<String> = emptyList(),
         /** Питомец спит; null — не спит. */
         val sleep: SleepInfo? = null,
         /** Купленные игрушки — id из магазина. Лежат на полу в зале. */
@@ -298,7 +298,7 @@ class HomeViewModel(
             // предмета: добавят в контент новую еду — она появится на столе сама.
             food = previews(state) { it.effect.satiety > 0 },
             care = previews(state) { it.effect.hygiene > 0 },
-            worn = state.wornItemId,
+            worn = state.worn,
             sleep = state.sleepingSince?.let { since ->
                 val endsAt = game.sleepEndsAt(state)!!
                 val threshold = content.economy.pet.needsThreshold
