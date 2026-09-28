@@ -44,6 +44,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import ru.finney.pet.domain.model.BodyColor
 import ru.finney.pet.domain.model.PetCharacter
 import ru.finney.pet.domain.profile.PetNameError
+import ru.finney.pet.ui.components.ChargeButton
 import ru.finney.pet.ui.components.FinneyButton
 import ru.finney.pet.ui.components.FinneyTextField
 import ru.finney.pet.ui.components.FinneyScreen
@@ -150,11 +151,19 @@ private fun PetSetupContent(
             onNameChange = onNameChange,
         )
 
-        FinneyButton(
-            text = if (state.isEditing) "Сохранить" else "Начать игру",
-            onClick = onSave,
-            enabled = !state.isSaving && !state.isLoading,
-        )
+        // «Начать игру» заряжается — начало игры бывает один раз и должно ощущаться.
+        // С неверным именем заряжать нечего: обычное нажатие сразу покажет ошибку.
+        // «Сохранить» в настройке — обычная кнопка, её жмут по делу.
+        val canSave = !state.isSaving && !state.isLoading
+        if (!state.isEditing && state.nameValid) {
+            ChargeButton(text = "Начать игру", onCharged = onSave, enabled = canSave)
+        } else {
+            FinneyButton(
+                text = if (state.isEditing) "Сохранить" else "Начать игру",
+                onClick = onSave,
+                enabled = canSave,
+            )
+        }
     }
 }
 

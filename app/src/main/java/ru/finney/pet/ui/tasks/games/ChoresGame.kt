@@ -72,7 +72,7 @@ internal fun ChoresGame(task: ChoresTask, character: PetCharacter, onClose: () -
     fun canAdd(chore: Chore) = TaskEngines.choreOpen(chore, selected) && chore.hours <= freeToday &&
         (chore.maxTimes == null || (times[chore.id] ?: 0) < chore.maxTimes)
 
-    GameScene(backdrop = Backdrop.ROOM, onClose = onClose) {
+    GameScene(backdrop = Backdrop.DOTS, onClose = onClose) {
         SceneBody(
             bottom = {
                 FinneyButton(text = "Готово", onClick = { onSubmit(TaskInput.Schedule(week)) })

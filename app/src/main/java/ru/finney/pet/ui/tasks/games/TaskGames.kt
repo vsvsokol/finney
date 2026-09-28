@@ -88,13 +88,13 @@ fun TaskGame(
 
 /** Сцена задания — и на вступлении, и в итоге. Лавка в итоге уже вечерняя. */
 fun backdropFor(task: TaskDefinition, finished: Boolean = false): Backdrop = when (task) {
-    is SorterTask -> Backdrop.ROOM
+    is SorterTask -> Backdrop.DOTS
     is BasketTask -> Backdrop.SHOP
     is GoalRaceTask -> Backdrop.FIELD
-    is ReserveTask -> if (finished) Backdrop.ROOM_RAIN else Backdrop.ROOM
+    is ReserveTask -> if (finished) Backdrop.DOTS_RAIN else Backdrop.DOTS
     is StandTask -> if (finished) Backdrop.SUNSET else Backdrop.SKY
     is ChangeTask, is ReceiptTask -> Backdrop.STORE
-    is ChoresTask, is DistributorTask, is GoalSliderTask -> Backdrop.ROOM
+    is ChoresTask, is DistributorTask, is GoalSliderTask -> Backdrop.DOTS
 }
 
 /** Значок задания — берётся из самого контента, отдельной картинки не нужно. */

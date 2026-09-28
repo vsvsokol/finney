@@ -38,6 +38,17 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import ru.finney.pet.R
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import ru.finney.pet.ui.theme.StrokeRegular
 import ru.finney.pet.ui.components.HeartIcon
 import ru.finney.pet.ui.theme.FinneyCream
 import ru.finney.pet.ui.theme.FinneyInk
@@ -114,31 +125,71 @@ fun HeartBurstLayer(burst: HeartBurst) {
 }
 
 /**
- * Подсказка к шкале настроения — картинками, без слов: игрушка, конфета, шляпа
- * поднимают сердечко. Это ровно то, что растит настроение в игре: игра с игрушкой,
- * «хочется» из магазина и шляпы (покупка и цель).
+ * Подсказка к шкале радости: игрушка, конфета, шляпа поднимают сердечко. Это ровно
+ * то, что растит радость в игре: игра с игрушкой, «хочется» из магазина и шляпы
+ * (покупка и цель). Зачем радость нужна, здесь не пишем: бонус за неё ещё не решён.
+ *
+ * Плейтест 28.09: «вылезает плашка, из которой ничего не понятно» — картинки были
+ * мелкие, стрелки тонкие, и плашка сама пропадала через 5 секунд, пока ребёнок
+ * разглядывал. Теперь картинки крупнее, сверху подпись одной строкой, и плашка
+ * висит, пока её не закроют крестиком или касанием мимо (ТЗ п. 8.1 — не торопить).
  */
 @Composable
-fun MoodHint(modifier: Modifier = Modifier) {
-    Row(
+fun MoodHint(onClose: () -> Unit, modifier: Modifier = Modifier) {
+    Column(
         modifier = modifier
+            // По ширине картинок: иначе строка с крестиком растягивала плашку за край экрана.
+            .width(IntrinsicSize.Max)
             .clip(RoundedCornerShape(20.dp))
             .background(FinneyCream)
-            .border(2.dp, FinneyInk, RoundedCornerShape(20.dp))
-            .padding(horizontal = 10.dp, vertical = 8.dp)
-            .clearAndSetSemantics {
-                contentDescription = "Настроение поднимают игрушки, сладости и шляпы"
-            },
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+            .border(StrokeRegular, FinneyInk, RoundedCornerShape(20.dp))
+            .padding(start = 12.dp, bottom = 10.dp),
     ) {
-        for (art in listOf(R.drawable.item_toy_ball, R.drawable.item_treat_candy, R.drawable.acc_hat_cowboy)) {
-            Image(painter = painterResource(art), contentDescription = null, modifier = Modifier.size(34.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "Радость поднимают:",
+                style = MaterialTheme.typography.titleMedium,
+                color = FinneyInk,
+                maxLines = 1,
+                modifier = Modifier.semantics { heading() },
+            )
+            Spacer(Modifier.weight(1f))
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(48.dp)
+                    .clickable(onClickLabel = "Закрыть подсказку", role = Role.Button, onClick = onClose)
+                    .semantics { contentDescription = "Закрыть подсказку" },
+            ) {
+                Text("✕", style = MaterialTheme.typography.titleLarge, color = FinneyInk)
+            }
         }
-        Text("→", style = MaterialTheme.typography.titleLarge, color = FinneyInk)
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("↑", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
-            HeartIcon(filled = true, size = 30.dp)
+        Row(
+            modifier = Modifier
+                .padding(end = 12.dp)
+                .clearAndSetSemantics { contentDescription = "игрушки, сладости и шляпы поднимают радость" },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            for (art in listOf(R.drawable.item_toy_ball, R.drawable.item_treat_candy, R.drawable.acc_hat_cowboy)) {
+                Image(painter = painterResource(art), contentDescription = null, modifier = Modifier.size(48.dp))
+            }
+            ThickArrow(Modifier.size(28.dp))
+            HeartIcon(filled = true, size = 44.dp)
+            ThickArrow(Modifier.size(24.dp).rotate(-90f))
         }
+    }
+}
+
+/** Стрелка вправо толстой чертой, а не «→» шрифта: у Glina она тонкая и терялась. */
+@Composable
+private fun ThickArrow(modifier: Modifier) {
+    Canvas(modifier) {
+        val w = 4.dp.toPx()
+        val y = size.height / 2
+        val head = size.height * 0.35f
+        drawLine(FinneyInk, Offset(w / 2, y), Offset(size.width - w / 2, y), w, StrokeCap.Round)
+        drawLine(FinneyInk, Offset(size.width - head, y - head), Offset(size.width - w / 2, y), w, StrokeCap.Round)
+        drawLine(FinneyInk, Offset(size.width - head, y + head), Offset(size.width - w / 2, y), w, StrokeCap.Round)
     }
 }

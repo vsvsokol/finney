@@ -38,6 +38,16 @@
 | Сдача (`change`) | две монеты | монеты в ладошке или над кассой | `ic_glossary_change.png` | 256 × 256 | низкий |
 | Уровень (`period`) | значок уровня «2» | не нужен — значок и так с главного | — | — | — |
 
+## Звуки
+
+Звука, которого нет в `res/raw`, код не ждёт: играет похожий из тех, что есть (`ui/sound/Sfx.kt`).
+Имена и формат — [design/exports/sounds/README.md](../design/exports/sounds/README.md).
+
+| Где | Что нужно | Сейчас | Имя файла | Приоритет |
+|---|---|---|---|---|
+| «Начать игру», зарядка (`ui/components/ChargeButton.kt`) | нарастающий гул или «вжух», около 0,8 с — в тон с кольцом | щелчок `sfx_ui_tap`, повторённый с растущим тоном | `sfx_ui_charge.ogg` | средний |
+| «Начать игру», вспышка на полном заряде | короткий яркий аккорд «поехали» | `sfx_level_up` — тот же, что при переходе на уровень | `sfx_game_start.ogg` | средний |
+
 ## Служебные знаки — не ассеты
 
 Это символы шрифта. Они читаются как текст и в TalkBack, а их смысл всегда продублирован
@@ -53,6 +63,6 @@
 | ! | `Gauge.kt` (`AlertBadge`), `ReserveGame.kt` | не хватает, перебор | — |
 | − + | `HoldRepeat.kt`, `ChoresGame.kt`, `TaskGames.kt` | убавить, прибавить, приход и расход | `ic_minus`, `ic_plus` |
 | ↺ | `BudgetScreen.kt`, `PeriodResultScreen.kt` | попробуй ещё раз | — |
-| ← → ↑ ↓ | `ShoppingGame.kt`, `StandGame.kt`, `ToyPlay.kt`, `CarePanel.kt`, `GameParts.kt` (`BouncingArrow`), `SavingsButtons.kt` | направление, «превращается в» | `ic_back` для ← |
+| ← → ↑ ↓ | `ShoppingGame.kt`, `StandGame.kt`, `CarePanel.kt`, `GameParts.kt` (`BouncingArrow`), `SavingsButtons.kt` | направление, «превращается в» | `ic_back` для ← |
 | × ≈ | `AdultScreen.kt`, `StandGame.kt`, `ReceiptGame.kt`, `ChoresGame.kt`, `SimpleGames.kt` | умножение, количество | — |
 | ♥ | `GoalRaceGame.kt` — «+♥» / «−♥» на кнопках соблазна | настроение | — (сердце уже есть в `HeartIcon.kt`) |

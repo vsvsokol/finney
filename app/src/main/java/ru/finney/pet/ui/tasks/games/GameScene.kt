@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.semantics.contentDescription
@@ -58,6 +59,8 @@ import ru.finney.pet.domain.model.PetCharacter
 import ru.finney.pet.ui.components.Coin
 import ru.finney.pet.ui.components.CoinAmount
 import ru.finney.pet.ui.components.FinneyIconButton
+import ru.finney.pet.ui.components.MenuBackdrop
+import ru.finney.pet.ui.components.menuBackdrop
 import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.components.fadingScroll
 import ru.finney.pet.ui.sound.Sfx
@@ -66,20 +69,23 @@ import ru.finney.pet.ui.pet.PetPose
 import ru.finney.pet.ui.pet.PetView
 import ru.finney.pet.ui.pet.rememberPetAnimation
 import ru.finney.pet.ui.pet.rememberPoseProvider
-import ru.finney.pet.ui.room.RoomScene
-import ru.finney.pet.ui.room.RoomSpot
+import ru.finney.pet.ui.theme.FinneyBlue
 import ru.finney.pet.ui.theme.FinneyCream
 import ru.finney.pet.ui.theme.FinneyGreen
 import ru.finney.pet.ui.theme.FinneyInk
+import ru.finney.pet.ui.theme.FinneyPeach
 import ru.finney.pet.ui.theme.FinneyYellow
 import ru.finney.pet.ui.theme.StrokeRegular
 
 // Сцена мини-игры, как в концептах: игра идёт не на пустом экране, а в месте —
-// в комнате Финни, в магазине, на поле, у лавки. Сверху деньги и крестик,
+// на спокойном фоне с точками, в магазине, на поле, у лавки. Сверху деньги и крестик,
 // поверх фона — сама игра, питомец и его реплики.
 
-/** Где идёт игра. Комнаты — настоящая комната с главного экрана, остальное нарисовано кодом. */
-enum class Backdrop { ROOM, ROOM_RAIN, SHOP, FIELD, SKY, SUNSET, STORE }
+/**
+ * Где идёт игра. Всё нарисовано кодом. [DOTS] — кремовый с точками, как у экранов-дел:
+ * раньше здесь стояла комната с главного, и на плейтесте (28.09) она отвлекала от игры.
+ */
+enum class Backdrop { DOTS, DOTS_RAIN, SHOP, FIELD, SKY, SUNSET, STORE }
 
 /**
  * Экран игры: фон, верхняя полоса и содержимое.
@@ -121,10 +127,9 @@ internal fun GameScene(
 
 /**
  * Один фон на всё задание: вступление, игру и итог. Раньше каждый экран рисовал
- * фон заново, и при переходе комната начинала жить с начала — облака за окном
- * отскакивали назад, НЛО вылетало снова, — а лавка из полудня рывком
+ * фон заново, и при переходе фон начинал жить с начала, а лавка из полудня рывком
  * становилась закатом. Теперь фон живёт, пока открыто задание, и меняется плавно:
- * в комнате начинается дождь, над лавкой садится солнце.
+ * начинается дождь, над лавкой садится солнце.
  */
 @Composable
 internal fun SceneStage(initial: Backdrop, content: @Composable () -> Unit) {
@@ -201,20 +206,19 @@ private fun MoneyPill(amount: Int, modifier: Modifier = Modifier) {
 }
 
 /**
- * Фон. Дождь и закат — не отдельные картинки, а состояние той же комнаты и того
- * же луга: они наступают постепенно, и комната при этом не пересоздаётся.
+ * Фон. Дождь и закат — не отдельные картинки, а состояние того же фона и того
+ * же луга: они наступают постепенно, и фон при этом не пересоздаётся.
  */
 @Composable
 private fun BackdropLayer(backdrop: Backdrop) {
-    val rain = animateFloatAsState(if (backdrop == Backdrop.ROOM_RAIN) 1f else 0f, tween(RAIN_MS), label = "rain")
+    val rain = animateFloatAsState(if (backdrop == Backdrop.DOTS_RAIN) 1f else 0f, tween(RAIN_MS), label = "rain")
     val dusk = animateFloatAsState(
         if (backdrop == Backdrop.SUNSET) 1f else 0f,
         tween(DUSK_MS, easing = FastOutSlowInEasing),
         label = "dusk",
     )
     when (backdrop) {
-        Backdrop.ROOM, Backdrop.ROOM_RAIN -> Box(Modifier.fillMaxSize()) {
-            RoomScene(spot = RoomSpot.LIVING, capsule = false, modifier = Modifier.fillMaxSize())
+        Backdrop.DOTS, Backdrop.DOTS_RAIN -> Box(Modifier.fillMaxSize().menuBackdrop(MenuBackdrop.DOTS)) {
             Rain { rain.value }
         }
         // Пол — под нижней полкой: полки прижаты к тележке, и стеллаж стоит на полу.
@@ -230,26 +234,51 @@ private fun BackdropLayer(backdrop: Backdrop) {
 }
 
 /**
- * Луг у лавки. [dusk] 0 — полдень, 1 — закат: небо розовеет, солнце опускается
- * и уходит за траву. Читается только на отрисовке — закат не пересобирает экран.
+ * Луг у лавки. [dusk] 0 — полдень, 1 — вечер: небо теплеет до золотистого, солнце
+ * опускается, желтеет в персиковый и уходит за траву. Читается только на
+ * отрисовке — закат не пересобирает экран.
+ *
+ * Небо только из палитры — голубое днём, вечером жёлтое пополам с кремовым: чистый
+ * кремовый сливался бы с панелями итога. Раньше оно уходило в
+ * красно-персиковый, и на плейтесте (28.09) «красное небо, зелёная трава и солнце»
+ * смотрелись странно. Облака — белые с обводкой, как всё в игре; у солнца
+ * (у всех лавок в прогнозе жарко или тепло) они не заслоняют.
  */
 @Composable
 private fun Meadow(dusk: () -> Float) {
     Canvas(Modifier.fillMaxSize()) {
         val t = dusk()
         val horizon = size.height * HORIZON_AT
-        // Небо через золотистый: напрямую голубой в персиковый проходил через серый.
-        val sky = if (t < 0.5f) lerp(Color(0xFF9CCBF0), Color(0xFFF6D9A0), t * 2) else lerp(Color(0xFFF6D9A0), Color(0xFFF4A98E), t * 2 - 1)
+        val sky = if (t < 0.5f) lerp(SkyNoon, FinneyCream, t * 2) else lerp(FinneyCream, SkyEvening, t * 2 - 1)
         drawRect(sky, size = size.copy(height = horizon))
+        // Облака встают из-за луга, низом в траву: выше они налезали на заголовки
+        // панелей, а из-под утренней панели торчали обрывками.
+        cloud(Offset(size.width * 0.14f, horizon - 10.dp.toPx()), 1f)
+        cloud(Offset(size.width * 0.5f, horizon - 6.dp.toPx()), 0.7f)
         // Солнце до травы: садясь, оно прячется за горизонт, а не ложится поверх луга.
         val c = Offset(size.width * 0.84f, lerp(size.height * 0.16f, horizon - 8.dp.toPx(), t))
-        val sun = lerp(FinneyYellow, Color(0xFFF7A35C), t)
+        val sun = lerp(FinneyYellow, FinneyPeach, t)
         drawCircle(sun.copy(alpha = 0.5f), 42.dp.toPx(), c)
         drawCircle(FinneyInk, 32.dp.toPx(), c)
         drawCircle(sun, 28.dp.toPx(), c)
         drawRect(lerp(FinneyGreen, Color(0xFF6FB679), t), topLeft = Offset(0f, horizon), size = size.copy(height = size.height - horizon))
     }
 }
+
+/** Облако из трёх кругов: сначала обводка всех, потом заливка — контур общий, без швов внутри. */
+private fun DrawScope.cloud(center: Offset, scale: Float) {
+    val r = 22.dp.toPx() * scale
+    val stroke = 4.dp.toPx() * scale
+    val puffs = listOf(Offset(-r * 1.1f, r * 0.25f) to r * 0.8f, Offset(0f, 0f) to r, Offset(r * 1.1f, r * 0.3f) to r * 0.7f)
+    puffs.forEach { (o, rr) -> drawCircle(FinneyInk, rr + stroke, center + o) }
+    puffs.forEach { (o, rr) -> drawCircle(Color.White, rr, center + o) }
+}
+
+/** Небо в полдень — светлый тон голубого из палитры (#67A6DC). */
+private val SkyNoon = Color(0xFF9CCBF0)
+
+/** Вечернее небо — жёлтый #F7DC8B пополам с кремовым #FFEDCD. */
+private val SkyEvening = lerp(FinneyYellow, FinneyCream, 0.5f)
 
 /** Линия горизонта на лугу — доля высоты. */
 private const val HORIZON_AT = 0.58f
@@ -284,7 +313,9 @@ private fun Split(top: Color, bottom: Color, at: Float, dots: Boolean, desk: Boo
 }
 
 /**
- * Дождь за окном и в комнате: косые светлые штрихи и лёгкая синева. Без анимации — не отвлекает.
+ * Дождь: косые голубые штрихи и лёгкая синева поверх кремового. Белые штрихи и тень ink
+ * были под комнату — на кремовом белое не видно, а ink делал фон грязно-серым.
+ * Без анимации — не отвлекает.
  * [amount] 0…1 — насколько он уже начался; 0 — дождя нет.
  */
 @Composable
@@ -292,7 +323,7 @@ private fun Rain(amount: () -> Float) {
     Canvas(Modifier.fillMaxSize()) {
         val a = amount()
         if (a <= 0f) return@Canvas
-        drawRect(FinneyInk.copy(alpha = 0.25f * a))
+        drawRect(FinneyBlue.copy(alpha = 0.15f * a))
         val step = 40.dp.toPx()
         val len = 60.dp.toPx()
         var x = -size.height
@@ -300,7 +331,7 @@ private fun Rain(amount: () -> Float) {
             var y = 0f
             while (y < size.height) {
                 drawLine(
-                    Color.White.copy(alpha = 0.5f * a),
+                    FinneyBlue.copy(alpha = 0.55f * a),
                     Offset(x + y * 0.27f, y),
                     Offset(x + (y + len) * 0.27f, y + len),
                     strokeWidth = 2.dp.toPx(),

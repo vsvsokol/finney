@@ -35,6 +35,9 @@ data class PetSetupUiState(
     val isSaving: Boolean = false,
 ) {
     val maxNameLength: Int get() = ProfileRules.PET_NAME_MAX_LENGTH
+
+    /** Имя пройдёт проверку при сохранении — кнопке можно заряжаться. */
+    val nameValid: Boolean get() = ProfileRules.normalizeName(name) is ProfileRules.Result.Valid
 }
 
 sealed interface PetSetupEvent {

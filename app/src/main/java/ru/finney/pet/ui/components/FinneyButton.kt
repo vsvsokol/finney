@@ -164,6 +164,8 @@ private val BackLabels = setOf("Назад", "Закрыть", "Отмена", "
  * [sound] — щелчок при нажатии; у «Назад» и «Закрыть» по умолчанию свой.
  * [icon] — значок перед надписью: копилка на «В копилку». Надпись всё равно
  * обязательна — значок подсказывает, а смысл несут слова.
+ * [sound] null и свой [interactionSource] — для [ChargeButton]: звук и отклик на
+ * палец у неё свои.
  */
 @Composable
 fun FinneyButton(
@@ -172,11 +174,12 @@ fun FinneyButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     fillWidth: Boolean = true,
-    sound: Sfx = if (text in BackLabels) Sfx.Back else Sfx.Tap,
+    sound: Sfx? = if (text in BackLabels) Sfx.Back else Sfx.Tap,
     icon: (@Composable () -> Unit)? = null,
+    interactionSource: MutableInteractionSource? = null,
 ) {
     val sounds = LocalSounds.current
-    val interactionSource = remember { MutableInteractionSource() }
+    val interactionSource = interactionSource ?: remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
     val shape = RoundedCornerShape(percent = 50)
     val scale by animateFloatAsState(
@@ -187,7 +190,7 @@ fun FinneyButton(
 
     Surface(
         onClick = {
-            sounds.play(sound)
+            sound?.let(sounds::play)
             onClick()
         },
         modifier = modifier
