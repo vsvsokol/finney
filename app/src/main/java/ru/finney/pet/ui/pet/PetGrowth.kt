@@ -30,7 +30,17 @@ fun torsoScale(look: Int): Float = when (look) {
  * На сколько поднять голову в облике — доля стороны. Туловище растёт от ступней, и место,
  * где на нём лежит низ головы ([PetSkin.neck]), поднимается на столько же.
  */
-fun PetSkin.headLift(stage: Int): Float = (ground.pivotFractionY - neck) * (torsoScale(lookFor(stage)) - 1f)
+fun PetSkin.headLift(stage: Int): Float {
+    val look = lookFor(stage)
+    val lift = (ground.pivotFractionY - neck) * (torsoScale(look) - 1f)
+    return if (look == 3) (lift - ADULT_HEAD_DROP).coerceAtLeast(0f) else lift
+}
+
+/**
+ * У взрослого облика голова ниже расчётной — доля стороны (160 px холста 2200).
+ * По расчёту от шеи между подбородком и туловищем оставался разрез; подобрано на глаз.
+ */
+private const val ADULT_HEAD_DROP = 160f / 2200f
 
 /** Точка вращения конечности в увеличенном облике: слой растёт от ступней. */
 internal fun PetSkin.grownPivot(pivot: TransformOrigin, look: Int): TransformOrigin {
