@@ -239,7 +239,7 @@ private fun TaskResultScene(state: TaskUiState.Ready, onReplay: () -> Unit, onDo
                     modifier = Modifier.fillMaxWidth(),
                     badge = { if (success) CheckBadge(size = 44.dp) else AlertBadge(size = 44.dp) },
                 ) {
-                    ResultBody(state.task, result.details, result.input)
+                    ResultBody(state.task, result.details, result.input, result.bonus)
                 }
                 RewardChip(
                     result.reward,

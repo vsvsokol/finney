@@ -32,8 +32,11 @@ import ru.finney.pet.domain.tasks.TaskInputError
 /** Вступление → игра → итог. Итог показывается при любом исходе (ТЗ п. 2.5.8). */
 enum class TaskPhase { INTRO, PLAY, RESULT }
 
-/** [input] — ответ ребёнка: итог показывает по нему, что взято в корзину, какие монеты дал. */
-data class TaskOutcomeUi(val outcome: TaskOutcome, val details: TaskDetails, val reward: Int, val input: TaskInput)
+/**
+ * [input] — ответ ребёнка: итог показывает по нему, что взято в корзину, какие монеты дал.
+ * [bonus] — часть [reward] за бонус движка: итог называет, за что он, а не прибавляет молча.
+ */
+data class TaskOutcomeUi(val outcome: TaskOutcome, val details: TaskDetails, val reward: Int, val input: TaskInput, val bonus: Int = 0)
 
 sealed interface TaskUiState {
     data object Loading : TaskUiState
@@ -106,7 +109,7 @@ class TaskViewModel(
                 is TaskResult.Submitted -> local.update {
                     it.copy(
                         phase = TaskPhase.RESULT,
-                        result = TaskOutcomeUi(r.outcome, r.details, r.reward, input),
+                        result = TaskOutcomeUi(r.outcome, r.details, r.reward, input, r.bonus),
                         inputError = null,
                         submitting = false,
                     )

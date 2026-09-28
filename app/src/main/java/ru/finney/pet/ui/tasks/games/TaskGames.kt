@@ -143,10 +143,10 @@ private fun ItemArt.pictureKey(): String? = art ?: emoji
  *
  * Удачное здесь тихое, а неудачное заметное — см. [ResultRow]: ребёнок сразу
  * видит, где ошибся, а не читает все строки подряд. Итоговые числа «3 из 4» —
- * с полосой рядом ([ScoreLine]).
+ * с полосой рядом ([ScoreLine]). [bonus] — часть награды за бонус движка, число из ядра.
  */
 @Composable
-fun ColumnScope.ResultBody(task: TaskDefinition, details: TaskDetails, input: TaskInput) {
+fun ColumnScope.ResultBody(task: TaskDefinition, details: TaskDetails, input: TaskInput, bonus: Int = 0) {
     when (details) {
         is TaskDetails.Sorting -> {
             val items = (task as? SorterTask)?.items.orEmpty().associateBy { it.id }
@@ -196,6 +196,16 @@ fun ColumnScope.ResultBody(task: TaskDefinition, details: TaskDetails, input: Ta
 
         is TaskDetails.Reserve -> {
             val reserve = task as? ReserveTask
+            // Сначала то, из-за чего «почти», потом суммы: причину видно сразу, её не ищут.
+            if (details.keptWants == 0) ResultRow(null, "Неделя без радостей", ok = false)
+            if (details.shortage > 0) ResultRow(null, "Запаса не хватило ${details.shortage}", ok = false)
+            if (details.droppedNeeds > 0) ResultRow(null, "Пришлось перенести нужное", ok = false)
+            if (details.droppedWants > 0) ResultRow(null, "Пришлось отменить желаемое", ok = false)
+            val dropped = (input as? TaskInput.Reserve)?.dropped.orEmpty()
+            reserve?.spendings?.filter { it.id in dropped }?.forEach { ResultRow(it, "${it.label} — перенесли", ok = false) }
+            // Без радостей в плане запас хватает сам собой — зелёная строка выглядела бы победой.
+            if (details.shortage == 0 && details.keptWants > 0) ResultRow(null, "Запаса хватило", ok = true)
+            if (bonus > 0) SumRow("Запас на всё непредвиденное", "+$bonus")
             reserve?.let {
                 // Хватило ли запаса на непредвиденное — полосой: запас против того, что понадобилось.
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -207,10 +217,6 @@ fun ColumnScope.ResultBody(task: TaskDefinition, details: TaskDetails, input: Ta
                     }
                 }
             }
-            val dropped = (input as? TaskInput.Reserve)?.dropped.orEmpty()
-            reserve?.spendings?.filter { it.id in dropped }?.forEach { ResultRow(it, "${it.label} — перенесли", ok = false) }
-            ResultRow(null, if (details.shortage == 0) "Запаса хватило" else "Не хватило ${details.shortage}", ok = details.shortage == 0)
-            if (details.droppedNeeds > 0) ResultRow(null, "Пришлось перенести нужное", ok = false)
             if (details.left > 0) SumRow("Осталось на потом", details.left.toString())
         }
 
