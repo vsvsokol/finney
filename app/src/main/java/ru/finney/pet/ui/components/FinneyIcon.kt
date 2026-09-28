@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -59,7 +60,7 @@ enum class FinneyIcons {
     /** Три полосы — меню взрослого. */
     Menu,
 
-    /** Монетка-копилка — цели и накопления. */
+    /** Свинка-копилка — цели и накопления. */
     Piggy,
 
     /** Звезда — задания. */
@@ -277,40 +278,58 @@ private fun DrawScope.drawMenu(tint: Color) {
     }
 }
 
-// Копилка: банка с прорезью и монеткой над ней. Раньше это был круг с полосой
-// поперёк — на устройстве читался как знак «проезд запрещён», а не как копилка.
+// Свинка-копилка боком: туловище, пятачок, ушко, ножки, хвостик, прорезь на спине
+// и монетка над ней. Раньше здесь была банка-трапеция — на плейтесте 28.09 её
+// не узнали: «копилка» у ребёнка — это свинка.
+//
+// Прорезь, глаз и ноздри вырезаются (Difference), а не закрашиваются цветом фона:
+// кнопка под значком меняет цвет при нажатии, и закрашенные дырки остались бы
+// пятнами прежнего фона.
 private fun DrawScope.drawPiggy(tint: Color) {
     val s = size.minDimension
 
-    // Монетка, падающая в прорезь.
-    drawCircle(tint, s * 0.10f, Offset(s * 0.50f, s * 0.16f))
+    // Монетка над прорезью.
+    drawCircle(tint, s * 0.085f, Offset(s * 0.40f, s * 0.19f))
 
-    // Корпус копилки — трапеция с широким низом, с вырезанной прорезью.
-    //
-    // Прорезь именно вырезается (Difference), а не закрашивается цветом фона:
-    // кнопка под значком меняет цвет при нажатии, и закрашенная прорезь
-    // осталась бы пятном прежнего фона.
-    val body = Path().apply {
-        moveTo(s * 0.22f, s * 0.40f)
-        lineTo(s * 0.78f, s * 0.40f)
-        lineTo(s * 0.84f, s * 0.84f)
-        lineTo(s * 0.16f, s * 0.84f)
-        close()
+    // Части сливаются через Union: при простом наложении контуры с разным
+    // направлением обхода гасят друг друга, и на стыке уха оставалась щель.
+    val body = listOf(
+        Path().apply { addOval(Rect(s * 0.12f, s * 0.33f, s * 0.80f, s * 0.80f)) },
+        // Пятачок выступает вперёд из морды.
+        Path().apply { addRoundRect(RoundRect(s * 0.74f, s * 0.44f, s * 0.93f, s * 0.66f, CornerRadius(s * 0.07f))) },
+        // Ушко торчит вверх над мордой.
+        Path().apply {
+            moveTo(s * 0.58f, s * 0.42f)
+            quadraticTo(s * 0.62f, s * 0.22f, s * 0.70f, s * 0.24f)
+            quadraticTo(s * 0.74f, s * 0.34f, s * 0.74f, s * 0.46f)
+            close()
+        },
+        // Ножки: передняя и задняя.
+        Path().apply { addRoundRect(RoundRect(s * 0.22f, s * 0.68f, s * 0.35f, s * 0.90f, CornerRadius(s * 0.04f))) },
+        Path().apply { addRoundRect(RoundRect(s * 0.55f, s * 0.68f, s * 0.68f, s * 0.90f, CornerRadius(s * 0.04f))) },
+    ).reduce { acc, part -> Path().apply { op(acc, part, PathOperation.Union) } }
+    val holes = Path().apply {
+        addRoundRect(RoundRect(s * 0.30f, s * 0.41f, s * 0.50f, s * 0.47f, CornerRadius(s * 0.03f)))
+        addOval(Rect(Offset(s * 0.66f, s * 0.50f), s * 0.035f))
+        addOval(Rect(Offset(s * 0.815f, s * 0.55f), s * 0.025f))
+        addOval(Rect(Offset(s * 0.875f, s * 0.55f), s * 0.025f))
     }
-    val slot = Path().apply {
-        addRoundRect(
-            RoundRect(
-                left = s * 0.38f,
-                top = s * 0.48f,
-                right = s * 0.62f,
-                bottom = s * 0.55f,
-                cornerRadius = CornerRadius(s * 0.035f),
-            ),
-        )
-    }
-    drawPath(Path().apply { op(body, slot, PathOperation.Difference) }, tint)
+    drawPath(Path().apply { op(body, holes, PathOperation.Difference) }, tint)
+
+    // Хвостик-закорючка сзади.
+    drawArc(
+        color = tint,
+        startAngle = 90f,
+        sweepAngle = 270f,
+        useCenter = false,
+        topLeft = Offset(s * 0.03f, s * 0.44f),
+        size = Size(s * 0.11f, s * 0.11f),
+        style = Stroke(width = s * 0.05f, cap = StrokeCap.Round),
+    )
 }
 
+// Копилка: банка с прорезью и монеткой над ней. Раньше это был круг с полосой
+// поперёк — на устройстве читался как знак «проезд запрещён», а не как копилка.
 // Звезда о пяти лучах.
 private fun DrawScope.drawStar(tint: Color) {
     val s = size.minDimension

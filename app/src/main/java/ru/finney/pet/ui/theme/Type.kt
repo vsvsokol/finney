@@ -17,7 +17,8 @@ import ru.finney.pet.R
 //
 // Glina на треть уже Roboto при той же высоте букв (замер: фраза «нужное и желаемое» —
 // 673 против 925 у Arial при кегле 100). Поэтому текст того же кегля смотрится мельче,
-// и кегли подняты на ступень: основной 19 sp, мелкие подписи 16 sp.
+// и кегли подняты на ступень. После плейтеста 28.09 («мелкий шрифт») — ещё на 1 sp:
+// основной 20 sp, мелкие подписи 17 sp. Заголовки не тронуты — их мелкими не называли.
 
 /**
  * Толщина обводки текста по правилу из макета: 15 при кегле 200.
@@ -78,26 +79,26 @@ val Typography = Typography(
     bodyLarge = TextStyle(
         fontFamily = Display,
         fontWeight = FontWeight.Normal,
-        fontSize = 19.sp,
-        lineHeight = 27.sp,
+        fontSize = 20.sp,
+        lineHeight = 28.sp,
     ),
     bodyMedium = TextStyle(
         fontFamily = Display,
         fontWeight = FontWeight.Normal,
-        fontSize = 18.sp,
-        lineHeight = 25.sp,
+        fontSize = 19.sp,
+        lineHeight = 26.sp,
     ),
-    // Подписи под иконками и суммами. Ниже 16 sp не опускаемся.
+    // Подписи под иконками и суммами. Ниже 16 sp не опускаемся (ТЗ п. 3.6).
     labelLarge = TextStyle(
         fontFamily = Display,
         fontWeight = FontWeight.Normal,
-        fontSize = 18.sp,
-        lineHeight = 25.sp,
+        fontSize = 19.sp,
+        lineHeight = 26.sp,
     ),
     labelMedium = TextStyle(
         fontFamily = Display,
         fontWeight = FontWeight.Normal,
-        fontSize = 16.sp,
-        lineHeight = 22.sp,
+        fontSize = 17.sp,
+        lineHeight = 23.sp,
     ),
 )

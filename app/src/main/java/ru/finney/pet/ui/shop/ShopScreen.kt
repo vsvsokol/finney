@@ -160,6 +160,7 @@ private fun ShopSection(
         allowShortage = true,
         header = { CategoryBanner(kind, planLeft) },
         withConfirm = false,
+        tiles = true,
     )
 }
 

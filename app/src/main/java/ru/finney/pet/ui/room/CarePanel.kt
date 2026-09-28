@@ -6,6 +6,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,6 +26,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import ru.finney.pet.domain.game.PurchasePreview
@@ -95,6 +99,10 @@ data class CareBlock(
  * [header] — что стоит в панели над товарами: в магазине это полоса категории.
  * [withConfirm] false — кнопки в панели нет, её ставит экран: в магазине панелей
  * три, а кнопка «Купить» одна, внизу.
+ *
+ * [tiles] — товары плитками по два в ряд с крупной картинкой сверху: так в магазине
+ * (плейтест 28.09: «уныленько», картинка терялась в строке). На главном панель
+ * открывается поверх комнаты, и там строки ниже и короче — остаётся список.
  */
 @Composable
 fun CarePanel(
@@ -110,6 +118,7 @@ fun CarePanel(
     allowShortage: Boolean = false,
     header: (@Composable () -> Unit)? = null,
     withConfirm: Boolean = true,
+    tiles: Boolean = false,
 ) {
     val selected = options.firstOrNull { it.isSelected }
 
@@ -124,8 +133,20 @@ fun CarePanel(
             return@FinneyPanel
         }
 
-        options.forEach { option ->
-            CareRow(option = option, onPick = { onPick(option.item.id) })
+        if (tiles) {
+            options.chunked(2).forEach { pair ->
+                // Высота ряда — по высокой плитке: у соседки с «не хватает» текста больше.
+                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    pair.forEach { option ->
+                        CareTile(option, onPick = { onPick(option.item.id) }, modifier = Modifier.weight(1f).fillMaxHeight())
+                    }
+                    if (pair.size == 1) Spacer(Modifier.weight(1f))
+                }
+            }
+        } else {
+            options.forEach { option ->
+                CareRow(option = option, onPick = { onPick(option.item.id) })
+            }
         }
 
         if (!withConfirm) return@FinneyPanel
@@ -230,6 +251,61 @@ private fun CareRow(option: CareOption, onPick: () -> Unit) {
         }
     }
 }
+
+/**
+ * Товар плиткой: картинка во всю ширину — главное, под ней что изменится и цена.
+ * Всё, что требует п. 2.5.6, на месте, как и в [CareRow]; признаки выбора и
+ * нехватки те же — заливка, «✓» и слова, не только цвет (ТЗ п. 3.6).
+ */
+@Composable
+private fun CareTile(option: CareOption, onPick: () -> Unit, modifier: Modifier = Modifier) {
+    val preview = option.preview
+    val notEnough = preview.shortage > 0
+    val needed = option.item.category == Category.NEEDS
+    val accent = when {
+        notEnough -> FinneyBlue
+        option.isSelected -> FinneyYellow
+        else -> null
+    }
+
+    FinneyCard(
+        modifier = modifier
+            .semantics(mergeDescendants = true) {
+                contentDescription = "${option.item.label}, ${if (needed) "нужное" else "желаемое"}"
+                selected = option.isSelected
+            }
+            .clickable(onClickLabel = "Выбрать: ${option.item.label}", onClick = onPick),
+        accent = accent,
+    ) {
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            ItemPicture(option.item.id, itemFallback(option.item.id), size = TilePicture)
+            if (option.isSelected) CheckBadge(Modifier.align(Alignment.TopEnd), size = 28.dp)
+        }
+        Column(
+            Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            EffectChip(FinneyIcons.Food, "сытость", option.item.effect.satiety, preview.statsBefore.satiety, preview.statsAfter.satiety)
+            EffectChip(FinneyIcons.Bath, "чистота", option.item.effect.hygiene, preview.statsBefore.hygiene, preview.statsAfter.hygiene)
+            EffectChip(null, "радость", option.item.effect.mood, preview.statsBefore.mood, preview.statsAfter.mood)
+            CoinAmount(amount = option.item.price)
+        }
+        if (notEnough) {
+            // В узкой плитке — коротко; что делать, сказано в отказе при попытке купить.
+            Text(
+                text = "Не хватает ${preview.shortage}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = FinneyInk,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+/** Картинка товара в плитке: на 360 dp плитка ~135 dp, картинка занимает её почти целиком. */
+private val TilePicture = 88.dp
 
 /**
  * Что станет со шкалой: «+20» и значок шкалы одной плашкой. Раньше значок стоял

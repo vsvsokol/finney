@@ -28,6 +28,7 @@ import ru.finney.pet.ui.components.FinneyIcon
 import ru.finney.pet.ui.components.FinneyIcons
 import ru.finney.pet.ui.components.FinneyPanel
 import ru.finney.pet.ui.components.FinneyScreen
+import ru.finney.pet.ui.components.MenuBackdrop
 import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.room.itemFallback
 import ru.finney.pet.ui.tasks.games.ItemPicture
@@ -60,6 +61,7 @@ fun ProgressScreen(
         }
 
         is ProgressUiState.Ready -> FinneyScreen(
+            backdrop = MenuBackdrop.SHAPES,
             scrollable = true,
             verticalArrangement = Arrangement.spacedBy(16.dp),
             onClose = onBack,
