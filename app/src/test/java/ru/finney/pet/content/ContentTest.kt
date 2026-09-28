@@ -188,7 +188,9 @@ class ContentTest {
             val shortage = TaskEngines.surprisesTotal(task) - TaskEngines.reserveLeft(task, planned)
             val dropped = task.spendings.filter { it.id in planned }.sortedWith(compareBy({ it.category != Category.NEEDS }, { -it.price }))
                 .fold(emptyList<String>()) { acc, s -> if (acc.sumOf { id -> task.spendings.first { it.id == id }.price } >= shortage) acc else acc + s.id }
-            TaskInput.Reserve(needs, emptySet()) to TaskInput.Reserve(planned, dropped.toSet())
+            // Успех: нужное и самое дешёвое желаемое, остальное — запас.
+            val cheapest = task.spendings.filter { it.category == Category.WANTS }.minBy { it.price }.id
+            TaskInput.Reserve(needs + cheapest, emptySet()) to TaskInput.Reserve(planned, dropped.toSet())
         }
         is StandTask -> {
             val best = TaskEngines.bestStock(task)

@@ -120,12 +120,18 @@ object TaskChecks {
         task.surprises.filter { it.price <= 0 }.forEach { add("$at — сюрприз «${it.label}»: price должен быть > 0") }
         duplicates(task.spendings.map { it.id }).forEach { add("$at — повторяется трата $it") }
         task.spendings.filter { it.price <= 0 }.forEach { add("$at — ${it.id}: цена должна быть > 0") }
-        val needs = task.spendings.filter { it.category == Category.NEEDS }.sumOf { it.price }
-        if (task.amount - needs < TaskEngines.surprisesTotal(task)) {
-            add("$at — после нужного не остаётся запаса на все сюрпризы: игру не выиграть")
+        // Выигрыш — нужное, хотя бы одно желаемое и запас на все сюрпризы. Без желаемого не выиграть.
+        val wants = task.spendings.filter { it.category == Category.WANTS }
+        if (wants.isEmpty()) {
+            add("$at — нет ни одного желаемого")
+            return
         }
-        // Бонус — за желаемое, которое удалось сохранить: без желаемого его не получить.
-        if (task.spendings.none { it.category == Category.WANTS }) add("$at — нет ни одного желаемого")
+        // Проверяется и шаблон, где выпали все сюрпризы: если там можно выиграть с бонусом,
+        // то и при любом другом зерне тоже.
+        val needs = task.spendings.filter { it.category == Category.NEEDS }.sumOf { it.price }
+        if (task.amount - needs - wants.minOf { it.price } < TaskEngines.surprisesWorstCase(task)) {
+            add("$at — после нужного и самого дешёвого желаемого не остаётся запаса на все сюрпризы: игру не выиграть")
+        }
     }
 
     private fun MutableList<String>.checkStand(task: StandTask, at: String) {

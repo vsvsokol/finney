@@ -17,6 +17,7 @@ import ru.finney.pet.domain.model.TaskDefinition
 import ru.finney.pet.domain.model.TaskOutcome
 import ru.finney.pet.domain.tasks.TaskChecks
 import ru.finney.pet.domain.tasks.TaskEngines
+import ru.finney.pet.domain.tasks.TaskEvaluation
 import ru.finney.pet.domain.tasks.TaskGenerator
 import ru.finney.pet.domain.tasks.TaskInput
 import java.io.File
@@ -176,6 +177,31 @@ class TaskGeneratorTest {
             }
             assertTrue("$id: числа не меняются", tasks.toSet().size > 1)
         }
+    }
+
+    /** «Дождливый день» на фиксированных зёрнах: пусто — неудача, разумно — успех с бонусом, жадно — неудача. */
+    @Test
+    fun `дождливый день выигрывается балансом, а не бездействием`() {
+        val template = content.taskTemplates.getValue("game_rainy")
+        val empty = TaskInput.Reserve(setOf("food", "soap"), emptySet())
+        val safe = TaskInput.Reserve(setOf("food", "soap", "icecream"), emptySet())
+        val all = setOf("food", "soap", "ball", "stickers", "icecream")
+        var stormy = 0
+        for (seed in 1L..100L) {
+            val task = TaskGenerator.generate(template, seed) as ReserveTask
+            assertEquals("зерно $seed: зонт и рюкзак вместе", 25, task.worstCase)
+            assertEquals("зерно $seed", TaskOutcome.FAIL, (TaskEngines.evaluate(task, empty) as TaskEvaluation.Done).outcome)
+            val ok = TaskEngines.evaluate(task, safe) as TaskEvaluation.Done
+            assertEquals("зерно $seed", TaskOutcome.SUCCESS, ok.outcome)
+            assertTrue("зерно $seed: запас 25 на все сюрпризы — бонус", ok.bonus)
+            if (task.surprises.isEmpty()) continue
+            stormy++
+            // Жадно: всё желаемое, запаса 5 — на любой сюрприз приходится отменять желаемое.
+            val shortage = TaskEngines.surprisesTotal(task) - TaskEngines.reserveLeft(task, all)
+            val dropped = listOf("ball", "stickers", "icecream").let { if (shortage <= 10) it.take(1) else it.take(2) }.toSet()
+            assertEquals("зерно $seed", TaskOutcome.FAIL, (TaskEngines.evaluate(task, TaskInput.Reserve(all, dropped)) as TaskEvaluation.Done).outcome)
+        }
+        assertTrue("сюрпризы выпадают", stormy > 50)
     }
 
     @Test

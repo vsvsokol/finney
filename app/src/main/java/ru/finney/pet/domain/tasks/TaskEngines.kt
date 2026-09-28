@@ -131,8 +131,9 @@ sealed interface TaskDetails {
 
     /**
      * [reserve] — запас после плана; [surprises] — сколько стоило непредвиденное;
-     * [shortage] — сколько не хватило запаса; [droppedNeeds] — перенесено нужного (тогда
-     * игра не пройдена); [keptWants] — желаемого осталось в плане (за это бонус);
+     * [shortage] — сколько не хватило запаса; [droppedNeeds] и [droppedWants] — сколько
+     * нужного и желаемого пришлось перенести (любой перенос — игра не пройдена);
+     * [keptWants] — желаемого осталось в плане (0 — неделя без радостей, тоже неудача);
      * [left] — сколько запаса осталось на потом.
      */
     data class Reserve(
@@ -142,6 +143,7 @@ sealed interface TaskDetails {
         val droppedNeeds: Int = 0,
         val keptWants: Int = 0,
         val left: Int = 0,
+        val droppedWants: Int = 0,
     ) : TaskDetails
 
     /**
@@ -526,6 +528,9 @@ object TaskEngines {
     /** Сколько стоит всё непредвиденное недели. */
     fun surprisesTotal(task: ReserveTask): Int = task.surprises.sumOf { it.price }
 
+    /** Сколько стоили бы все сюрпризы, какие могли случиться, — запас «на самый дождливый день». */
+    fun surprisesWorstCase(task: ReserveTask): Int = maxOf(task.worstCase, surprisesTotal(task))
+
     /** Запас после плана: сумма минус всё запланированное. */
     fun reserveLeft(task: ReserveTask, planned: Set<String>): Int =
         task.amount - task.spendings.filter { it.id in planned }.sumOf { it.price }
@@ -630,8 +635,11 @@ object TaskEngines {
         val freed = input.dropped.sumOf { byId.getValue(it).price }
         if (freed < shortage) return TaskEvaluation.Invalid(TaskInputError.SurpriseNotCovered(shortage - freed))
         val droppedNeeds = input.dropped.count { byId.getValue(it).category == Category.NEEDS }
+        val droppedWants = input.dropped.size - droppedNeeds
         val keptWants = (input.planned - input.dropped).count { byId.getValue(it).category == Category.WANTS }
-        val success = droppedNeeds == 0
+        // Выигрыш — баланс: и порадовать Финни, и оставить запас. Пустой план — неделя без
+        // радостей, жадный — сюрприз заставил отменить купленное. Оба — неудача.
+        val success = droppedNeeds == 0 && droppedWants == 0 && keptWants > 0
         return TaskEvaluation.Done(
             outcome(success),
             TaskDetails.Reserve(
@@ -641,8 +649,11 @@ object TaskEngines {
                 droppedNeeds = droppedNeeds,
                 keptWants = keptWants,
                 left = reserve + freed - total,
+                droppedWants = droppedWants,
             ),
-            bonus = success && keptWants > 0,
+            // Бонус — за запас на все сюрпризы, даже те, что не случились: запас откладывают
+            // до того, как узнали, понадобится ли он.
+            bonus = success && reserve >= surprisesWorstCase(task),
         )
     }
 
