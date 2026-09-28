@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.semantics.contentDescription
@@ -71,6 +72,7 @@ import ru.finney.pet.ui.room.RoomSpot
 import ru.finney.pet.ui.theme.FinneyCream
 import ru.finney.pet.ui.theme.FinneyGreen
 import ru.finney.pet.ui.theme.FinneyInk
+import ru.finney.pet.ui.theme.FinneyPeach
 import ru.finney.pet.ui.theme.FinneyYellow
 import ru.finney.pet.ui.theme.StrokeRegular
 
@@ -230,26 +232,51 @@ private fun BackdropLayer(backdrop: Backdrop) {
 }
 
 /**
- * Луг у лавки. [dusk] 0 — полдень, 1 — закат: небо розовеет, солнце опускается
- * и уходит за траву. Читается только на отрисовке — закат не пересобирает экран.
+ * Луг у лавки. [dusk] 0 — полдень, 1 — вечер: небо теплеет до золотистого, солнце
+ * опускается, желтеет в персиковый и уходит за траву. Читается только на
+ * отрисовке — закат не пересобирает экран.
+ *
+ * Небо только из палитры — голубое днём, вечером жёлтое пополам с кремовым: чистый
+ * кремовый сливался бы с панелями итога. Раньше оно уходило в
+ * красно-персиковый, и на плейтесте (28.09) «красное небо, зелёная трава и солнце»
+ * смотрелись странно. Облака — белые с обводкой, как всё в игре; у солнца
+ * (у всех лавок в прогнозе жарко или тепло) они не заслоняют.
  */
 @Composable
 private fun Meadow(dusk: () -> Float) {
     Canvas(Modifier.fillMaxSize()) {
         val t = dusk()
         val horizon = size.height * HORIZON_AT
-        // Небо через золотистый: напрямую голубой в персиковый проходил через серый.
-        val sky = if (t < 0.5f) lerp(Color(0xFF9CCBF0), Color(0xFFF6D9A0), t * 2) else lerp(Color(0xFFF6D9A0), Color(0xFFF4A98E), t * 2 - 1)
+        val sky = if (t < 0.5f) lerp(SkyNoon, FinneyCream, t * 2) else lerp(FinneyCream, SkyEvening, t * 2 - 1)
         drawRect(sky, size = size.copy(height = horizon))
+        // Облака встают из-за луга, низом в траву: выше они налезали на заголовки
+        // панелей, а из-под утренней панели торчали обрывками.
+        cloud(Offset(size.width * 0.14f, horizon - 10.dp.toPx()), 1f)
+        cloud(Offset(size.width * 0.5f, horizon - 6.dp.toPx()), 0.7f)
         // Солнце до травы: садясь, оно прячется за горизонт, а не ложится поверх луга.
         val c = Offset(size.width * 0.84f, lerp(size.height * 0.16f, horizon - 8.dp.toPx(), t))
-        val sun = lerp(FinneyYellow, Color(0xFFF7A35C), t)
+        val sun = lerp(FinneyYellow, FinneyPeach, t)
         drawCircle(sun.copy(alpha = 0.5f), 42.dp.toPx(), c)
         drawCircle(FinneyInk, 32.dp.toPx(), c)
         drawCircle(sun, 28.dp.toPx(), c)
         drawRect(lerp(FinneyGreen, Color(0xFF6FB679), t), topLeft = Offset(0f, horizon), size = size.copy(height = size.height - horizon))
     }
 }
+
+/** Облако из трёх кругов: сначала обводка всех, потом заливка — контур общий, без швов внутри. */
+private fun DrawScope.cloud(center: Offset, scale: Float) {
+    val r = 22.dp.toPx() * scale
+    val stroke = 4.dp.toPx() * scale
+    val puffs = listOf(Offset(-r * 1.1f, r * 0.25f) to r * 0.8f, Offset(0f, 0f) to r, Offset(r * 1.1f, r * 0.3f) to r * 0.7f)
+    puffs.forEach { (o, rr) -> drawCircle(FinneyInk, rr + stroke, center + o) }
+    puffs.forEach { (o, rr) -> drawCircle(Color.White, rr, center + o) }
+}
+
+/** Небо в полдень — светлый тон голубого из палитры (#67A6DC). */
+private val SkyNoon = Color(0xFF9CCBF0)
+
+/** Вечернее небо — жёлтый #F7DC8B пополам с кремовым #FFEDCD. */
+private val SkyEvening = lerp(FinneyYellow, FinneyCream, 0.5f)
 
 /** Линия горизонта на лугу — доля высоты. */
 private const val HORIZON_AT = 0.58f
