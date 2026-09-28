@@ -218,7 +218,7 @@ class MiniGamesTest {
     )
 
     @Test
-    fun `reserve — нужное закрыто — успех, желаемое осталось — бонус`() {
+    fun `reserve — желаемое и запас, ничего не отменили — успех и бонус`() {
         assertEquals(
             TaskEvaluation.Done(
                 TaskOutcome.SUCCESS,
@@ -227,16 +227,29 @@ class MiniGamesTest {
             ),
             TaskEngines.evaluate(rainy, TaskInput.Reserve(setOf("food", "soap", "ball"), emptySet())),
         )
-        // Перенесли желаемое — нужное цело, успех, но без бонуса.
+    }
+
+    @Test
+    fun `reserve — пустой план — неделя без радостей, неудача`() {
         assertEquals(
             TaskEvaluation.Done(
-                TaskOutcome.SUCCESS,
-                TaskDetails.Reserve(reserve = 5, shortage = 10, surprises = 15, keptWants = 0, left = 15),
-                bonus = false,
+                TaskOutcome.FAIL,
+                TaskDetails.Reserve(reserve = 30, shortage = 0, surprises = 15, keptWants = 0, left = 15),
+            ),
+            TaskEngines.evaluate(rainy, TaskInput.Reserve(setOf("food", "soap"), emptySet())),
+        )
+    }
+
+    @Test
+    fun `reserve — жадный план — сюрприз заставил отменить желаемое, неудача`() {
+        assertEquals(
+            TaskEvaluation.Done(
+                TaskOutcome.FAIL,
+                TaskDetails.Reserve(reserve = 5, shortage = 10, surprises = 15, keptWants = 1, left = 10, droppedWants = 2),
             ),
             TaskEngines.evaluate(
                 rainy,
-                TaskInput.Reserve(setOf("food", "soap", "ball", "stickers", "icecream"), setOf("ball", "stickers", "icecream")),
+                TaskInput.Reserve(setOf("food", "soap", "ball", "stickers", "icecream"), setOf("ball", "stickers")),
             ),
         )
     }
@@ -254,10 +267,23 @@ class MiniGamesTest {
     }
 
     @Test
+    fun `reserve — бонус только за запас на все сюрпризы, даже невыпавшие`() {
+        // Выпал только зонт за 10, а могли оба — на 15.
+        val lucky = rainy.copy(surprises = listOf(Surprise("Зонт", "", 10)), worstCase = 15)
+        val safe = TaskEngines.evaluate(lucky, TaskInput.Reserve(setOf("food", "soap", "ball"), emptySet())) as TaskEvaluation.Done
+        assertEquals(TaskOutcome.SUCCESS, safe.outcome)
+        assertTrue("запас 20 ≥ 15", safe.bonus)
+        // Запаса 10 хватило на зонт — повезло: игра пройдена, но без бонуса.
+        val risky = TaskEngines.evaluate(lucky, TaskInput.Reserve(setOf("food", "soap", "ball", "stickers"), emptySet())) as TaskEvaluation.Done
+        assertEquals(TaskOutcome.SUCCESS, risky.outcome)
+        assertFalse("запас 10 < 15", risky.bonus)
+    }
+
+    @Test
     fun `reserve — без сюрпризов весь запас остаётся на потом`() {
         val calm = rainy.copy(surprises = emptyList())
-        val done = TaskEngines.evaluate(calm, TaskInput.Reserve(setOf("food", "soap"), emptySet())) as TaskEvaluation.Done
-        assertEquals(30, (done.details as TaskDetails.Reserve).left)
+        val done = TaskEngines.evaluate(calm, TaskInput.Reserve(setOf("food", "soap", "icecream"), emptySet())) as TaskEvaluation.Done
+        assertEquals(25, (done.details as TaskDetails.Reserve).left)
         assertEquals(TaskOutcome.SUCCESS, done.outcome)
     }
 

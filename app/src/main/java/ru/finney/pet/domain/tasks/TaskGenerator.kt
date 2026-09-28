@@ -7,6 +7,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.intOrNull
+import ru.finney.pet.domain.model.ReserveTask
 import ru.finney.pet.domain.model.TaskDefinition
 import kotlin.random.Random
 
@@ -57,12 +58,20 @@ object TaskGenerator {
     fun generate(template: JsonObject, seed: Long): TaskDefinition {
         if (!isRandom(template)) return base(template)
         val random = Random(seed)
+        val base = base(template)
         repeat(TRIES) {
-            val task = build(template, random)
+            val task = withWorstCase(build(template, random), base)
             if (TaskChecks.problems(task).isEmpty()) return task
         }
-        return base(template)
+        return base
     }
+
+    /**
+     * Сюрпризы «Дождливого дня» с `chance` выпадают не все, а бонус — за запас на все сразу.
+     * Сколько стоят все, знает только шаблон: берём их из [base], где выпадает каждый.
+     */
+    private fun withWorstCase(task: TaskDefinition, base: TaskDefinition): TaskDefinition =
+        if (task is ReserveTask && base is ReserveTask) task.copy(worstCase = TaskEngines.surprisesTotal(base)) else task
 
     /** Есть ли в [element] хоть один разброс. Без разброса задание не зависит от зерна. */
     fun isRandom(element: JsonElement): Boolean = when (element) {

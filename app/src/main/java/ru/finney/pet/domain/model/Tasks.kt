@@ -268,6 +268,8 @@ data class RaceEvent(
  * «Дождливый день»: спланировать траты с запасом, потом случается непредвиденное.
  * [surprises] — что случилось на этой неделе: в tasks.json у каждого сюрприза
  * `chance`, и какие выпали, решает зерно попытки. Бывает и ни одного.
+ * [worstCase] — сколько стоили бы все сюрпризы шаблона сразу. Его ставит [ru.finney.pet.domain.tasks.TaskGenerator],
+ * в tasks.json не пишется; 0 — считать по [surprises].
  */
 @Serializable
 @SerialName("reserve")
@@ -285,6 +287,7 @@ data class ReserveTask(
     val amount: Int,
     val spendings: List<Spending>,
     val surprises: List<Surprise>,
+    val worstCase: Int = 0,
 ) : TaskDefinition()
 
 /**
