@@ -63,6 +63,6 @@
 | ! | `Gauge.kt` (`AlertBadge`), `ReserveGame.kt` | не хватает, перебор | — |
 | − + | `HoldRepeat.kt`, `ChoresGame.kt`, `TaskGames.kt` | убавить, прибавить, приход и расход | `ic_minus`, `ic_plus` |
 | ↺ | `BudgetScreen.kt`, `PeriodResultScreen.kt` | попробуй ещё раз | — |
-| ← → ↑ ↓ | `ShoppingGame.kt`, `StandGame.kt`, `ToyPlay.kt`, `CarePanel.kt`, `GameParts.kt` (`BouncingArrow`), `SavingsButtons.kt` | направление, «превращается в» | `ic_back` для ← |
+| ← → ↑ ↓ | `ShoppingGame.kt`, `StandGame.kt`, `CarePanel.kt`, `GameParts.kt` (`BouncingArrow`), `SavingsButtons.kt` | направление, «превращается в» | `ic_back` для ← |
 | × ≈ | `AdultScreen.kt`, `StandGame.kt`, `ReceiptGame.kt`, `ChoresGame.kt`, `SimpleGames.kt` | умножение, количество | — |
 | ♥ | `GoalRaceGame.kt` — «+♥» / «−♥» на кнопках соблазна | настроение | — (сердце уже есть в `HeartIcon.kt`) |

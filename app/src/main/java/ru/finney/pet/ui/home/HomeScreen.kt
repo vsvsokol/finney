@@ -252,9 +252,6 @@ private val SighPauseMs = 4_000L..8_000L
 /** Шкала настроения при нехватке радости покачивается с такой паузой. */
 private const val BarWobblePauseMillis = 3_000L
 
-/** Подсказка к шкале настроения закрывается сама через столько. */
-private const val MoodHintMillis = 5_000L
-
 /** Настроения, на которые питомец вздыхает. */
 private val SadEmotions = setOf(Emotion.HUNGRY, Emotion.DIRTY, Emotion.TIRED, Emotion.SAD)
 
@@ -460,14 +457,9 @@ private fun HomeContent(
         }
     }
 
-    // Подсказка к шкале настроения: что её поднимает. Открывается нажатием на шкалу.
+    // Подсказка к шкале радости: что её поднимает. Открывается нажатием на шкалу и
+    // висит, пока не закроют: сама она пропадала, пока ребёнок её читал.
     var moodHint by remember { mutableStateOf(false) }
-    LaunchedEffect(moodHint) {
-        if (moodHint) {
-            delay(MoodHintMillis)
-            moodHint = false
-        }
-    }
 
     // Подсказка следующего шага: где стоят кнопки-цели и вспышка «уровень готов».
     val hintTargets = remember { HintTargets() }
@@ -773,10 +765,23 @@ private fun HomeContent(
                     ),
             )
             if (moodHint) {
+                // Касание мимо подсказки её закрывает. Слой — только на средней части
+                // экрана и только пока подсказка открыта; сама шкала лежит под ним
+                // и закрывает её так же.
+                Box(
+                    Modifier
+                        .matchParentSize()
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClickLabel = "Закрыть подсказку",
+                            onClick = { moodHint = false },
+                        ),
+                )
                 MoodHint(
-                    modifier = Modifier
-                        .offset(x = barWidth + 4.dp, y = barHeight * 0.55f)
-                        .clickable(onClickLabel = "Скрыть") { moodHint = false },
+                    onClose = { moodHint = false },
+                    // Отступом, а не сдвигом: сдвинутая плашка не знает, что справа кончился экран.
+                    modifier = Modifier.padding(start = barWidth + 4.dp, top = barHeight * 0.35f),
                 )
             }
 
