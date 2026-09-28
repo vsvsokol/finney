@@ -47,5 +47,6 @@
 3. [screen-3-game.png](screen-3-game.png) — мини-игра «Дождливый день»
 4. [screen-4-wardrobe.png](screen-4-wardrobe.png) — гардероб, шляпы за цели
 5. [screen-5-kitchen.png](screen-5-kitchen.png) — кухня, уход за питомцем
+6. [screen-6-setup.png](screen-6-setup.png) — создание питомца: персонаж, цвет, имя
 
 Сняты с debug-сборки на эмуляторе API 37, статус-бар в демо-режиме (10:00, без уведомлений).
