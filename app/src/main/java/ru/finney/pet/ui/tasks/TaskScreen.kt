@@ -31,6 +31,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
 import ru.finney.pet.domain.model.TaskOutcome
 import ru.finney.pet.domain.model.TaskTheme
+import ru.finney.pet.ui.components.AlertBadge
+import ru.finney.pet.ui.components.CheckBadge
 import ru.finney.pet.ui.components.Coin
 import ru.finney.pet.ui.components.FinneyButton
 import ru.finney.pet.ui.components.FinneyQuietButton
@@ -210,7 +212,13 @@ private fun TaskResultScene(state: TaskUiState.Ready, onReplay: () -> Unit, onDo
                 }
             },
         ) {
-            ScenePanel(title = if (success) "Готово!" else "Почти!", modifier = Modifier.fillMaxWidth()) {
+            // Итог — значком на рамке, крупно: «✓» или «!» видно раньше, чем прочитано слово.
+            // Цвет здесь — итог действия ребёнка, как и велит правило цвета, и не единственный признак.
+            ScenePanel(
+                title = if (success) "Готово!" else "Почти!",
+                modifier = Modifier.fillMaxWidth(),
+                badge = { if (success) CheckBadge(size = 44.dp) else AlertBadge(size = 44.dp) },
+            ) {
                 ResultBody(state.task, result.details, result.input)
             }
             RewardChip(result.reward, Modifier.align(Alignment.CenterHorizontally))

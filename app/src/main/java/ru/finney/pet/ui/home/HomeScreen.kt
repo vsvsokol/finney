@@ -1111,7 +1111,10 @@ private fun LevelPanel(
                 color = FinneyInk,
             )
             CheckRow(listOf(FinneyIcons.Food, FinneyIcons.Bath, FinneyIcons.Lamp), "Сыт, чист и выспался", check.needsCovered)
-            CheckRow(listOf(FinneyIcons.Plan), "Траты по плану", check.planMatched)
+            // «По плану» — единственное условие, которое проверяют по числам на другом
+            // экране: строка ведёт туда, в «План и факт». Иначе этот экран ребёнок видел
+            // один раз — сразу после подтверждения плана.
+            CheckRow(listOf(FinneyIcons.Plan), "Траты по плану", check.planMatched, onClick = onOpenBudget)
             CheckRow(listOf(FinneyIcons.Piggy), "Отложено в копилку", check.savingsAdded)
             Text(
                 if (check.willPass) {
@@ -1148,11 +1151,19 @@ private fun LevelPanel(
  * Прежний вид — «✓»/«—» перед текстом — на плейтесте читался как логи.
  */
 @Composable
-private fun CheckRow(icons: List<FinneyIcons>, label: String, done: Boolean) {
+private fun CheckRow(icons: List<FinneyIcons>, label: String, done: Boolean, onClick: (() -> Unit)? = null) {
+    val tap = if (onClick != null) {
+        Modifier
+            .clip(RoundedCornerShape(RadiusField))
+            .clickable(role = Role.Button, onClickLabel = "Посмотреть", onClick = onClick)
+    } else {
+        Modifier
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = 48.dp)
+            .then(tap)
             .clearAndSetSemantics { contentDescription = "$label: ${if (done) "да" else "пока нет"}" },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -1167,6 +1178,8 @@ private fun CheckRow(icons: List<FinneyIcons>, label: String, done: Boolean) {
             color = FinneyInk,
             modifier = Modifier.weight(1f),
         )
+        // Строку можно открыть — это видно по стрелке, а не только по тому, что она нажимается.
+        if (onClick != null) OutlinedText("›", style = MaterialTheme.typography.headlineMedium)
         CheckMark(done)
     }
 }

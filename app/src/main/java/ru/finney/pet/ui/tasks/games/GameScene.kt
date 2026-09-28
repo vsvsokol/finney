@@ -442,11 +442,15 @@ private class BubbleShape(private val tail: Tail, private val radius: Dp, privat
     }
 }
 
-/** Кремовая панель с заголовком на рамке, как «Проверка», «Касса», «Итог дня» в концептах. */
+/**
+ * Кремовая панель с заголовком на рамке, как «Проверка», «Касса», «Итог дня» в концептах.
+ * [badge] — значок перед заголовком на той же рамке: так итог игры читается и без слов.
+ */
 @Composable
 internal fun ScenePanel(
     title: String?,
     modifier: Modifier = Modifier,
+    badge: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     // Над рамкой — место под всю верхнюю половину заголовка. Было 18 dp при сдвиге
@@ -464,12 +468,15 @@ internal fun ScenePanel(
             content = content,
         )
         if (title != null) {
-            OutlinedText(
-                title,
-                style = MaterialTheme.typography.headlineMedium,
-                // Заголовок садится на рамку: половина над ней, половина — внутри.
+            // Заголовок садится на рамку: половина над ней, половина — внутри.
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.align(Alignment.TopCenter).offset(y = -PanelTitleRise),
-            )
+            ) {
+                badge?.invoke()
+                OutlinedText(title, style = MaterialTheme.typography.headlineMedium)
+            }
         }
     }
 }

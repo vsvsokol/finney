@@ -6,13 +6,14 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -277,7 +278,7 @@ fun HoldStepper(
             enabled = minusEnabled,
             contentDescription = minusDescription,
         ) {
-            OutlinedText("−", style = MaterialTheme.typography.headlineMedium)
+            StepSign(plus = false)
         }
         number(
             Modifier.graphicsLayer {
@@ -290,7 +291,22 @@ fun HoldStepper(
             enabled = plusEnabled,
             contentDescription = plusDescription,
         ) {
-            OutlinedText("+", style = MaterialTheme.typography.headlineMedium)
+            StepSign(plus = true)
         }
+    }
+}
+
+/**
+ * «−» и «+» толстыми чертами, а не буквами шрифта: у Glina эти знаки тонкие и мелкие,
+ * и на плейтесте кнопки в плане не заметили — видели жёлтые кружки, а не «добавить».
+ */
+@Composable
+private fun StepSign(plus: Boolean) {
+    Canvas(Modifier.size(24.dp)) {
+        val width = size.minDimension * 0.24f
+        val inset = width / 2f
+        val mid = size.minDimension / 2f
+        drawLine(FinneyInk, Offset(inset, mid), Offset(size.width - inset, mid), width, StrokeCap.Round)
+        if (plus) drawLine(FinneyInk, Offset(mid, inset), Offset(mid, size.height - inset), width, StrokeCap.Round)
     }
 }
