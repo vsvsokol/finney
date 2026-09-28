@@ -19,16 +19,21 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlinx.coroutines.delay
 import ru.finney.pet.domain.model.TaskOutcome
 import ru.finney.pet.domain.model.TaskTheme
 import ru.finney.pet.ui.components.AlertBadge
@@ -184,55 +189,81 @@ private fun TaskIntro(state: TaskUiState.Ready, onStart: () -> Unit, onBack: () 
 private fun TaskResultScene(state: TaskUiState.Ready, onReplay: () -> Unit, onDone: () -> Unit) {
     val result = state.result ?: return
     val success = result.outcome == TaskOutcome.SUCCESS
-    // Джингл итога, следом — монеты награды. Раз на попытку: поворот экрана не повторяет.
+    // Джингл итога, следом — монеты награды летят в кошелёк. Раз на попытку.
     val sounds = LocalSounds.current
+    val flight = remember(state.attempt) { RewardFlight(result.reward) }
     LaunchedEffect(state.attempt) {
         sounds.play(if (success) Sfx.GameWin else Sfx.GameFail)
-        if (result.reward > 0) {
-            delay(RewardCoinDelayMs)
-            sounds.play(Sfx.Coin)
-        }
+        flight.play(sounds)
     }
-    GameScene(backdrop = backdropFor(state.task, finished = true), onClose = onDone, money = state.balance) {
-        // Разбор бывает длиннее экрана — прокручивается он, а «Ещё раз» и «Дальше»
-        // всегда видны: раньше они уезжали вниз, и ребёнок не знал, как выйти.
-        SceneBody(
-            // Главная кнопка — та, что ведёт по игре дальше: после успеха «Дальше», после
-            // неудачи «Ещё раз». Вторая — спокойная, как «Взять» в копилке. Раньше обе были
-            // одинаковыми, и после победы ребёнок жал «Ещё раз» наугад (плейтест).
-            bottom = {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    if (success) {
-                        FinneyQuietButton(text = "Ещё раз", onClick = onReplay, modifier = Modifier.weight(1f))
-                        FinneyButton(text = "Дальше", onClick = onDone, modifier = Modifier.weight(1f))
-                    } else {
-                        FinneyQuietButton(text = "Дальше", onClick = onDone, modifier = Modifier.weight(1f))
-                        FinneyButton(text = "Ещё раз", onClick = onReplay, modifier = Modifier.weight(1f))
-                    }
+    val density = LocalDensity.current
+    // Монетка кошелька — у его правого края: поле плашки и половина монетки.
+    val walletCoinInset = with(density) { (12.dp + 15.dp).toPx() }
+    Box(Modifier.fillMaxSize()) {
+        GameScene(
+            backdrop = backdropFor(state.task, finished = true),
+            onClose = onDone,
+            money = flight.wallet(state.balance),
+            moneyModifier = Modifier
+                .onGloballyPositioned { c ->
+                    val b = c.boundsInRoot()
+                    flight.to = Offset(b.right - walletCoinInset, b.center.y)
                 }
-            },
+                .graphicsLayer {
+                    scaleX = flight.walletPop.value
+                    scaleY = flight.walletPop.value
+                },
         ) {
-            // Итог — значком на рамке, крупно: «✓» или «!» видно раньше, чем прочитано слово.
-            // Цвет здесь — итог действия ребёнка, как и велит правило цвета, и не единственный признак.
-            ScenePanel(
-                title = if (success) "Готово!" else "Почти!",
-                modifier = Modifier.fillMaxWidth(),
-                badge = { if (success) CheckBadge(size = 44.dp) else AlertBadge(size = 44.dp) },
+            // Разбор бывает длиннее экрана — прокручивается он, а «Ещё раз» и «Дальше»
+            // всегда видны: раньше они уезжали вниз, и ребёнок не знал, как выйти.
+            SceneBody(
+                // Главная кнопка — та, что ведёт по игре дальше: после успеха «Дальше», после
+                // неудачи «Ещё раз». Вторая — спокойная, как «Взять» в копилке. Раньше обе были
+                // одинаковыми, и после победы ребёнок жал «Ещё раз» наугад (плейтест).
+                bottom = {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        if (success) {
+                            FinneyQuietButton(text = "Ещё раз", onClick = onReplay, modifier = Modifier.weight(1f))
+                            FinneyButton(text = "Дальше", onClick = onDone, modifier = Modifier.weight(1f))
+                        } else {
+                            FinneyQuietButton(text = "Дальше", onClick = onDone, modifier = Modifier.weight(1f))
+                            FinneyButton(text = "Ещё раз", onClick = onReplay, modifier = Modifier.weight(1f))
+                        }
+                    }
+                },
             ) {
-                ResultBody(state.task, result.details, result.input)
+                // Итог — значком на рамке, крупно: «✓» или «!» видно раньше, чем прочитано слово.
+                // Цвет здесь — итог действия ребёнка, как и велит правило цвета, и не единственный признак.
+                ScenePanel(
+                    title = if (success) "Готово!" else "Почти!",
+                    modifier = Modifier.fillMaxWidth(),
+                    badge = { if (success) CheckBadge(size = 44.dp) else AlertBadge(size = 44.dp) },
+                ) {
+                    ResultBody(state.task, result.details, result.input)
+                }
+                RewardChip(
+                    result.reward,
+                    Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .onGloballyPositioned { flight.from = it.boundsInRoot().center }
+                        .graphicsLayer {
+                            scaleX = flight.chipPop.value
+                            scaleY = flight.chipPop.value
+                        },
+                )
+                Spacer(Modifier.weight(1f))
+                // Объяснение — репликой питомца во всю ширину, хвостиком к нему: так оно
+                // отделено от пунктов и читается как совет, а не как ещё один абзац.
+                Bubble(
+                    if (success) state.task.explainOk else state.task.explainFail,
+                    Tail.DOWN_RIGHT,
+                    Modifier.fillMaxWidth(),
+                    maxWidth = 600.dp,
+                )
+                PetAtRight(state.character, 110.dp, Modifier.padding(end = 8.dp))
             }
-            RewardChip(result.reward, Modifier.align(Alignment.CenterHorizontally))
-            Spacer(Modifier.weight(1f))
-            // Объяснение — репликой питомца во всю ширину, хвостиком к нему: так оно
-            // отделено от пунктов и читается как совет, а не как ещё один абзац.
-            Bubble(
-                if (success) state.task.explainOk else state.task.explainFail,
-                Tail.DOWN_RIGHT,
-                Modifier.fillMaxWidth(),
-                maxWidth = 600.dp,
-            )
-            PetAtRight(state.character, 110.dp, Modifier.padding(end = 8.dp))
         }
+        RewardCoins(flight)
     }
 }
 
@@ -259,6 +290,3 @@ private fun RewardChip(reward: Int, modifier: Modifier = Modifier) {
         }
     }
 }
-
-/** Монеты награды звенят, когда джингл итога почти отыграл. */
-private const val RewardCoinDelayMs = 900L
