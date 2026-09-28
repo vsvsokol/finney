@@ -84,6 +84,7 @@ enum class Backdrop { ROOM, ROOM_RAIN, SHOP, FIELD, SKY, SUNSET, STORE }
 /**
  * Экран игры: фон, верхняя полоса и содержимое.
  * [money] — число в кошельке этой игры; null — кошелёк не показываем.
+ * [moneyModifier] — на сам кошелёк: итог узнаёт по нему, куда лететь монетам награды.
  *
  * Внутри [SceneStage] фон рисует сцена, а экран только говорит, какой он: так
  * вступление, игра и итог стоят на одном фоне, и смена фона плавная. Без сцены
@@ -95,6 +96,7 @@ internal fun GameScene(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
     money: Int? = null,
+    moneyModifier: Modifier = Modifier,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val stage = LocalStageBackdrop.current
@@ -107,7 +109,7 @@ internal fun GameScene(
                 modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (money != null) MoneyPill(money)
+                if (money != null) MoneyPill(money, moneyModifier)
                 Box(Modifier.weight(1f))
                 FinneyIconButton(onClick = onClose, contentDescription = "Закрыть игру", size = 48.dp, sound = Sfx.Back) {
                     OutlinedText("✕", style = MaterialTheme.typography.titleLarge)
@@ -186,11 +188,11 @@ internal fun SceneBody(
 }
 
 @Composable
-private fun MoneyPill(amount: Int) {
+private fun MoneyPill(amount: Int, modifier: Modifier = Modifier) {
     CoinAmount(
         amount = amount,
         coinSize = 30.dp,
-        modifier = Modifier
+        modifier = modifier
             .clip(RoundedCornerShape(50))
             .background(FinneyCream)
             .border(StrokeRegular, FinneyInk, RoundedCornerShape(50))

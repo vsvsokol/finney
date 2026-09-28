@@ -74,6 +74,7 @@ import ru.finney.pet.ui.components.Coin
 import ru.finney.pet.ui.components.FeedbackSound
 import ru.finney.pet.ui.components.FillRing
 import ru.finney.pet.ui.components.FinneyButton
+import ru.finney.pet.ui.components.CheckBadge
 import ru.finney.pet.ui.components.FinneyIcon
 import ru.finney.pet.ui.components.FinneyIconButton
 import ru.finney.pet.ui.components.FinneyIcons
@@ -686,12 +687,17 @@ private fun HomeContent(
             // Список всех игр ребёнку не нужен: на каждом уровне своя (он остался в отладке).
             val levelTaskId = state.check.levelTaskId
             if (levelTaskId != null && state.levelGame != null) {
+                // Пройденная — не тонкой галочкой в конце строки (плейтест 28.09, п. 46),
+                // а крупным «✓» вместо звезды, зелёной заливкой и словом «пройдено».
+                // Зелёный здесь — итог действия ребёнка, и рядом значок с подписью.
+                val passed = state.check.gamePassed
                 InfoChip(
                     icon = FinneyIcons.Star,
-                    text = if (state.check.gamePassed) "${state.levelGame} ✓" else "Игра: ${state.levelGame}",
+                    text = if (passed) "${state.levelGame}\nпройдено" else "Игра: ${state.levelGame}",
                     action = "Игра уровня",
                     onClick = { onOpenTask(levelTaskId) },
                     enabled = !sleeping,
+                    done = passed,
                     modifier = Modifier.weight(1f).hintTarget(hintTargets, NextStep.LEVEL_GAME),
                 )
             }
@@ -1394,12 +1400,13 @@ private fun InfoChip(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     progress: Pair<Int, Int>? = null,
+    done: Boolean = false,
 ) {
     Row(
         modifier = modifier
             .graphicsLayer { alpha = if (enabled) 1f else NightDim }
             .clip(RoundedCornerShape(RadiusField))
-            .background(FinneySand)
+            .background(if (done) FinneyGreen else FinneySand)
             .border(StrokeThin, FinneyInk, RoundedCornerShape(RadiusField))
             .clickable(enabled = enabled, onClickLabel = action, onClick = onClick)
             .defaultMinSize(minHeight = 48.dp)
@@ -1407,19 +1414,31 @@ private fun InfoChip(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (progress != null) {
+        if (done) {
+            // Тот же размер, что кольцо копилки рядом: полоса над комнатой не растёт.
+            CheckBadge(size = 32.dp)
+        } else if (progress != null) {
             // 32 dp — ровно высота плашки без полей: полоса над комнатой не растёт.
             FillRing(progress.first, progress.second, diameter = 32.dp) { FinneyIcon(icon, size = 17.dp) }
         } else {
             FinneyIcon(icon, size = 22.dp)
         }
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = FinneyInk,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
+        if (done) {
+            // «Пройдена!» — первой строкой и целиком: длинное название иначе съедало
+            // обе строки, и слово обрезалось. Название — ниже, сколько влезет.
+            Column {
+                Text("Пройдена!", style = MaterialTheme.typography.bodyMedium, color = FinneyInk, maxLines = 1)
+                Text(text, style = MaterialTheme.typography.bodyMedium, color = FinneyInk, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        } else {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyMedium,
+                color = FinneyInk,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
