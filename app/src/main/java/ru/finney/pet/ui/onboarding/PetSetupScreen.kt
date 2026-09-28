@@ -10,13 +10,25 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.gestures.snapping.SnapPosition
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.layout.layout
+import kotlinx.coroutines.launch
+import ru.finney.pet.ui.components.ScreenPadding
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,6 +47,7 @@ import ru.finney.pet.domain.profile.PetNameError
 import ru.finney.pet.ui.components.FinneyButton
 import ru.finney.pet.ui.components.FinneyTextField
 import ru.finney.pet.ui.components.FinneyScreen
+import ru.finney.pet.ui.components.MenuBackdrop
 import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.pet.PetMood
 import ru.finney.pet.ui.pet.PetPose
@@ -103,6 +116,7 @@ private fun PetSetupContent(
     onSave: () -> Unit,
 ) {
     FinneyScreen(
+        backdrop = MenuBackdrop.SHAPES,
         scrollable = true,
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
@@ -127,7 +141,7 @@ private fun PetSetupContent(
             onSelect = onBodyColorChange,
         )
 
-        SectionTitle("Как его зовут")
+        OutlinedText("Как назовёшь?", style = MaterialTheme.typography.headlineMedium)
         NameField(
             name = state.name,
             error = state.nameError,
@@ -207,16 +221,6 @@ private fun ColorPicker(
 }
 
 @Composable
-private fun SectionTitle(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.titleMedium,
-        color = FinneyInk,
-        modifier = Modifier.fillMaxWidth(),
-    )
-}
-
-@Composable
 private fun NameField(
     name: String,
     error: PetNameError?,
@@ -259,22 +263,97 @@ private fun CharacterPicker(
     // Ленивый он не ради памяти, а ради кадров: каждая карточка крутит свою
     // анимацию (см. комментарий к CharacterCard про 5 fps), и в LazyRow
     // одновременно живут только видимые — две-три вместо пяти.
-    LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        contentPadding = PaddingValues(horizontal = 4.dp),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        items(PetCharacter.entries) { character ->
-            CharacterCard(
-                character = character,
-                bodyColor = bodyColor,
-                isSelected = character == selected,
-                enabled = enabled,
-                onSelect = { onSelect(character) },
-                modifier = Modifier.width(132.dp),
-            )
+    //
+    // Выбранный — тот, кто в середине (плейтест 28.09): листаешь — и сразу выбираешь,
+    // без второго нажатия. Соседи меньше и бледнее, прокрутка защёлкивается по центру.
+    val list = rememberLazyListState(initialFirstVisibleItemIndex = selected.ordinal)
+    val scope = rememberCoroutineScope()
+    val latestSelected by rememberUpdatedState(selected)
+    val latestOnSelect by rememberUpdatedState(onSelect)
+
+    // Профиль при редактировании загружается позже первого кадра: докручиваем
+    // к выбранному, если он не в середине.
+    LaunchedEffect(selected) {
+        if (!list.isScrollInProgress && list.centeredIndex() != selected.ordinal) {
+            list.animateScrollToItem(selected.ordinal)
         }
     }
+    LaunchedEffect(list, enabled) {
+        if (!enabled) return@LaunchedEffect
+        var wasScrolling = false
+        snapshotFlow { list.isScrollInProgress }.collect { scrolling ->
+            if (wasScrolling && !scrolling) {
+                val centered = PetCharacter.entries.getOrNull(list.centeredIndex() ?: -1)
+                if (centered != null && centered != latestSelected) latestOnSelect(centered)
+            }
+            wasScrolling = scrolling
+        }
+    }
+
+    BoxWithConstraints(
+        Modifier
+            .fillMaxWidth()
+            // Карусель — во всю ширину экрана, поверх его полей: иначе соседи
+            // срезались по линейке в 16 dp от края.
+            .layout { measurable, constraints ->
+                val bleed = ScreenPadding.roundToPx()
+                val wide = constraints.copy(
+                    minWidth = constraints.minWidth + bleed * 2,
+                    maxWidth = constraints.maxWidth + bleed * 2,
+                )
+                val placeable = measurable.measure(wide)
+                layout(constraints.maxWidth, placeable.height) { placeable.place(-bleed, 0) }
+            },
+    ) {
+        // Крайний отступ такой, чтобы первый и последний питомец вставали в середину.
+        val side = (maxWidth - CardWidth) / 2
+        LazyRow(
+            state = list,
+            contentPadding = PaddingValues(horizontal = side),
+            flingBehavior = rememberSnapFlingBehavior(list, SnapPosition.Center),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            itemsIndexed(PetCharacter.entries) { index, character ->
+                CharacterCard(
+                    character = character,
+                    bodyColor = bodyColor,
+                    isSelected = character == selected,
+                    enabled = enabled,
+                    onSelect = {
+                        onSelect(character)
+                        scope.launch { list.animateScrollToItem(index) }
+                    },
+                    modifier = Modifier
+                        .width(CardWidth)
+                        .shrinkAwayFromCenter(list, index),
+                )
+            }
+        }
+    }
+}
+
+/** Индекс карточки, ближайшей к середине карусели. */
+private fun LazyListState.centeredIndex(): Int? {
+    val info = layoutInfo
+    val center = (info.viewportStartOffset + info.viewportEndOffset) / 2f
+    return info.visibleItemsInfo.minByOrNull { kotlin.math.abs(it.offset + it.size / 2f - center) }?.index
+}
+
+private val CardWidth = 132.dp
+
+/**
+ * Карточка уменьшается и бледнеет по мере того, как уходит от середины.
+ * Положение читается в graphicsLayer — прокрутка не пересобирает карточки.
+ */
+private fun Modifier.shrinkAwayFromCenter(list: LazyListState, index: Int): Modifier = graphicsLayer {
+    val info = list.layoutInfo
+    val item = info.visibleItemsInfo.firstOrNull { it.index == index } ?: return@graphicsLayer
+    val center = (info.viewportStartOffset + info.viewportEndOffset) / 2f
+    val distance = kotlin.math.abs(item.offset + item.size / 2f - center) / item.size
+    val t = distance.coerceIn(0f, 1f)
+    scaleX = 1f - 0.25f * t
+    scaleY = 1f - 0.25f * t
+    alpha = 1f - 0.4f * t
 }
 
 /**

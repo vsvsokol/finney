@@ -1,7 +1,6 @@
 package ru.finney.pet.ui.components
 
 import androidx.compose.foundation.ScrollState
-import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
@@ -25,14 +24,13 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import ru.finney.pet.ui.theme.FinneyCream
 import ru.finney.pet.ui.sound.Sfx
 
-// Подложка экрана: кремовый фон и одинаковые поля по краям. Отдельный компонент,
+// Подложка экрана: фон меню и одинаковые поля по краям. Отдельный компонент,
 // чтобы отступы не разъезжались от экрана к экрану и их не приходилось помнить.
 
 /** Поля экрана. 16 dp по бокам — на 360 dp ширины (ТЗ п. 3.1) содержимому остаётся 328 dp. */
-private val ScreenPadding = 16.dp
+internal val ScreenPadding = 16.dp
 
 /**
  * [scrollable] — экран длиннее высоты устройства: содержимое можно прокручивать.
@@ -51,6 +49,8 @@ fun FinneyScreen(
     scrollable: Boolean = false,
     verticalArrangement: Arrangement.Vertical = Arrangement.spacedBy(16.dp),
     horizontalAlignment: Alignment.Horizontal = Alignment.CenterHorizontally,
+    /** Точки — экран-дело, круги — экран-событие (см. [MenuBackdrop]). */
+    backdrop: MenuBackdrop = MenuBackdrop.DOTS,
     bottom: (@Composable ColumnScope.() -> Unit)? = null,
     /**
      * Выход с экрана — круглый «✕» в правом верхнем углу, один на все экраны:
@@ -65,7 +65,7 @@ fun FinneyScreen(
         Column(
             modifier = modifier
                 .fillMaxSize()
-                .background(FinneyCream)
+                .menuBackdrop(backdrop)
                 // Системные панели: под строкой состояния и кнопками навигации
                 // содержимое оказаться не должно.
                 .systemBarsPadding()
@@ -80,7 +80,7 @@ fun FinneyScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(FinneyCream)
+            .menuBackdrop(backdrop)
             .systemBarsPadding()
             .padding(ScreenPadding),
         verticalArrangement = Arrangement.spacedBy(16.dp),

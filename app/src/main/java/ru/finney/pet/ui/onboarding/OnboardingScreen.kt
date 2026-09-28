@@ -28,10 +28,12 @@ import androidx.compose.ui.unit.dp
 import ru.finney.pet.domain.model.Category
 import ru.finney.pet.domain.model.PetCharacter
 import ru.finney.pet.ui.components.FinneyButton
+import ru.finney.pet.ui.components.FinneyQuietButton
 import ru.finney.pet.ui.components.FinneyCard
 import ru.finney.pet.ui.components.FinneyIcon
 import ru.finney.pet.ui.components.FinneyIcons
 import ru.finney.pet.ui.components.FinneyScreen
+import ru.finney.pet.ui.components.MenuBackdrop
 import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.components.SavingsIcon
 import ru.finney.pet.ui.components.StepDots
@@ -69,6 +71,7 @@ fun OnboardingScreen(
     val last = page == PAGES - 1
 
     FinneyScreen(
+        backdrop = MenuBackdrop.SHAPES,
         scrollable = true,
         // Разделы страницы — с воздухом: на плейтесте приветствие назвали тесным.
         verticalArrangement = Arrangement.spacedBy(GapSection),
@@ -82,7 +85,8 @@ fun OnboardingScreen(
                     },
                     onClick = { if (last) onFinish() else page++ },
                 )
-                if (page > 0) FinneyButton(text = "Назад", onClick = { page-- })
+                // «Назад» — второстепенная: одинаковые с «Дальше» кнопки жали наугад (плейтест 28.09).
+                if (page > 0) FinneyQuietButton(text = "Назад", onClick = { page-- })
                 if (last && !isReplay) {
                     FinneyButton(text = "Режим проверки (демо)", onClick = onStartDemo)
                 }

@@ -44,6 +44,7 @@ import ru.finney.pet.ui.components.SpendBar
 import ru.finney.pet.ui.tasks.games.ItemPicture
 import ru.finney.pet.ui.components.FinneyPanel
 import ru.finney.pet.ui.components.FinneyScreen
+import ru.finney.pet.ui.components.MenuBackdrop
 import ru.finney.pet.ui.components.LevelBadge
 import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.sound.LocalSounds
@@ -98,6 +99,7 @@ private fun PeriodResultContent(state: PeriodResultUiState.Ready, onBack: () -> 
     // «На главный» закреплена внизу: разбор длиннее экрана, и в конце прокрутки
     // кнопку не находили — выйти можно было только системным «назад».
     FinneyScreen(
+        backdrop = MenuBackdrop.SHAPES,
         scrollable = true,
         verticalArrangement = Arrangement.spacedBy(16.dp),
         bottom = { FinneyButton(text = "На главный", onClick = onBack) },

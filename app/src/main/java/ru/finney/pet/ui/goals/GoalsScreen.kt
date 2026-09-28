@@ -52,6 +52,7 @@ import ru.finney.pet.ui.components.FinneyIcon
 import ru.finney.pet.ui.components.FinneyIcons
 import ru.finney.pet.ui.components.FinneyPanel
 import ru.finney.pet.ui.components.FinneyScreen
+import ru.finney.pet.ui.components.MenuBackdrop
 import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.pet.accessoryArt
 import ru.finney.pet.ui.theme.FinneyCream
@@ -166,6 +167,7 @@ private fun GoalsContent(
 ) {
     var amount by rememberSaveable { mutableIntStateOf(AMOUNT_STEP) }
     FinneyScreen(
+        backdrop = MenuBackdrop.SHAPES,
         scrollable = true,
         verticalArrangement = Arrangement.spacedBy(16.dp),
         onClose = onBack,
