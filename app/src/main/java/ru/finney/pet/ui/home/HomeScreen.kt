@@ -375,6 +375,8 @@ private fun HomeContent(
 
     // Панель отладки: долгое нажатие на уровень, только в отладочной сборке.
     var debugOpen by rememberSaveable { mutableStateOf(false) }
+    // Отладка: облик питомца поверх уровня, чтобы посмотреть все стадии роста.
+    var previewStage by rememberSaveable { mutableStateOf<Int?>(null) }
 
     // Панель уровня: чек-лист условий и «Завершить уровень». Открывается только
     // значком уровня, и она же — подтверждение: шаг необратимый, случайное
@@ -408,7 +410,7 @@ private fun HomeContent(
     val currentState by rememberUpdatedState(state)
 
     // Место PetView — с поправкой на стадию роста: облик меньше рамки и стоит у её низа.
-    fun petBounds(): Rect = currentState.let { petLayout.grownPet(it.appearance.character.skin, it.stage) }
+    fun petBounds(): Rect = currentState.let { petLayout.grownPet(it.appearance.character.skin, previewStage ?: it.stage) }
     fun flushPlay() {
         val toy = heldToy ?: return
         if (pendingShakes > 0) onPlay(toy, pendingShakes)
@@ -546,7 +548,7 @@ private fun HomeContent(
                 character = state.appearance.character,
                 bodyColor = state.appearance.bodyColor,
                 accessories = state.worn,
-                stage = state.stage,
+                stage = previewStage ?: state.stage,
                 mood = if (eyesClosed) PetMood.SLEEP else state.emotion.toMood(),
                 pose = rememberPoseProvider(animation),
                 modifier = Modifier
@@ -1029,6 +1031,8 @@ private fun HomeContent(
                 DebugPanel(
                     onDismiss = { debugOpen = false },
                     onOpenTasks = { debugOpen = false; onOpenTasks() },
+                    previewStage = previewStage,
+                    onPreviewStage = { previewStage = it },
                     modifier = Modifier.pointerInput(Unit) { detectTapGestures { } },
                 )
             }

@@ -41,6 +41,9 @@ fun DebugPanel(
     /** Список всех мини-игр: ребёнку он не показывается, у него — одна игра на уровень. */
     onOpenTasks: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Облик питомца поверх уровня — посмотреть стадии роста; null — по уровню. */
+    previewStage: Int? = null,
+    onPreviewStage: (Int?) -> Unit = {},
     viewModel: DebugViewModel = viewModel(factory = DebugViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -65,6 +68,8 @@ fun DebugPanel(
             onFinishSleep = viewModel::finishSleep,
             onWipe = viewModel::wipeAll,
             onOpenTasks = onOpenTasks,
+            previewStage = previewStage,
+            onPreviewStage = onPreviewStage,
             onDismiss = onDismiss,
             modifier = modifier,
         )
@@ -81,6 +86,8 @@ private fun DebugContent(
     onWipe: () -> Unit,
     onFinishSleep: () -> Unit = {},
     onOpenTasks: () -> Unit = {},
+    previewStage: Int? = null,
+    onPreviewStage: (Int?) -> Unit = {},
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -128,6 +135,15 @@ private fun DebugContent(
             )
 
             Buttons("Все мини-игры" to onOpenTasks)
+
+            // Только вид: уровень и стадия в игре не меняются.
+            Line("Облик питомца: ${previewStage?.let { "как на уровне $it" } ?: "по уровню"}")
+            Buttons(
+                "1" to { onPreviewStage(1) },
+                "2" to { onPreviewStage(2) },
+                "4" to { onPreviewStage(4) },
+                "По уровню" to { onPreviewStage(null) },
+            )
 
             Buttons(
                 if (confirmWipe) {

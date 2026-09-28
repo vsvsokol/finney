@@ -2,7 +2,6 @@ package ru.finney.pet.ui.room
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -30,23 +29,40 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.zIndex
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.snapshots.SnapshotStateMap
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.platform.LocalDensity
 import kotlinx.coroutines.launch
 
-// Игрушки в зале. Купленная игрушка лежит на полу — в ряд над кнопкой уровня,
-// почти на одной линии со ступнями питомца. Рисуется она за питомцем: он может
-// пройти перед ней, но сама она его не заслоняет. Её можно взять пальцем
-// и поводить рядом с питомцем: он тянется к ней и радуется. Отпустил — игрушка
-// сама возвращается на место. Что это даёт в игре, решает главный экран: сцена
-// только сообщает, где игрушка и как её двигают.
+// Игрушки в зале. Купленная игрушка лежит на полу; её можно взять пальцем и
+// положить в любое место пола — там она и останется. Рядом с питомцем он тянется
+// к ней и радуется. Кто кого заслоняет, решает глубина: игрушка ближе к зрителю,
+// чем ступни питомца, лежит перед ним, дальше — за ним. Тень у игрушки всегда
+// своя: лежит — у её низа, в руке — на полу под ней. Что это даёт в игре, решает
+// главный экран: сцена только сообщает, где игрушка и как её двигают.
 
-/** Сторона игрушки — доля видимой ширины экрана. На телефоне около 45 dp. */
-private const val TOY_SCREEN_SIZE = 0.115f
+/** Сторона игрушки — доля видимой ширины экрана. На телефоне около 60 dp. */
+private const val TOY_SCREEN_SIZE = 0.155f
 
 /**
- * Низ игрушки — доля высоты холста. Ступни питомца в зале — 0.70, верх кнопки
- * уровня — около 0.73: ряд лежит между ними и кнопку не задевает.
+ * Низ игрушки на своём месте — доля высоты холста. Ступни питомца в зале — 0.70:
+ * ряд чуть ближе к зрителю, чем он.
  */
 private const val TOY_BOTTOM = 0.72f
+
+/**
+ * Куда по глубине можно положить игрушку — её низ, доли высоты холста. Дальше —
+ * основание капсулы (0.66), ближе — ряд кнопок комнат.
+ */
+private const val FLOOR_BACK = 0.665f
+private const val FLOOR_FRONT = 0.76f
+
+/** Ступни питомца в зале: игрушка ниже этой линии — перед ним, выше — за ним. */
+private const val PET_FEET = 0.70f
 
 /**
  * Места игрушек — середины, доли видимой ширины экрана. Сначала — перед капсулой
@@ -61,7 +77,16 @@ const val MAX_ROOM_TOYS = 6
 private val ToyFooting = Footing(feetX = 0.5f, feetY = 0.92f)
 
 /** Насколько игрушка крупнее в руке: её «подняли» ближе к экрану. */
-private const val HELD_SCALE = 1.3f
+private const val HELD_SCALE = 1.2f
+
+/** На сколько поднята игрушка в руке — доля её высоты. Тень остаётся на полу. */
+private const val HELD_LIFT = 0.45f
+
+/** Поднятая игрушка дальше от пола — тень под ней бледнее на эту долю. */
+private const val HELD_SHADOW_FADE = 0.45f
+
+/** Игрушка перед питомцем — над ним, но под поднятой. */
+private const val FRONT_Z = 1f
 
 /** Поднятая игрушка — над питомцем и дверью капсулы. */
 private const val HELD_Z = 2f
@@ -83,9 +108,37 @@ internal fun toySlots(count: Int, left: Float, right: Float): List<RelRect> {
     }
 }
 
+/** Видимая часть пола по ширине — доли ширины холста: за край игрушку не утащить. */
+@Immutable
+internal data class ToyFloor(val left: Float, val right: Float)
+
+/**
+ * Куда игрушки передвинули — сдвиг от своего места, доли холста, по id.
+ * Живёт выше комнаты: переход на кухню и обратно, магазин и поворот экрана его не сбрасывают.
+ */
+@Composable
+internal fun rememberToyMoves(): SnapshotStateMap<String, Offset> = rememberSaveable(
+    saver = listSaver(
+        save = { moves -> moves.flatMap { (id, at) -> listOf(id, at.x, at.y) } },
+        restore = { saved ->
+            mutableStateMapOf<String, Offset>().apply {
+                saved.chunked(3).forEach { (id, x, y) -> put(id as String, Offset(x as Float, y as Float)) }
+            }
+        },
+    ),
+) { mutableStateMapOf() }
+
+/** Сдвиг, при котором [place] остаётся на полу [floor]. */
+private fun clampToFloor(place: RelRect, shift: Offset, floor: ToyFloor): Offset = Offset(
+    x = shift.x.coerceIn(floor.left - place.left, maxOf(floor.left - place.left, floor.right - place.right)),
+    y = shift.y.coerceIn(FLOOR_BACK - place.bottom, FLOOR_FRONT - place.bottom),
+)
+
 /**
  * Одна игрушка на полу.
  *
+ * @param place где она лежит, пока её не двигали.
+ * @param moves куда её передвинули — общий на все игрушки, см. [rememberToyMoves].
  * @param onDrag игрушку тащат: где её середина сейчас (в координатах экрана) и на сколько сдвинули.
  * @param onDrop отпустили.
  */
@@ -94,6 +147,8 @@ internal fun RoomToy(
     toyId: String,
     art: Int,
     place: RelRect,
+    moves: SnapshotStateMap<String, Offset>,
+    floor: ToyFloor,
     canvasW: Dp,
     canvasH: Dp,
     lighting: RoomLighting,
@@ -101,30 +156,33 @@ internal fun RoomToy(
     onDrag: (toyId: String, centre: Offset, delta: Offset) -> Unit,
     onDrop: (toyId: String) -> Unit,
 ) {
-    val drag = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
+    val shift = clampToFloor(place, moves[toyId] ?: Offset.Zero, floor)
+    val here = place.shiftedX(shift.x).shiftedY(shift.y)
+    // Поднята ли игрушка: 0 — лежит, 1 — в руке.
+    val lift = remember { Animatable(0f) }
     var held by remember { mutableStateOf(false) }
-    // Где игрушка лежит — без сдвига пальцем: сдвиг добавляется к этому.
-    var home by remember { mutableStateOf(Rect.Zero) }
+    var bounds by remember { mutableStateOf(Rect.Zero) }
     val scope = rememberCoroutineScope()
     val drop by rememberUpdatedState(onDrop)
     val move by rememberUpdatedState(onDrag)
+    val canvasPx = with(LocalDensity.current) { Size(canvasW.toPx(), canvasH.toPx()) }
 
     fun release() {
         if (!held) return
         held = false
         drop(toyId)
-        scope.launch { drag.animateTo(Offset.Zero, spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMediumLow)) }
+        scope.launch { lift.animateTo(0f, spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMediumLow)) }
     }
 
-    // Рисунок лежит за питомцем, а ловит пальцы отдельная зона поверх него:
+    // Рисунок лежит в своём слое, а ловит пальцы отдельная зона поверх всего:
     // у питомца квадрат с прозрачными полями, и стоя рядом, он забирал бы касания себе.
     val box = Modifier
-        .offset(canvasW * place.left, canvasH * place.top)
-        .requiredSize(canvasW * place.width, canvasH * place.height)
+        .offset(canvasW * here.left, canvasH * here.top)
+        .requiredSize(canvasW * here.width, canvasH * here.height)
     val lifted = Modifier.graphicsLayer {
-        translationX = drag.value.x
-        translationY = drag.value.y
-        val s = if (held) HELD_SCALE else 1f
+        val up = lift.value
+        translationY = -size.height * HELD_LIFT * up
+        val s = 1f + (HELD_SCALE - 1f) * up
         scaleX = s
         scaleY = s
     }
@@ -132,21 +190,21 @@ internal fun RoomToy(
     Box(
         modifier = box
             .zIndex(GRAB_Z)
-            .onGloballyPositioned { home = it.boundsInRoot() }
-            .then(lifted)
+            .onGloballyPositioned { bounds = it.boundsInRoot() }
             .semantics { contentDescription = "Игрушка" }
             .pointerInput(enabled) {
                 if (!enabled) return@pointerInput
                 detectDragGestures(
                     onDragStart = {
                         held = true
-                        scope.launch { drag.stop() }
+                        scope.launch { lift.animateTo(1f, spring(stiffness = Spring.StiffnessMedium)) }
                     },
                     onDrag = { change, amount ->
                         change.consume()
-                        val next = drag.value + amount
-                        scope.launch { drag.snapTo(next) }
-                        move(toyId, home.center + next, amount)
+                        val now = moves[toyId] ?: Offset.Zero
+                        val step = Offset(amount.x / canvasPx.width, amount.y / canvasPx.height)
+                        moves[toyId] = clampToFloor(place, now + step, floor)
+                        move(toyId, bounds.center + amount, amount)
                     },
                     onDragEnd = ::release,
                     onDragCancel = ::release,
@@ -156,12 +214,18 @@ internal fun RoomToy(
 
     LitBody(
         lighting = lighting,
-        place = place,
+        place = here,
         footing = ToyFooting,
-        // Пока игрушка в руке или летит обратно, тени на её месте на полу нет.
-        visibility = { if (drag.value == Offset.Zero) 1f else 0f },
-        // Лежит — за питомцем, поднятая — поверх него и остальных игрушек.
-        modifier = box.zIndex(if (held) HELD_Z else 0f).then(lifted),
+        visibility = { 1f - HELD_SHADOW_FADE * lift.value },
+        modifier = box
+            .zIndex(
+                when {
+                    held -> HELD_Z
+                    here.bottom > PET_FEET -> FRONT_Z
+                    else -> 0f
+                },
+            )
+            .then(lifted),
     ) {
         Image(
             painter = painterResource(art),

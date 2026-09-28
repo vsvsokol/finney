@@ -35,6 +35,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -285,6 +286,8 @@ fun RoomScene(
         // Игрушки — на полу по бокам видимой части комнаты, см. RoomToys.kt.
         val toyPlaces = toys.mapNotNull { id -> itemArt(id)?.let { id to it } }
             .let { found -> found.zip(toySlots(found.size, -shiftX / canvasW, visibleRight)) }
+        val toyFloor = ToyFloor(left = -shiftX / canvasW, right = visibleRight)
+        val toyMoves = rememberToyMoves()
         // Какая комната на экране сейчас: во время перехода это ещё старая.
         var shown by remember { mutableStateOf(spot) }
         // Проступающая комната и насколько она уже видна. Пока она проступает,
@@ -378,6 +381,8 @@ fun RoomScene(
                     door = { door.value },
                     onTapItem = onTapItem,
                     toys = toyPlaces,
+                    toyMoves = toyMoves,
+                    toyFloor = toyFloor,
                     toysEnabled = toysEnabled,
                     onToyDrag = onToyDrag,
                     onToyDrop = onToyDrop,
@@ -441,6 +446,8 @@ private fun RoomCanvas(
     door: () -> Float,
     onTapItem: (() -> Unit)?,
     toys: List<Pair<Pair<String, Int>, RelRect>>,
+    toyMoves: SnapshotStateMap<String, Offset>,
+    toyFloor: ToyFloor,
     toysEnabled: Boolean,
     onToyDrag: (toyId: String, centre: Offset, delta: Offset) -> Unit,
     onToyDrop: (toyId: String) -> Unit,
@@ -468,7 +475,7 @@ private fun RoomCanvas(
             // упала бы на мебель, а мебель пола не знает.
             when (room) {
                 RoomSpot.LIVING -> {
-                    // Игрушки лежат за питомцем: он может пройти перед ними, а они его не заслоняют.
+                    // Игрушки на полу: дальше ступней питомца — за ним, ближе — перед ним (RoomToys.kt).
                     val toysOnFloor: @Composable () -> Unit = {
                         for ((toy, place) in toys) {
                             key(toy.first) {
@@ -476,6 +483,8 @@ private fun RoomCanvas(
                                     toyId = toy.first,
                                     art = toy.second,
                                     place = place,
+                                    moves = toyMoves,
+                                    floor = toyFloor,
                                     canvasW = canvasW,
                                     canvasH = canvasH,
                                     lighting = lighting,
