@@ -244,14 +244,12 @@ fun ShopScreen(onBack: () -> Unit, viewModel: ShopViewModel = viewModel(factory 
 | Эмоция | шкалы `pet_state` |
 | Подпись операции для ребёнка | `type` + название товара, цели или задания из контента, ТЗ п. 2.5.4 |
 
-**Меняешь entity — поднимаешь `version` в `FinneyDatabase`.** Миграций сейчас нет:
-`fallbackToDestructiveMigration(dropAllTables = true)` пересоздаёт базу при любой смене
-версии. Это осознанный размен — писать миграцию для версии 3 значило бы держать прежние
-имена питомцев в коде. Цена: установка новой сборки поверх старой стирает профиль,
-и перед сдачей это стоит проверять на чистом устройстве.
-
-Понадобится сохранять прогресс между версиями — возвращаем `addMigrations` и тест на
-`MigrationTestHelper`, который поднимает настоящую базу предыдущей версии из `app/schemas/`.
+**Меняешь entity — поднимаешь `version` в `FinneyDatabase` и пишешь миграцию.** Сейчас
+версия 10; с версии 3 изменения переносятся миграциями `MIGRATION_3_4` … `MIGRATION_9_10`,
+и прогресс переживает обновление. Базы версий 1–2 пересоздаются с нуля
+(`fallbackToDestructiveMigration`): версия 3 переименовала питомцев, и перенос старых значений
+держал бы прежние имена в коде. Каждую миграцию проверяет `MigrationTest` на
+`MigrationTestHelper` — он поднимает настоящую базу предыдущей версии из `app/schemas/`.
 Имена методов в `androidTest` — camelCase без обратных кавычек: `minSdk = 26`, а DEX
 до версии 040 не принимает пробелы в именах методов, и тесты не соберутся вовсе.
 Описание теста — в KDoc над ним. CI это ловит шагом «Build instrumented tests».
@@ -267,7 +265,7 @@ fun ShopScreen(onBack: () -> Unit, viewModel: ShopViewModel = viewModel(factory 
 
 ```
 content/
-├── tasks.json      задания — шесть мини-игр (docs/minigames.md)
+├── tasks.json      задания — восемь мини-игр по три варианта (docs/minigames.md)
 ├── shop.json       товары и цены
 ├── goals.json      цели накопления
 ├── economy.json    баланс: доход, награды, очки, шкалы питомца
@@ -279,7 +277,7 @@ content/
 
 ```json
 {
-  "incomeByStage": [50, 60, 70],
+  "incomeByStage": [50, 55, 60, 65, 70, 70],
   "taskReward": { "success": 15, "fail": 5 },
   "parentBonus": { "step": 5, "maxPerPeriod": 20 },
   "planTolerance": 5,
