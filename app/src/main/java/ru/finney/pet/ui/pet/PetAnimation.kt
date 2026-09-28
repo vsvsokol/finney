@@ -23,6 +23,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import ru.finney.pet.ui.motion.LocalAnimations
+import ru.finney.pet.ui.motion.motionEnabled
 import kotlin.random.Random
 
 /**
@@ -38,6 +40,10 @@ import kotlin.random.Random
  * Мытья — [playGiggle]: от мыла щекотно.
  * Игры с игрушкой — [lookAt]: тянется к игрушке в руке ребёнка.
  * Грусти — [playSigh]: вздыхает и оседает, руки повисают.
+ *
+ * Без анимаций (ТЗ п. 3.6) цепочки `play*` не начинаются: при нулевой скорости каждый
+ * шаг длится кадр, и питомец мелькал бы промежуточными позами. Одиночные переходы
+ * ([lookAt], [openMouth]) просто встают в конечное положение.
  */
 @Stable
 class PetAnimation internal constructor(private val scope: CoroutineScope) {
@@ -81,6 +87,7 @@ class PetAnimation internal constructor(private val scope: CoroutineScope) {
     fun playSigh() {
         if (droopJob?.isActive == true) return
         droopJob = scope.launch {
+            if (!motionEnabled()) return@launch
             droop.animateTo(1f, tween(durationMillis = 700, easing = FastOutSlowInEasing))
             delay(900)
             droop.animateTo(0f, tween(durationMillis = 900, easing = FastOutSlowInEasing))
@@ -102,6 +109,11 @@ class PetAnimation internal constructor(private val scope: CoroutineScope) {
     fun playEat() {
         mouthJob?.cancel()
         mouthJob = scope.launch {
+            // Рот мог остаться открытым навстречу еде — закрыть без жевания и прыжка.
+            if (!motionEnabled()) {
+                mouth.snapTo(0f)
+                return@launch
+            }
             mouth.animateTo(0f, tween(durationMillis = 90))
             repeat(3) {
                 launch {
@@ -119,6 +131,7 @@ class PetAnimation internal constructor(private val scope: CoroutineScope) {
     fun playGiggle() {
         if (wiggleJob?.isActive == true) return
         wiggleJob = scope.launch {
+            if (!motionEnabled()) return@launch
             for (target in floatArrayOf(1f, -0.8f, 0.5f, -0.25f, 0f)) {
                 wiggle.animateTo(target, tween(durationMillis = 70))
             }
@@ -133,6 +146,7 @@ class PetAnimation internal constructor(private val scope: CoroutineScope) {
     fun playJoy() {
         if (job?.isActive == true) return
         job = scope.launch {
+            if (!motionEnabled()) return@launch
             try {
                 crouch.animateTo(1f, tween(durationMillis = 140, easing = FastOutLinearInEasing))
                 launch { crouch.animateTo(0f, tween(durationMillis = 170)) }
@@ -187,13 +201,17 @@ fun rememberPoseProvider(animation: PetAnimation): () -> PetPose {
     )
 
     val lid = rememberBlink()
+    // Без анимаций бесконечная встаёт в крайнее значение: питомец стоял бы наклонённым.
+    // Покой — прямо и на вдохе.
+    val animations = LocalAnimations.current
 
     // Лямбда запоминается один раз: все источники кадров — стабильные объекты,
     // и значения из них берутся в момент вызова, то есть при отрисовке.
-    return remember(animation, breath, sway, lid) {
+    return remember(animation, breath, sway, lid, animations) {
         {
             composePose(
-                breath.value, sway.value, animation.lift.value, animation.crouch.value,
+                if (animations) breath.value else 1f, if (animations) sway.value else 0f,
+                animation.lift.value, animation.crouch.value,
                 lid.value, animation.mouth.value, animation.wiggle.value,
                 animation.lean.value, animation.droop.value,
             )
@@ -219,6 +237,8 @@ private fun rememberBlink(): Animatable<Float, AnimationVector1D> {
     LaunchedEffect(lid) {
         while (true) {
             delay(Random.nextLong(2000L, 5500L))
+            // Без анимаций моргание — веко на один кадр: глаза просто открыты.
+            if (!motionEnabled()) continue
             repeat(if (Random.nextFloat() < 0.2f) 2 else 1) {
                 lid.animateTo(1f, tween(LID_CLOSE_MS, easing = FastOutLinearInEasing))
                 delay(LID_HOLD_MS)
@@ -284,6 +304,11 @@ fun PetAnimation.currentPose(): PetPose {
         label = "sway",
     )
 
+    val animations = LocalAnimations.current
+
     // Моргание сюда не входит: превью — один неподвижный кадр, глаза в нём открыты.
-    return composePose(breath, sway, lift.value, crouch.value, lid = 0f, mouth.value, wiggle.value, lean.value, droop.value)
+    return composePose(
+        if (animations) breath else 1f, if (animations) sway else 0f, lift.value, crouch.value,
+        lid = 0f, mouth.value, wiggle.value, lean.value, droop.value,
+    )
 }
