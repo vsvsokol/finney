@@ -141,6 +141,9 @@ private fun clampToFloor(place: RelRect, shift: Offset, floor: ToyFloor): Offset
  * @param moves куда её передвинули — общий на все игрушки, см. [rememberToyMoves].
  * @param onDrag игрушку тащат: где её середина сейчас (в координатах экрана) и на сколько сдвинули.
  * @param onDrop отпустили.
+ * @param nudge сдвиг рисунка в пикселях, не трогая места: главный экран так показывает,
+ *   что с игрушкой делать, и подбрасывает её, когда питомцу скучно. Читается при рисовании.
+ * @param onPlaced где игрушка на экране — для руки-подсказки.
  */
 @Composable
 internal fun RoomToy(
@@ -155,6 +158,8 @@ internal fun RoomToy(
     enabled: Boolean,
     onDrag: (toyId: String, centre: Offset, delta: Offset) -> Unit,
     onDrop: (toyId: String) -> Unit,
+    nudge: (toyId: String) -> Offset = { Offset.Zero },
+    onPlaced: (toyId: String, bounds: Rect) -> Unit = { _, _ -> },
 ) {
     val shift = clampToFloor(place, moves[toyId] ?: Offset.Zero, floor)
     val here = place.shiftedX(shift.x).shiftedY(shift.y)
@@ -165,6 +170,7 @@ internal fun RoomToy(
     val scope = rememberCoroutineScope()
     val drop by rememberUpdatedState(onDrop)
     val move by rememberUpdatedState(onDrag)
+    val placed by rememberUpdatedState(onPlaced)
     val canvasPx = with(LocalDensity.current) { Size(canvasW.toPx(), canvasH.toPx()) }
 
     fun release() {
@@ -181,7 +187,9 @@ internal fun RoomToy(
         .requiredSize(canvasW * here.width, canvasH * here.height)
     val lifted = Modifier.graphicsLayer {
         val up = lift.value
-        translationY = -size.height * HELD_LIFT * up
+        val n = nudge(toyId)
+        translationX = n.x
+        translationY = -size.height * HELD_LIFT * up + n.y
         val s = 1f + (HELD_SCALE - 1f) * up
         scaleX = s
         scaleY = s
@@ -190,7 +198,10 @@ internal fun RoomToy(
     Box(
         modifier = box
             .zIndex(GRAB_Z)
-            .onGloballyPositioned { bounds = it.boundsInRoot() }
+            .onGloballyPositioned {
+                bounds = it.boundsInRoot()
+                placed(toyId, bounds)
+            }
             .semantics { contentDescription = "Игрушка" }
             .pointerInput(enabled) {
                 if (!enabled) return@pointerInput

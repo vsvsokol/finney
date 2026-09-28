@@ -101,7 +101,9 @@ import ru.finney.pet.ui.components.FeedbackDialog
 import ru.finney.pet.ui.components.ActionFeedbackCard
 import ru.finney.pet.ui.components.ActionFeedback
 import ru.finney.pet.domain.game.Rejection
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
+import androidx.compose.runtime.mutableStateMapOf
 import ru.finney.pet.domain.game.LevelCheck
 import ru.finney.pet.ui.components.Coin
 import ru.finney.pet.ui.components.FeedbackSound
@@ -583,6 +585,63 @@ private fun HomeContent(
     // Считаются одни нажатия, без движения пальца: каждое — одна рекомпозиция, не на кадр.
     var touches by remember { mutableIntStateOf(0) }
 
+    // Игрушка показывает, что с ней делать (ToyShowcase.kt): рука — пока с игрушками ни разу
+    // не играли, подскок — когда питомцу не радостно и ребёнок долго ничего не делает.
+    // Рука уходит от любого касания; до следующего запуска она не вернётся.
+    val showcase = remember { ToyShowcase() }
+    val toyBounds = remember { mutableStateMapOf<String, Rect>() }
+    var toyShown by rememberSaveable { mutableStateOf(false) }
+    val roomCalm = spot == RoomSpot.LIVING && !sleeping && playing == null && care == null &&
+        heldToy == null && !levelOpen && dreamCard == null
+    val showToy = !state.toyPlayed && !toyShown && state.toys.isNotEmpty() && roomCalm
+    LaunchedEffect(showToy, animations) {
+        if (!showToy) return@LaunchedEffect
+        try {
+            delay(ToyShowDelayMillis)
+            val id = currentState.toys.firstOrNull { it in toyBounds } ?: return@LaunchedEffect
+            if (!animations) {
+                showcase.point(id)
+                awaitCancellation()
+            }
+            repeat(ToyShowRounds) { round ->
+                val from = toyBounds[id] ?: return@LaunchedEffect
+                val pet = petBounds()
+                if (pet == Rect.Zero) return@LaunchedEffect
+                // К тому боку питомца, с которого лежит игрушка: рука не пересекает его.
+                val side = if (from.center.x >= pet.center.x) 1f else -1f
+                val to = Offset(pet.center.x + side * pet.width * 0.3f, pet.center.y + pet.height * 0.1f)
+                showcase.show(id, from, to) {
+                    // Звук — только в первом круге: дальше показ идёт молча, не надоедает.
+                    if (round == 0) sounds.play(toyShakeSound(id), 0.95f + Random.nextFloat() * 0.2f)
+                    hearts.emit(Offset(pet.center.x, pet.top + pet.height * 0.2f), filled = true)
+                }
+                delay(600)
+            }
+            toyShown = true
+        } finally {
+            showcase.reset()
+        }
+    }
+    LaunchedEffect(touches) {
+        if (showcase.hand) toyShown = true
+    }
+    val hopToys = animations && roomCalm && !state.moodHappy && state.toys.isNotEmpty() && !showToy
+    LaunchedEffect(touches, hopToys) {
+        if (!hopToys) return@LaunchedEffect
+        try {
+            delay(ToyIdleMillis)
+            repeat(ToyHopsPerIdle) { i ->
+                val toys = currentState.toys.filter { it in toyBounds }
+                if (toys.isEmpty()) return@LaunchedEffect
+                val id = toys[i % toys.size]
+                showcase.hop(id, toyBounds.getValue(id).height, sounds, toyShakeSound(id))
+                delay(ToyHopGapMillis)
+            }
+        } finally {
+            showcase.reset()
+        }
+    }
+
     // FinneyScreen тут не подходит: он заливает фон кремовым и сам растит колонку,
     // а под интерфейсом должна быть видна комната. Свой корень — ровно поэтому,
     // сам FinneyScreen не трогаем, на нём держатся пять других экранов.
@@ -620,6 +679,8 @@ private fun HomeContent(
             toysEnabled = !sleeping && playing == null && care == null,
             onToyDrag = ::onToyDrag,
             onToyDrop = ::onToyDrop,
+            toyNudge = showcase::offsetFor,
+            onToyPlaced = { id, bounds -> if (toyBounds[id] != bounds) toyBounds[id] = bounds },
         ) {
             // Нажатие — питомец подпрыгивает: это игра, а не меню.
             //
@@ -993,7 +1054,8 @@ private fun HomeContent(
             label = "hintVisibility",
         )
         NextStepOverlay(
-            step = if (visibility > 0f) shownStep else null,
+            // Пока рука показывает игрушку, подсказка шага молчит: двух рук сразу не бывает.
+            step = if (visibility > 0f && !showcase.hand) shownStep else null,
             targets = hintTargets,
             bubble = shownStep?.takeIf { tutorial }?.bubble(),
             spotlight = tutorial,
@@ -1002,6 +1064,8 @@ private fun HomeContent(
             hand = hintWithHand(state.level),
             visibility = { visibility },
         )
+
+        ToyShowcaseLayer(showcase, toyBounds, caption = "Возьми игрушку и потряси — ${state.petName} обрадуется")
 
         HeartBurstLayer(hearts)
 

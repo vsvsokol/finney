@@ -41,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.TransformOrigin
@@ -194,6 +195,8 @@ private val UfoPauseMs = 20_000L..45_000L
  * @param toysEnabled можно ли их брать: во сне и в играх ухода нельзя.
  * @param onToyDrag игрушку тащат: где её середина на экране и на сколько сдвинули.
  * @param onToyDrop игрушку отпустили.
+ * @param toyNudge сдвиг рисунка игрушки в пикселях — показ и подпрыгивание, см. [RoomToy].
+ * @param onToyPlaced где игрушка на экране.
  */
 @Composable
 fun RoomScene(
@@ -209,6 +212,8 @@ fun RoomScene(
     toysEnabled: Boolean = false,
     onToyDrag: (toyId: String, centre: Offset, delta: Offset) -> Unit = { _, _, _ -> },
     onToyDrop: (toyId: String) -> Unit = {},
+    toyNudge: (toyId: String) -> Offset = { Offset.Zero },
+    onToyPlaced: (toyId: String, bounds: Rect) -> Unit = { _, _ -> },
     pet: @Composable BoxScope.() -> Unit = {},
 ) {
     // Где питомец в зале сейчас: сдвиг от его обычного места, доля ширины холста.
@@ -386,6 +391,8 @@ fun RoomScene(
                     toysEnabled = toysEnabled,
                     onToyDrag = onToyDrag,
                     onToyDrop = onToyDrop,
+                    toyNudge = toyNudge,
+                    onToyPlaced = onToyPlaced,
                     pet = pet,
                     // Питомец в старой комнате тает, пока проступает новая: иначе
                     // посреди перехода на экране два питомца разного размера.
@@ -451,6 +458,8 @@ private fun RoomCanvas(
     toysEnabled: Boolean,
     onToyDrag: (toyId: String, centre: Offset, delta: Offset) -> Unit,
     onToyDrop: (toyId: String) -> Unit,
+    toyNudge: (toyId: String) -> Offset,
+    onToyPlaced: (toyId: String, bounds: Rect) -> Unit,
     pet: @Composable BoxScope.() -> Unit,
     modifier: Modifier = Modifier,
     petVisibility: () -> Float = { 1f },
@@ -491,6 +500,8 @@ private fun RoomCanvas(
                                     enabled = toysEnabled,
                                     onDrag = onToyDrag,
                                     onDrop = onToyDrop,
+                                    nudge = toyNudge,
+                                    onPlaced = onToyPlaced,
                                 )
                             }
                         }

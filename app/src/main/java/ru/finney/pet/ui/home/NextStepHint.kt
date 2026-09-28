@@ -288,10 +288,18 @@ private fun DrawScope.drawGlow(target: Rect, strength: Float) {
  * вверх, в нижней — над ней и смотрит вниз. В нажатии рука чуть сжимается к пальцу.
  */
 private fun DrawScope.drawHand(target: Rect, tap: TapPhase) {
-    val u = HandLength.toPx() / 46f
     val up = target.center.y < size.height / 2f
     val reach = RingGap.toPx() + 4.dp.toPx() + HandTravel.toPx() * tap.distance
     val tip = if (up) Offset(target.center.x, target.bottom + reach) else Offset(target.center.x, target.top - reach)
+    drawPointingHand(tip, up, tap.press)
+}
+
+/**
+ * Рука кончиком пальца в [tip]: [up] — палец смотрит вверх, рука ниже точки; иначе наоборот.
+ * [press] 0..1 — насколько рука сжата к пальцу. Её же водит показ игрушки (ToyPlay.kt).
+ */
+internal fun DrawScope.drawPointingHand(tip: Offset, up: Boolean, press: Float = 0f) {
+    val u = HandLength.toPx() / 46f
 
     // Кончик пальца — в начале координат, рука уходит вниз, по +y.
     fun rr(l: Float, t: Float, r: Float, b: Float, c: Float) =
@@ -300,7 +308,7 @@ private fun DrawScope.drawHand(target: Rect, tap: TapPhase) {
         op(rr(-5f, 0f, 5f, 26f, 5f), rr(-7f, 18f, 17f, 46f, 9f), PathOperation.Union)
     }.let { Path().apply { op(it, rr(-14f, 22f, -2f, 32f, 5f), PathOperation.Union) } }
 
-    val squeeze = 1f - 0.1f * tap.press
+    val squeeze = 1f - 0.1f * press
     translate(tip.x, tip.y) {
         rotate(if (up) 0f else 180f, pivot = Offset.Zero) {
             scale(squeeze, squeeze, pivot = Offset.Zero) {

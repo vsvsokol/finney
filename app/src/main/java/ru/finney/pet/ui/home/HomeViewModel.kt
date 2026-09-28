@@ -131,6 +131,10 @@ sealed interface HomeUiState {
         val moodPerShake: Int = 0,
         /** Настроение ниже порога грусти: питомец вздыхает, шкала зовёт на неё нажать. */
         val moodLow: Boolean = false,
+        /** Настроение дошло до «радостного»: скучать игрушкам незачем. */
+        val moodHappy: Boolean = false,
+        /** С игрушками уже играли (ядро: `playSince`): показывать, как с ними играть, не нужно. */
+        val toyPlayed: Boolean = false,
         /** Что подсветить сейчас; null — ничего. */
         val nextStep: NextStep? = null,
     ) : HomeUiState {
@@ -341,6 +345,8 @@ class HomeViewModel(
             playLeft = game.playMoodLeft(state),
             moodPerShake = content.economy.play.moodPerShake,
             moodLow = state.pet.mood < content.economy.pet.emotionLow,
+            moodHappy = state.pet.mood >= content.economy.pet.emotionHappy,
+            toyPlayed = state.playSince != null,
             nextStep = nextStepFor(
                 check = check,
                 stats = state.pet,
