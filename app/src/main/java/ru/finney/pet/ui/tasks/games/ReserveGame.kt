@@ -63,7 +63,7 @@ import ru.finney.pet.ui.theme.StrokeRegular
 
 // «Дождливый день» — спланированный случай непредвиденной траты, который ТЗ
 // разрешает прямо (раздел 2). Сначала «Моя неделя»: траты конвертами, нужное
-// всегда в плане, остаток падает в банку «Запас». Потом за окном дождь и
+// всегда в плане, остаток падает в банку «Запас». Потом начинается дождь и
 // случается непредвиденное — от нуля до нескольких трат, заранее неизвестно. Запаса
 // не хватило — ребёнок сам переносит траты. Выигрыш — баланс: хоть одна радость в плане
 // и ничего не пришлось отменить; пустой план и жадный — оба «почти». Бонус — за запас на
@@ -85,7 +85,7 @@ internal fun ReserveGame(
     val reserve = TaskEngines.reserveLeft(task, planned)
 
     if (!weekStarted) {
-        GameScene(backdrop = Backdrop.ROOM, onClose = onClose, money = task.amount) {
+        GameScene(backdrop = Backdrop.DOTS, onClose = onClose, money = task.amount) {
             SceneBody(
                 bottom = { FinneyButton(text = "Начать неделю", onClick = { weekStarted = true }, enabled = reserve >= 0) },
             ) {
@@ -132,7 +132,7 @@ internal fun ReserveGame(
     val shortage = maxOf(0, total - reserve)
     val freed = task.spendings.filter { it.id in dropped }.sumOf { it.price }
 
-    GameScene(backdrop = Backdrop.ROOM_RAIN, onClose = onClose, money = reserve) {
+    GameScene(backdrop = Backdrop.DOTS_RAIN, onClose = onClose, money = reserve) {
         SceneBody {
             Column(
                 modifier = Modifier

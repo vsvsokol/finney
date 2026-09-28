@@ -59,6 +59,8 @@ import ru.finney.pet.domain.model.PetCharacter
 import ru.finney.pet.ui.components.Coin
 import ru.finney.pet.ui.components.CoinAmount
 import ru.finney.pet.ui.components.FinneyIconButton
+import ru.finney.pet.ui.components.MenuBackdrop
+import ru.finney.pet.ui.components.menuBackdrop
 import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.components.fadingScroll
 import ru.finney.pet.ui.sound.Sfx
@@ -67,8 +69,7 @@ import ru.finney.pet.ui.pet.PetPose
 import ru.finney.pet.ui.pet.PetView
 import ru.finney.pet.ui.pet.rememberPetAnimation
 import ru.finney.pet.ui.pet.rememberPoseProvider
-import ru.finney.pet.ui.room.RoomScene
-import ru.finney.pet.ui.room.RoomSpot
+import ru.finney.pet.ui.theme.FinneyBlue
 import ru.finney.pet.ui.theme.FinneyCream
 import ru.finney.pet.ui.theme.FinneyGreen
 import ru.finney.pet.ui.theme.FinneyInk
@@ -77,11 +78,14 @@ import ru.finney.pet.ui.theme.FinneyYellow
 import ru.finney.pet.ui.theme.StrokeRegular
 
 // Сцена мини-игры, как в концептах: игра идёт не на пустом экране, а в месте —
-// в комнате Финни, в магазине, на поле, у лавки. Сверху деньги и крестик,
+// на спокойном фоне с точками, в магазине, на поле, у лавки. Сверху деньги и крестик,
 // поверх фона — сама игра, питомец и его реплики.
 
-/** Где идёт игра. Комнаты — настоящая комната с главного экрана, остальное нарисовано кодом. */
-enum class Backdrop { ROOM, ROOM_RAIN, SHOP, FIELD, SKY, SUNSET, STORE }
+/**
+ * Где идёт игра. Всё нарисовано кодом. [DOTS] — кремовый с точками, как у экранов-дел:
+ * раньше здесь стояла комната с главного, и на плейтесте (28.09) она отвлекала от игры.
+ */
+enum class Backdrop { DOTS, DOTS_RAIN, SHOP, FIELD, SKY, SUNSET, STORE }
 
 /**
  * Экран игры: фон, верхняя полоса и содержимое.
@@ -123,10 +127,9 @@ internal fun GameScene(
 
 /**
  * Один фон на всё задание: вступление, игру и итог. Раньше каждый экран рисовал
- * фон заново, и при переходе комната начинала жить с начала — облака за окном
- * отскакивали назад, НЛО вылетало снова, — а лавка из полудня рывком
+ * фон заново, и при переходе фон начинал жить с начала, а лавка из полудня рывком
  * становилась закатом. Теперь фон живёт, пока открыто задание, и меняется плавно:
- * в комнате начинается дождь, над лавкой садится солнце.
+ * начинается дождь, над лавкой садится солнце.
  */
 @Composable
 internal fun SceneStage(initial: Backdrop, content: @Composable () -> Unit) {
@@ -203,20 +206,19 @@ private fun MoneyPill(amount: Int, modifier: Modifier = Modifier) {
 }
 
 /**
- * Фон. Дождь и закат — не отдельные картинки, а состояние той же комнаты и того
- * же луга: они наступают постепенно, и комната при этом не пересоздаётся.
+ * Фон. Дождь и закат — не отдельные картинки, а состояние того же фона и того
+ * же луга: они наступают постепенно, и фон при этом не пересоздаётся.
  */
 @Composable
 private fun BackdropLayer(backdrop: Backdrop) {
-    val rain = animateFloatAsState(if (backdrop == Backdrop.ROOM_RAIN) 1f else 0f, tween(RAIN_MS), label = "rain")
+    val rain = animateFloatAsState(if (backdrop == Backdrop.DOTS_RAIN) 1f else 0f, tween(RAIN_MS), label = "rain")
     val dusk = animateFloatAsState(
         if (backdrop == Backdrop.SUNSET) 1f else 0f,
         tween(DUSK_MS, easing = FastOutSlowInEasing),
         label = "dusk",
     )
     when (backdrop) {
-        Backdrop.ROOM, Backdrop.ROOM_RAIN -> Box(Modifier.fillMaxSize()) {
-            RoomScene(spot = RoomSpot.LIVING, capsule = false, modifier = Modifier.fillMaxSize())
+        Backdrop.DOTS, Backdrop.DOTS_RAIN -> Box(Modifier.fillMaxSize().menuBackdrop(MenuBackdrop.DOTS)) {
             Rain { rain.value }
         }
         // Пол — под нижней полкой: полки прижаты к тележке, и стеллаж стоит на полу.
@@ -311,7 +313,9 @@ private fun Split(top: Color, bottom: Color, at: Float, dots: Boolean, desk: Boo
 }
 
 /**
- * Дождь за окном и в комнате: косые светлые штрихи и лёгкая синева. Без анимации — не отвлекает.
+ * Дождь: косые голубые штрихи и лёгкая синева поверх кремового. Белые штрихи и тень ink
+ * были под комнату — на кремовом белое не видно, а ink делал фон грязно-серым.
+ * Без анимации — не отвлекает.
  * [amount] 0…1 — насколько он уже начался; 0 — дождя нет.
  */
 @Composable
@@ -319,7 +323,7 @@ private fun Rain(amount: () -> Float) {
     Canvas(Modifier.fillMaxSize()) {
         val a = amount()
         if (a <= 0f) return@Canvas
-        drawRect(FinneyInk.copy(alpha = 0.25f * a))
+        drawRect(FinneyBlue.copy(alpha = 0.15f * a))
         val step = 40.dp.toPx()
         val len = 60.dp.toPx()
         var x = -size.height
@@ -327,7 +331,7 @@ private fun Rain(amount: () -> Float) {
             var y = 0f
             while (y < size.height) {
                 drawLine(
-                    Color.White.copy(alpha = 0.5f * a),
+                    FinneyBlue.copy(alpha = 0.55f * a),
                     Offset(x + y * 0.27f, y),
                     Offset(x + (y + len) * 0.27f, y + len),
                     strokeWidth = 2.dp.toPx(),
