@@ -120,7 +120,7 @@ def split(pet: str, limb_suffix: str) -> None:
     for look, scale in LOOKS.items():
         save(grow(torso, scale, ground, line), pet, f"torso_{look}")
         for limb in LIMBS:
-            save(grow(load(pet, limb + limb_suffix), scale, ground, line), pet, f"{limb}_{look}")
+            save(grow(load(pet, limb + limb_suffix), scale, ground, line, leg_raise(limb, scale, line)), pet, f"{limb}_{look}")
 
     for state in STATES:
         src = load(pet, state)
@@ -131,6 +131,14 @@ def split(pet: str, limb_suffix: str) -> None:
         save(head, pet, f"base_{state}")
         if state == "happy":
             check_looks(pet, head, torso, limb_suffix, ground, line)
+
+
+def leg_raise(limb: str, scale: float, line: float) -> float:
+    """На сколько поднять ногу в облике: на всю лишнюю толщину линии — сумму того,
+    на что поднялся низ туловища и опустился верх ноги. Стопы отрываются от пола на
+    столько же, в приложении это пиксель-два. Руки не трогаем: их стык с туловищем
+    сбоку, и щели там нет."""
+    return line * (scale - 1) if limb.endswith("leg") else 0.0
 
 
 def head_attach(head: Image.Image) -> int:
@@ -176,7 +184,7 @@ def check_looks(pet: str, head: Image.Image, torso: Image.Image, limb_suffix: st
     limbs = [load(pet, limb + limb_suffix) for limb in LIMBS]
     before = gaps(look_frame(head, torso, limbs, 0))
     for look, scale in LOOKS.items():
-        grown = [grow(limb, scale, ground, line) for limb in limbs]
+        grown = [grow(image, scale, ground, line, leg_raise(name, scale, line)) for name, image in zip(LIMBS, limbs)]
         lift = round((ground - attach) * (scale - 1))
         found = gaps(look_frame(head, grow(torso, scale, ground, line), grown, lift))
         # Только отчёт: у подросшего тела другая форма, и в вогнутых углах силуэта —
@@ -214,7 +222,7 @@ def stroke_width(layer: Image.Image) -> float:
     return float(np.median(dt[ridge]) * 2)
 
 
-def grow(layer: Image.Image, scale: float, ground: int, line: float) -> Image.Image:
+def grow(layer: Image.Image, scale: float, ground: int, line: float, raise_by: float = 0.0) -> Image.Image:
     """Слой крупнее в [scale] раз от ступней, а контур — прежней толщины [line].
 
     Просто увеличенный рисунок даёт линию в [scale] раз толще: на старших стадиях
@@ -227,13 +235,17 @@ def grow(layer: Image.Image, scale: float, ground: int, line: float) -> Image.Im
     выглядели раздутыми, а замкнутый по верху туловища контур лёг чёрными линиями
     внутри заливок. Щели на стыках, которые даёт утончение с двух сторон, закрывает
     посадка головы по низу подбородка — см. [head_attach].
+
+    [raise_by] — поднять слой на столько пикселей холста. Нужно ногам: утончение
+    с двух сторон поднимает низ туловища и опускает верх ног на половину лишней
+    толщины линии каждое, и между ними открывался разрез — см. [leg_raise].
     """
     w, h = layer.size
     cx = w / 2
     # Обратное преобразование для Image.transform: точка результата → точка исходника.
     big = layer.transform(
         (w, h), Image.AFFINE,
-        (1 / scale, 0, cx - cx / scale, 0, 1 / scale, ground - ground / scale),
+        (1 / scale, 0, cx - cx / scale, 0, 1 / scale, ground - ground / scale + raise_by / scale),
         resample=Image.BICUBIC,
     )
     img = pixels(big)
