@@ -118,7 +118,9 @@ private val PushistikSkin = PetSkin(
     leftLegPivot = TransformOrigin(960f / PUSHISTIK_CANVAS, 1640f / PUSHISTIK_CANVAS),
     rightLegPivot = TransformOrigin(1100f / PUSHISTIK_CANVAS, 1640f / PUSHISTIK_CANVAS),
     ground = TransformOrigin(0.5f, 1828f / PUSHISTIK_CANVAS),
-    neck = 1690f / PUSHISTIK_CANVAS,
+    // Не низ воротника (1690): он свисает до плеч, и в старших обликах руки прятались
+    // под капюшоном. По плечам голова выше, шов под воротником чистый — проверено рендером.
+    neck = 1560f / PUSHISTIK_CANVAS,
     eyesTop = 234f / BLINK_LAYER + HEAD_DROP,
     eyesBottom = 342f / BLINK_LAYER + HEAD_DROP,
     mouthCenter = TransformOrigin(0.5022f, 0.6619f + HEAD_DROP),
