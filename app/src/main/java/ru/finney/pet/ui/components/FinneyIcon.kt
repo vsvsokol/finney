@@ -328,8 +328,6 @@ private fun DrawScope.drawPiggy(tint: Color) {
     )
 }
 
-// Копилка: банка с прорезью и монеткой над ней. Раньше это был круг с полосой
-// поперёк — на устройстве читался как знак «проезд запрещён», а не как копилка.
 // Звезда о пяти лучах.
 private fun DrawScope.drawStar(tint: Color) {
     val s = size.minDimension
