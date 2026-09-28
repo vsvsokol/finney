@@ -75,8 +75,8 @@ private const val StopWindowMs = 250L
 private const val ShakeDp = 6f
 
 /** Кольцо удержания: толщина и зазор от обводки кнопки, dp. */
-private const val RingDp = 3.5f
-private const val RingGapDp = 3f
+internal const val RingDp = 3.5f
+internal const val RingGapDp = 3f
 
 private fun intervalFor(tick: Int): Long = when {
     tick < MidFromTick -> SlowIntervalMs
@@ -84,7 +84,7 @@ private fun intervalFor(tick: Int): Long = when {
     else -> FastIntervalMs
 }
 
-private fun pitchFor(tick: Int): Float = (1f + tick * PitchPerTick).coerceAtMost(MaxPitch)
+internal fun pitchFor(tick: Int): Float = (1f + tick * PitchPerTick).coerceAtMost(MaxPitch)
 
 /** Что знает кнопка об удержании. Не состояние Compose: перерисовывать из-за него нечего. */
 private class Hold {
