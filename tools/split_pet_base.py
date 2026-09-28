@@ -118,7 +118,7 @@ def split(pet: str, limb_suffix: str) -> None:
     # Облики постарше: те же туловище и конечности крупнее, линия прежней толщины.
     line = stroke_width(torso)
     for look, scale in LOOKS.items():
-        save(grow(torso, scale, ground, line, close_outline=True), pet, f"torso_{look}")
+        save(grow(torso, scale, ground, line), pet, f"torso_{look}")
         for limb in LIMBS:
             save(grow(load(pet, limb + limb_suffix), scale, ground, line), pet, f"{limb}_{look}")
 
@@ -178,7 +178,7 @@ def check_looks(pet: str, head: Image.Image, torso: Image.Image, limb_suffix: st
     for look, scale in LOOKS.items():
         grown = [grow(limb, scale, ground, line) for limb in limbs]
         lift = round((ground - attach) * (scale - 1))
-        found = gaps(look_frame(head, grow(torso, scale, ground, line, close_outline=True), grown, lift))
+        found = gaps(look_frame(head, grow(torso, scale, ground, line), grown, lift))
         # Только отчёт: у подросшего тела другая форма, и в вогнутых углах силуэта —
         # подмышки, между ногами — «закрытие» находит пиксель-другой и без разрезов.
         # Разрез между частями даёт десятки пикселей подряд — его видно в этой строке.
@@ -214,24 +214,19 @@ def stroke_width(layer: Image.Image) -> float:
     return float(np.median(dt[ridge]) * 2)
 
 
-def grow(layer: Image.Image, scale: float, ground: int, line: float, close_outline: bool = False) -> Image.Image:
+def grow(layer: Image.Image, scale: float, ground: int, line: float) -> Image.Image:
     """Слой крупнее в [scale] раз от ступней, а контур — прежней толщины [line].
 
     Просто увеличенный рисунок даёт линию в [scale] раз толще: на старших стадиях
     обводка тела становилась жирнее, чем у головы. Поэтому линию после увеличения
-    утончаем обратно, но по-разному:
+    утончаем обратно — с обеих сторон на половину лишней ширины. Освободившиеся
+    пиксели берут цвет ближайшего пикселя не-линии: снаружи это пустота, и силуэт
+    не раздувается, внутри — заливка тела. Край новой линии мягкий, как у рисунка.
 
-    - контур силуэта — только внутрь: внешний край остаётся там же, где у просто
-      увеличенного слоя, а освободившееся место занимает заливка. Иначе силуэт каждой
-      части «худел» на полосу, и на стыках руки с туловищем и туловища с головой
-      открывались щели — части перекрывались ровно на толщину линии;
-    - линии внутри рисунка (швы, галстук) — с обеих сторон, до прежней толщины.
-
-    Освободившиеся пиксели берут цвет ближайшей заливки. Край новой линии мягкий.
-
-    [close_outline] — замкнуть контур по всему силуэту. Нужно туловищу: верх у него
-    нарисован без линии, его закрывали голова и руки. Туловище растёт, голова нет,
-    и на плечах этот край выглядывает — без линии он смотрелся недорисованным.
+    Утончать только внутрь пробовали: увеличенный силуэт оставался целиком, части
+    выглядели раздутыми, а замкнутый по верху туловища контур лёг чёрными линиями
+    внутри заливок. Щели на стыках, которые даёт утончение с двух сторон, закрывает
+    посадка головы по низу подбородка — см. [head_attach].
     """
     w, h = layer.size
     cx = w / 2
@@ -241,38 +236,20 @@ def grow(layer: Image.Image, scale: float, ground: int, line: float, close_outli
         (1 / scale, 0, cx - cx / scale, 0, 1 / scale, ground - ground / scale),
         resample=Image.BICUBIC,
     )
-    img = pixels(big).astype(float)
+    img = pixels(big)
     core = ink_mask(img)
     # Сглаженная кайма линии светлее порога: пересчитываем и её, иначе она осталась бы
     # на старом месте бледным кольцом вокруг новой, тонкой линии.
     region = ndimage.binary_dilation(core, iterations=EDGE) & (img[..., 3] > 0)
-    fill = (img[..., 3] > 128) & ~region
-    if not fill.any():
-        return big
-    _, (iy, ix) = ndimage.distance_transform_edt(~fill, return_indices=True)
-    under = img[iy, ix]
-    under[..., 3] = 255.0
-
-    # Контур силуэта: до пустоты ближе, чем толщина увеличенной линии.
-    to_empty = ndimage.distance_transform_edt(img[..., 3] > 0)
-    outline = to_empty <= line * scale + EDGE
-    # Сколько от пикселя остаётся линией: 1 — линия, 0 — заливка.
-    ink_left = np.where(
-        outline,
-        np.clip(line + 0.5 - to_empty, 0.0, 1.0),
-        np.clip(ndimage.distance_transform_edt(core) - line * (scale - 1) / 2 + 0.5, 0.0, 1.0),
-    )
+    _, (iy, ix) = ndimage.distance_transform_edt(region, return_indices=True)
+    under = img[iy, ix].astype(float)
+    dt = ndimage.distance_transform_edt(core)
+    keep = np.clip(dt - line * (scale - 1) / 2 + 0.5, 0.0, 1.0)
     colour = np.median(img[core][:, :3], axis=0)
-    # Контур: пиксель как у увеличенного слоя (с его сглаженным краем), к заливке —
-    # цвет заливки. Внутренняя линия: цвет линии поверх заливки.
-    edge_px = img * ink_left[..., None] + under * (1 - ink_left[..., None])
-    mid_rgb = colour * ink_left[..., None] + under[..., :3] * (1 - ink_left[..., None])
-    mid_px = np.dstack([mid_rgb, np.full(ink_left.shape, 255.0)])
-    new = np.where(outline[..., None], edge_px, mid_px)
-    result = np.where(region[..., None], new, img)
-    if close_outline:
-        band = np.clip(line + 0.5 - to_empty, 0.0, 1.0)[..., None] * (result[..., 3:4] > 0)
-        result[..., :3] = colour * band + result[..., :3] * (1 - band)
+    a_under = under[..., 3] / 255.0
+    a = keep + a_under * (1 - keep)
+    rgb = (colour * keep[..., None] + under[..., :3] * (a_under * (1 - keep))[..., None]) / np.maximum(a, 1e-6)[..., None]
+    result = np.where(region[..., None], np.dstack([rgb, a * 255.0]), img)
     return Image.fromarray(np.clip(np.rint(result), 0, 255).astype(np.uint8), "RGBA")
 
 
