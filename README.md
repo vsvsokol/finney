@@ -98,7 +98,7 @@
 | | |
 |---|---|
 | Сборка для сдачи | 0.10.0 — подписанный APK в [Releases](https://github.com/vsvsokol/finny/releases), тег `v0.10.0` |
-| Требования ТЗ | 101 из 102 строк матрицы реализовано, 1 в работе (проверка с детьми) — [docs/requirements-matrix.md](docs/requirements-matrix.md), там же план до финала |
+| Требования ТЗ | 101 из 102 строк матрицы реализовано, 1 в работе — п. 3.6 «понятно без инструкции»: проверяется только на детях, их у нас пока не было — [docs/requirements-matrix.md](docs/requirements-matrix.md), там же план до финала |
 | Сценарий Приложения А | все 12 шагов: эмулятор API 37 (26.09) и Galaxy S23 с релизного APK, офлайн (29.09); холодный запуск 1,9 с |
 | Автотесты | 222 unit-теста и 14 инструментальных тестов базы, CI на каждый PR в `Main` |
 | Пояснительная записка (ТЗ п. 5) | [docs/documentation.md](docs/documentation.md), PDF — [docs/documentation.pdf](docs/documentation.pdf) |
@@ -250,7 +250,7 @@ docs/
   content-tasks.md            задания и правила текстов
   questions.md                вопросы к заказчику и ограничения
   assets-spec.md              спецификация графики для дизайнеров
-  assets-todo.md              какие ассеты ещё заглушки (звуки)
+  assets-todo.md              какие ассеты ждут замены
 design/exports/      готовые PNG от дизайнеров — источник для ресурсов приложения
 tools/               скрипты подготовки ассетов (Python + Pillow, scipy)
 .github/             CI и правила ревью
