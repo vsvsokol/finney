@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.stateIn
 import ru.finney.pet.appContainer
 import ru.finney.pet.domain.game.Game
 import ru.finney.pet.domain.game.Session
+import ru.finney.pet.domain.model.EntryType
 import ru.finney.pet.domain.model.PeriodFacts
 import ru.finney.pet.domain.model.Plan
 import ru.finney.pet.domain.model.GameContent
@@ -59,6 +60,8 @@ sealed interface PeriodResultUiState {
         val gamePassed: Boolean = true,
         /** Игра уровня обязательна; в демо-режиме — нет. */
         val gameRequired: Boolean = true,
+        /** Сколько пришло на следующий уровень — при любом исходе: ребёнок должен это видеть. */
+        val income: Int = 0,
     ) : PeriodResultUiState {
         /** Перерасход по нужному и желаемому сверх плана; 0, если уложились. */
         val overspend: Int
@@ -110,6 +113,10 @@ class PeriodResultViewModel(
             levelGameIcon = levelTask?.let(::taskIcon),
             gamePassed = result.gamePassed,
             gameRequired = game.levelCheck(state).gameRequired,
+            // Доход нового уровня — запись ленты, а не пересчёт: число совпадёт с историей.
+            income = state.ledger
+                .filter { it.periodNumber == period.number + 1 && it.type == EntryType.INCOME }
+                .sumOf { it.balanceDelta },
         )
     }
 

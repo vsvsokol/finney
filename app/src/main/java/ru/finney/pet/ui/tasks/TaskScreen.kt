@@ -4,6 +4,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,10 +27,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -60,7 +65,8 @@ import ru.finney.pet.ui.tasks.games.backdropFor
 import ru.finney.pet.ui.theme.FinneyCream
 import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneyYellow
-import ru.finney.pet.ui.theme.GapBlock
+import ru.finney.pet.ui.theme.GapInner
+import ru.finney.pet.ui.theme.StrokeThin
 import ru.finney.pet.ui.theme.StrokeRegular
 import ru.finney.pet.ui.sound.LocalSounds
 import ru.finney.pet.ui.sound.Sfx
@@ -136,13 +142,12 @@ private fun TaskIntro(state: TaskUiState.Ready, onStart: () -> Unit, onBack: () 
             },
         ) {
             OutlinedText(state.task.title, style = MaterialTheme.typography.headlineLarge, textAlign = TextAlign.Center)
-            // Заголовок панели «Что делать» почти упирался в название игры и читался
-            // с ним одной строкой — между ними воздух раздела.
-            Spacer(Modifier.height(GapBlock))
-            ScenePanel(title = "Что делать", modifier = Modifier.fillMaxWidth()) {
-                // Тема ребёнку ничего не говорит — она у взрослого, в «Пройденных темах».
-                // Кеглем крупнее основного: это главное, что нужно прочитать до игры.
-                Text(state.task.intro, style = MaterialTheme.typography.titleMedium, color = FinneyInk)
+            Spacer(Modifier.height(GapInner))
+            // Без заголовка на рамке: персиковое «Что делать» стояло вплотную к панели и
+            // спорило с названием игры того же цвета (плейтест 29.09). Что это правила,
+            // говорят номера шагов. Тема ребёнку ничего не говорит — она у взрослого.
+            ScenePanel(title = null, modifier = Modifier.fillMaxWidth()) {
+                IntroSteps(state.task.intro)
             }
             Spacer(Modifier.weight(1f))
             // Сколько дадут — монеткой в пузыре, а не фразой. Уже пройдено — просто «ещё?».
@@ -174,6 +179,48 @@ private fun TaskIntro(state: TaskUiState.Ready, onStart: () -> Unit, onBack: () 
                 }
             }
         }
+    }
+}
+
+/**
+ * Вступление по шагам: каждое предложение — своей строкой и со своим номером.
+ * Плейтест 29.09: «Финни копит на самокат. Каждый день…» сплошным абзацем дети
+ * 7–11 лет читали через силу, а с новой строки каждая мысль видна отдельно.
+ */
+@Composable
+private fun IntroSteps(intro: String) {
+    val steps = introSentences(intro)
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        steps.forEachIndexed { i, sentence ->
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                // Номер — только когда шагов больше одного: одинокая «1» ничего не считает.
+                if (steps.size > 1) StepNumber(i + 1)
+                Text(sentence, style = MaterialTheme.typography.titleMedium, color = FinneyInk, modifier = Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+/**
+ * Предложения вступления. Режем после «.», «!» и «?», за которыми идёт пробел и
+ * заглавная буква, — «10 монет. Каждый» разрежется, а «т. е.» и «3.5» нет.
+ */
+internal fun introSentences(intro: String): List<String> =
+    intro.split(Regex("""(?<=[.!?…])\s+(?=[«"A-ZА-ЯЁ0-9])""")).map { it.trim() }.filter { it.isNotEmpty() }
+
+/** Номер шага в кружке: белый с обводкой, как пустая отметка, — не кнопка. */
+@Composable
+private fun StepNumber(n: Int) {
+    Box(
+        modifier = Modifier
+            .size(28.dp)
+            .clip(CircleShape)
+            .background(Color.White)
+            .border(StrokeThin, FinneyInk, CircleShape)
+            .clearAndSetSemantics {},
+        contentAlignment = Alignment.Center,
+    ) {
+        Text("$n", style = MaterialTheme.typography.titleSmall, color = FinneyInk)
     }
 }
 

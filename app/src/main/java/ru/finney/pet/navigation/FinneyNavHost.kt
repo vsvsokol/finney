@@ -95,6 +95,7 @@ fun FinneyNavHost(
                 onOpenProgress = { navController.go(ProgressRoute) },
                 onOpenSettings = { navController.go(SettingsRoute) },
                 onOpenHelp = { navController.go(OnboardingRoute(isReplay = true)) },
+                onOpenGlossary = { navController.go(GlossaryRoute) },
                 onPeriodClosed = { number -> navController.go(PeriodResultRoute(number)) },
             )
         }

@@ -74,6 +74,12 @@ enum class FinneyIcons {
 
     /** Замок — нужное: из плана не убрать. */
     Lock,
+
+    /** Вешалка — гардероб. */
+    Hanger,
+
+    /** Шестерёнка — настройки. */
+    Gear,
 }
 
 /**
@@ -103,6 +109,8 @@ fun FinneyIcon(
             FinneyIcons.Trophy -> drawTrophy(tint)
             FinneyIcons.Plan -> drawPlan(tint)
             FinneyIcons.Lock -> drawLock(tint)
+            FinneyIcons.Hanger -> drawHanger(tint)
+            FinneyIcons.Gear -> drawGear(tint)
         }
     }
 }
@@ -431,6 +439,53 @@ private fun DrawScope.drawLock(tint: Color) {
         addRect(androidx.compose.ui.geometry.Rect(s * 0.47f, s * 0.62f, s * 0.53f, s * 0.78f))
     }
     drawPath(Path().apply { op(body, hole, PathOperation.Difference) }, tint)
+}
+
+// Вешалка: крючок сверху и треугольные плечики. Плечики — контуром, как тетрадь
+// плана: сплошной треугольник читался как крыша.
+private fun DrawScope.drawHanger(tint: Color) {
+    val s = size.minDimension
+    val line = s * 0.085f
+    drawArc(
+        color = tint,
+        startAngle = 180f,
+        sweepAngle = 250f,
+        useCenter = false,
+        topLeft = Offset(s * 0.40f, s * 0.12f),
+        size = Size(s * 0.20f, s * 0.20f),
+        style = Stroke(width = line, cap = StrokeCap.Round),
+    )
+    val shoulders = Path().apply {
+        moveTo(s * 0.50f, s * 0.36f)
+        lineTo(s * 0.90f, s * 0.72f)
+        lineTo(s * 0.10f, s * 0.72f)
+        close()
+    }
+    drawPath(shoulders, tint, style = Stroke(width = line, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+    drawLine(tint, Offset(s * 0.50f, s * 0.30f), Offset(s * 0.50f, s * 0.38f), line, StrokeCap.Round)
+}
+
+// Шестерёнка: восемь зубцов вокруг круга и дырка посередине. Дырка вырезается,
+// а не закрашивается — по той же причине, что прорезь копилки.
+private fun DrawScope.drawGear(tint: Color) {
+    val s = size.minDimension
+    val c = Offset(s / 2f, s / 2f)
+    var gear = Path().apply { addOval(Rect(c, s * 0.30f)) }
+    for (i in 0 until 8) {
+        val tooth = Path().apply {
+            addRoundRect(RoundRect(c.x - s * 0.08f, s * 0.08f, c.x + s * 0.08f, s * 0.30f, CornerRadius(s * 0.03f)))
+            transform(
+                androidx.compose.ui.graphics.Matrix().apply {
+                    translate(c.x, c.y)
+                    rotateZ(i * 45f)
+                    translate(-c.x, -c.y)
+                },
+            )
+        }
+        gear = Path().apply { op(gear, tooth, PathOperation.Union) }
+    }
+    val hole = Path().apply { addOval(Rect(c, s * 0.12f)) }
+    drawPath(Path().apply { op(gear, hole, PathOperation.Difference) }, tint)
 }
 
 /** Скруглённый прямоугольник сплошной заливкой — самая частая фигура в значках. */

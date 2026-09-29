@@ -10,7 +10,11 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,12 +35,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathFillType
-import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.graphics.drawscope.scale
-import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.layout
@@ -45,6 +45,7 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
 import kotlin.math.PI
@@ -52,6 +53,10 @@ import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sin
+import ru.finney.pet.ui.components.ActionFeedback
+import ru.finney.pet.ui.components.ActionFeedbackSummary
+import ru.finney.pet.ui.components.PointingHandLength
+import ru.finney.pet.ui.components.drawPointingHand
 import ru.finney.pet.ui.theme.FinneyCream
 import ru.finney.pet.ui.theme.FinneyGlare
 import ru.finney.pet.ui.theme.FinneyInk
@@ -77,16 +82,27 @@ import ru.finney.pet.ui.theme.FinneyYellow
 // нажатие и волна — движение. С выключенными анимациями (ТЗ п. 3.6) кольцо и рука
 // стоят на месте.
 
+/**
+ * Цель подсказки: где она и какой формы. [corner] — скругление самой кнопки;
+ * null — круглая или «стадион», скругление в полвысоты.
+ */
+class HintSpot(val rect: Rect, val corner: Dp?)
+
 /** Где на экране стоят цели подсказки. Кнопки сообщают о себе через [hintTarget]. */
 class HintTargets {
-    internal val bounds = mutableStateMapOf<NextStep, Rect>()
+    internal val spots = mutableStateMapOf<NextStep, HintSpot>()
 }
 
-/** Эта кнопка — цель шагов [steps]: слой подсказки узнаёт, где её обвести. */
-fun Modifier.hintTarget(targets: HintTargets, vararg steps: NextStep): Modifier =
+/**
+ * Эта кнопка — цель шагов [steps]: слой подсказки узнаёт, где её обвести.
+ * [corner] — скругление кнопки, если она не круглая: кольцо и вырез в затемнении
+ * повторяют её форму. Плейтест 29.09: плашку игры обводил «стадион», и рамка
+ * подсказки спорила с прямоугольником под ней.
+ */
+fun Modifier.hintTarget(targets: HintTargets, vararg steps: NextStep, corner: Dp? = null): Modifier =
     onGloballyPositioned { coordinates ->
-        val rect = coordinates.boundsInRoot()
-        steps.forEach { targets.bounds[it] = rect }
+        val spot = HintSpot(coordinates.boundsInRoot(), corner)
+        steps.forEach { targets.spots[it] = spot }
     }
 
 /** Одна строка к подсказке для первого уровня: до шести слов, чтобы прочитать на бегу. */
@@ -124,9 +140,6 @@ private val PulseTravel = 12.dp
 /** Сколько рука проходит от отведённой до нажимающей. */
 private val HandTravel = 22.dp
 
-/** Длина руки от кончика пальца до запястья. */
-private val HandLength = 46.dp
-
 /** Один цикл «подвела — нажала — отвела». */
 private const val TapCycleMillis = 1_400
 
@@ -137,6 +150,8 @@ private const val TapCycleMillis = 1_400
  * [hand] — рисовать ли руку. [visibility] 0..1 — насколько подсказка проявлена:
  * она приходит и уходит плавно (см. [hintDelayMillis]); вспышку уровня это не гасит.
  * [burst] 0..1 — вспышка у значка уровня, когда уровень стал готов к завершению.
+ * [note] — итог только что сделанного: на обучении он стоит в пузыре над следующим
+ * шагом, а не отдельной карточкой, которую надо ждать или смахивать.
  *
  * Анимация читается только при рисовании: кадры не пересобирают ни слой, ни главный экран.
  */
@@ -151,10 +166,13 @@ fun NextStepOverlay(
     modifier: Modifier = Modifier,
     hand: Boolean = true,
     visibility: () -> Float = { 1f },
+    note: ActionFeedback? = null,
 ) {
     var origin by remember { mutableStateOf(Offset.Zero) }
-    val target = step?.let { targets.bounds[it] }?.translate(-origin)
-    val badge = targets.bounds[NextStep.FINISH]?.translate(-origin)
+    val spot = step?.let { targets.spots[it] }
+    val target = spot?.rect?.translate(-origin)
+    val corner = spot?.corner
+    val badge = targets.spots[NextStep.FINISH]?.rect?.translate(-origin)
 
     val transition = rememberInfiniteTransition(label = "hint")
     val cycle = transition.animateFloat(
@@ -176,18 +194,16 @@ fun NextStepOverlay(
         }
         Canvas(Modifier.fillMaxSize().graphicsLayer { alpha = visibility() }) {
             if (target == null) return@Canvas
-            if (spotlight) drawSpotlight(target)
+            if (spotlight) drawSpotlight(target, corner)
             val tap = if (animate) TapPhase.at(cycle.value) else TapPhase.Still
             if (step == NextStep.FINISH) drawGlow(target, if (animate) 0.75f + 0.25f * (1f - tap.distance) else 1f)
-            drawHintRing(target, tap.wave)
+            drawHintRing(target, corner, tap.wave)
             if (hand) drawHand(target, tap)
         }
 
         if (target != null && bubble != null) {
-            Text(
-                text = bubble,
-                style = MaterialTheme.typography.bodyLarge,
-                color = FinneyInk,
+            Column(
+                verticalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier
                     // Место считается по цели: под рукой, если цель сверху, и над ней, если снизу.
                     .layout { measurable, constraints ->
@@ -196,7 +212,7 @@ fun NextStepOverlay(
                             Constraints(maxWidth = (constraints.maxWidth - 2 * margin).coerceAtLeast(0)),
                         )
                         val below = target.center.y < constraints.maxHeight / 2f
-                        val reach = (RingGap + PulseTravel + HandTravel + HandLength + 8.dp).toPx()
+                        val reach = (RingGap + PulseTravel + HandTravel + PointingHandLength + 8.dp).toPx()
                         val x = (target.center.x - placeable.width / 2f)
                             .coerceIn(margin.toFloat(), (constraints.maxWidth - margin - placeable.width).toFloat().coerceAtLeast(margin.toFloat()))
                         val y = if (below) target.bottom + reach else target.top - reach - placeable.height
@@ -205,11 +221,23 @@ fun NextStepOverlay(
                         }
                     }
                     .graphicsLayer { alpha = visibility() }
-                    .clearAndSetSemantics { contentDescription = "Подсказка: $bubble" }
+                    .clearAndSetSemantics {
+                        contentDescription = listOfNotNull(note?.title, "Подсказка: $bubble").joinToString(". ")
+                    }
                     .background(FinneyCream, RoundedCornerShape(16.dp))
                     .border(2.dp, FinneyInk, RoundedCornerShape(16.dp))
                     .padding(horizontal = 12.dp, vertical = 6.dp),
-            )
+            ) {
+                if (note != null) {
+                    ActionFeedbackSummary(note)
+                    Box(Modifier.fillMaxWidth().height(2.dp).background(FinneyInk.copy(alpha = 0.3f)))
+                }
+                Text(
+                    text = if (note != null) "Дальше: $bubble" else bubble,
+                    style = if (note != null) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyLarge,
+                    color = FinneyInk,
+                )
+            }
         }
     }
 }
@@ -237,24 +265,34 @@ private class TapPhase(val distance: Float, val press: Float, val wave: Float) {
     }
 }
 
+/**
+ * Обводка вокруг цели на [grow] шире неё. Скругление растёт на тот же [grow]: кольцо
+ * идёт параллельно краю кнопки, а не срезает углы. [corner] null — кнопка круглая
+ * или «стадион», и кольцо такое же.
+ */
+private fun DrawScope.around(target: Rect, corner: Dp?, grow: Float): RoundRect {
+    val r = target.inflate(grow)
+    val radius = corner?.let { (it.toPx() + grow).coerceAtMost(min(r.width, r.height) / 2f) }
+        ?: (min(r.width, r.height) / 2f)
+    return RoundRect(r, CornerRadius(radius))
+}
+
 /** Всё темнеет, кроме цели: вырез по форме кольца. */
-private fun DrawScope.drawSpotlight(target: Rect) {
-    val hole = target.inflate(RingGap.toPx() + 4.dp.toPx())
+private fun DrawScope.drawSpotlight(target: Rect, corner: Dp?) {
+    val hole = around(target, corner, RingGap.toPx() + 4.dp.toPx())
     val path = Path().apply {
         fillType = PathFillType.EvenOdd
         addRect(Rect(Offset.Zero, size))
-        addRoundRect(RoundRect(hole, CornerRadius(min(hole.width, hole.height) / 2f)))
+        addRoundRect(hole)
     }
     drawPath(path, FinneyInk.copy(alpha = 0.55f))
 }
 
-/** Кольцо по форме цели: у круглой кнопки — круг, у плашки — «стадион». */
-private fun DrawScope.drawHintRing(target: Rect, wave: Float) {
+/** Кольцо по форме цели: у круглой кнопки — круг, у плашки — её же скруглённый прямоугольник. */
+private fun DrawScope.drawHintRing(target: Rect, corner: Dp?, wave: Float) {
     val gap = RingGap.toPx()
     fun ring(extra: Float, alpha: Float) {
-        val r = target.inflate(gap + extra)
-        val round = RoundRect(r, CornerRadius(min(r.width, r.height) / 2f))
-        val path = Path().apply { addRoundRect(round) }
+        val path = Path().apply { addRoundRect(around(target, corner, gap + extra)) }
         drawPath(path, FinneyYellow.copy(alpha = alpha), style = Stroke(8.dp.toPx()))
         drawPath(path, FinneyInk.copy(alpha = alpha), style = Stroke(3.dp.toPx()))
     }
@@ -292,35 +330,6 @@ private fun DrawScope.drawHand(target: Rect, tap: TapPhase) {
     val reach = RingGap.toPx() + 4.dp.toPx() + HandTravel.toPx() * tap.distance
     val tip = if (up) Offset(target.center.x, target.bottom + reach) else Offset(target.center.x, target.top - reach)
     drawPointingHand(tip, up, tap.press)
-}
-
-/**
- * Рука кончиком пальца в [tip]: [up] — палец смотрит вверх, рука ниже точки; иначе наоборот.
- * [press] 0..1 — насколько рука сжата к пальцу. Её же водит показ игрушки (ToyPlay.kt).
- */
-internal fun DrawScope.drawPointingHand(tip: Offset, up: Boolean, press: Float = 0f) {
-    val u = HandLength.toPx() / 46f
-
-    // Кончик пальца — в начале координат, рука уходит вниз, по +y.
-    fun rr(l: Float, t: Float, r: Float, b: Float, c: Float) =
-        Path().apply { addRoundRect(RoundRect(l * u, t * u, r * u, b * u, CornerRadius(c * u))) }
-    val hand = Path().apply {
-        op(rr(-5f, 0f, 5f, 26f, 5f), rr(-7f, 18f, 17f, 46f, 9f), PathOperation.Union)
-    }.let { Path().apply { op(it, rr(-14f, 22f, -2f, 32f, 5f), PathOperation.Union) } }
-
-    val squeeze = 1f - 0.1f * press
-    translate(tip.x, tip.y) {
-        rotate(if (up) 0f else 180f, pivot = Offset.Zero) {
-            scale(squeeze, squeeze, pivot = Offset.Zero) {
-                drawPath(hand, FinneyGlare)
-                drawPath(hand, FinneyInk, style = Stroke(2.5.dp.toPx()))
-                // Складки пальцев на ладони — чтобы читалась рука, а не варежка.
-                for (x in listOf(8f, 13f)) {
-                    drawLine(FinneyInk, Offset(x * u, 19f * u), Offset(x * u, 26f * u), strokeWidth = 2.dp.toPx())
-                }
-            }
-        }
-    }
 }
 
 /**

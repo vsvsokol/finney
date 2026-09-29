@@ -8,6 +8,10 @@ import androidx.compose.foundation.Image
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.foundation.Canvas
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import ru.finney.pet.ui.components.CloseButton
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Path
@@ -80,6 +84,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ru.finney.pet.domain.model.BodyColor
@@ -117,6 +122,8 @@ import ru.finney.pet.ui.components.FinneyIcons
 import ru.finney.pet.ui.components.LevelBadge
 import ru.finney.pet.ui.components.FinneyNeedButton
 import ru.finney.pet.ui.components.FinneyPanel
+import ru.finney.pet.ui.components.WarningBadge
+import ru.finney.pet.ui.tasks.games.ItemPicture
 import ru.finney.pet.ui.components.HappinessBar
 import ru.finney.pet.ui.pet.PetMood
 import ru.finney.pet.ui.pet.PetView
@@ -126,6 +133,7 @@ import ru.finney.pet.ui.pet.rememberPetAnimation
 import ru.finney.pet.ui.debug.DebugPanel
 import androidx.compose.animation.core.animateFloatAsState
 import ru.finney.pet.ui.components.OutlinedText
+import ru.finney.pet.ui.progress.GlossaryBook
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableFloatStateOf
@@ -137,7 +145,11 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.keyframes
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.boundsInRoot
@@ -196,6 +208,7 @@ fun HomeScreen(
     onOpenProgress: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenHelp: () -> Unit,
+    onOpenGlossary: () -> Unit,
     onPeriodClosed: (periodNumber: Int) -> Unit,
     viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory),
 ) {
@@ -240,31 +253,19 @@ fun HomeScreen(
             onOpenProgress = onOpenProgress,
             onOpenSettings = onOpenSettings,
             onOpenHelp = onOpenHelp,
+            onOpenGlossary = onOpenGlossary,
             onClosePeriod = viewModel::closePeriod,
             onBuy = viewModel::buy,
             onSleep = viewModel::sleep,
             onWake = viewModel::wake,
-            onSleepCard = viewModel::answerSleepCard,
             onPlay = viewModel::play,
+            purchased = purchased,
+            onHidePurchased = { purchased = null },
+            rejectShown = rejected != null,
         )
     }
 
     FeedbackSound(feedback = purchased, rejection = null)
-    purchased?.let { feedback ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .systemBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 96.dp),
-            contentAlignment = Alignment.TopCenter,
-        ) {
-            ActionFeedbackCard(
-                feedback = feedback,
-                compact = true,
-                modifier = Modifier.clickable(onClickLabel = "Скрыть") { purchased = null },
-            )
-        }
-    }
     FeedbackDialog(
         feedback = null,
         rejection = rejected,
@@ -340,8 +341,11 @@ private fun HomeContent(
     onBuy: (itemId: String) -> Unit,
     onSleep: () -> Unit = {},
     onWake: () -> Unit = {},
-    onSleepCard: (correct: Boolean) -> Unit = {},
     onPlay: (toyId: String, shakes: Int) -> Unit = { _, _ -> },
+    onOpenGlossary: () -> Unit = {},
+    purchased: ActionFeedback? = null,
+    onHidePurchased: () -> Unit = {},
+    rejectShown: Boolean = false,
 ) {
     // Питомец спит — это ночь: он в капсуле, свет выключен, игра на паузе
     // до утра. Глаза закрываются, когда он уже внутри, и открываются,
@@ -423,6 +427,16 @@ private fun HomeContent(
     // значком уровня, и она же — подтверждение: шаг необратимый, случайное
     // нажатие не должно подводить итоги за ребёнка.
     var levelOpen by rememberSaveable { mutableStateOf(false) }
+
+    // Панель «Игры уровня»: обязательная игра и две по желанию.
+    var gamesOpen by rememberSaveable { mutableStateOf(false) }
+
+    // «Назад» закрывает открытую панель, а не приложение: плейтест 29.09 — из
+    // панели непройденного уровня было не выйти.
+    BackHandler(enabled = levelOpen || gamesOpen) {
+        levelOpen = false
+        gamesOpen = false
+    }
 
     // Игра ухода: что выбрали в панели и теперь бросают в рот или трут о питомца.
     // Покупка — в конце игры, см. ui/room/CareGame.kt.
@@ -592,7 +606,7 @@ private fun HomeContent(
     val toyBounds = remember { mutableStateMapOf<String, Rect>() }
     var toyShown by rememberSaveable { mutableStateOf(false) }
     val roomCalm = spot == RoomSpot.LIVING && !sleeping && playing == null && care == null &&
-        heldToy == null && !levelOpen && dreamCard == null
+        heldToy == null && !levelOpen && dreamCard == null && purchased == null && !rejectShown && !menuOpen && !moodHint && !gamesOpen
     val showToy = !state.toyPlayed && !toyShown && state.toys.isNotEmpty() && roomCalm
     LaunchedEffect(showToy, animations) {
         if (!showToy) return@LaunchedEffect
@@ -799,6 +813,7 @@ private fun HomeContent(
                         onOpenHelp = onOpenHelp,
                         onOpenBudget = onOpenBudget,
                         onOpenWardrobe = onOpenWardrobe,
+                        onOpenGlossary = onOpenGlossary,
                         onOpenSettings = onOpenSettings,
                     )
                 }
@@ -824,25 +839,33 @@ private fun HomeContent(
                 onClick = onOpenGoals,
                 enabled = !sleeping,
                 progress = state.goal?.let { it.saved to it.goal.price },
-                modifier = Modifier.weight(1f).hintTarget(hintTargets, NextStep.SAVE),
+                modifier = Modifier.weight(1f).hintTarget(hintTargets, NextStep.SAVE, corner = RadiusField),
             )
 
-            // Игра уровня — обязательное условие, поэтому вход в неё всегда на виду.
-            // Список всех игр ребёнку не нужен: на каждом уровне своя (он остался в отладке).
-            val levelTaskId = state.check.levelTaskId
-            if (levelTaskId != null && state.levelGame != null) {
+            // Игры уровня — обязательная и две по желанию — всегда на виду: плашка
+            // открывает их список. Пока обязательная не пройдена, плашка называет её:
+            // это условие уровня. Дальше — сколько из трёх уже пройдено.
+            val games = state.levelGames
+            if (games.isNotEmpty() && state.levelGame != null) {
                 // Пройденная — не тонкой галочкой в конце строки (плейтест 28.09, п. 46),
                 // а крупным «✓» вместо звезды, зелёной заливкой и словом «пройдено».
                 // Зелёный здесь — итог действия ребёнка, и рядом значок с подписью.
-                val passed = state.check.gamePassed
+                val passed = games.count { it.passed }
+                val requiredPassed = state.check.gamePassed
                 InfoChip(
                     icon = FinneyIcons.Star,
-                    text = if (passed) "${state.levelGame}\nпройдено" else "Игра: ${state.levelGame}",
-                    action = "Игра уровня",
-                    onClick = { onOpenTask(levelTaskId) },
+                    text = when {
+                        !requiredPassed -> "Игра: ${state.levelGame}"
+                        passed == games.size -> "Все игры уровня"
+                        else -> "Игры: $passed из ${games.size}"
+                    },
+                    action = "Игры уровня",
+                    onClick = { gamesOpen = true },
                     enabled = !sleeping,
-                    done = passed,
-                    modifier = Modifier.weight(1f).hintTarget(hintTargets, NextStep.LEVEL_GAME),
+                    done = passed == games.size,
+                    doneTitle = "Пройдены!",
+                    progress = (passed to games.size).takeIf { requiredPassed && passed < games.size },
+                    modifier = Modifier.weight(1f).hintTarget(hintTargets, NextStep.LEVEL_GAME, corner = RadiusField),
                 )
             }
         }
@@ -1032,8 +1055,19 @@ private fun HomeContent(
         // а состояние игры за это время не меняется. Минуту, когда сна хватает,
         // считает ViewModel (SleepInfo.enoughAt), экран только сверяет часы.
         val step = if (sleep != null) NextStep.WAKE.takeIf { now >= sleep.enoughAt } else state.nextStep
-        val hint = step.takeIf { playing == null && care == null && !levelOpen && !debugOpen }
+        // Подсказка говорит одна: всё, что уже открыто поверх комнаты или ещё объясняет
+        // своё (окно отказа, меню, подсказка настроения, сон-загадка), её глушит.
+        val busy = playing != null || care != null || levelOpen || debugOpen || rejectShown ||
+            menuOpen || moodHint || dreamCard != null || gamesOpen
         val tutorial = state.level == 1
+        // Итог покупки на обучении — не отдельной карточкой, а в пузыре подсказки,
+        // над следующим шагом: «Купили: каша, −10 · +40» и «Дальше: сыграй в игру».
+        // Плейтест 29.09: подсказка ждала, пока уйдёт карточка, — ребёнок смотрел на
+        // «уведомление», не понимал, что его надо смахнуть, и игра стояла.
+        // После обучения — как было: карточка сверху, подсказка после неё.
+        val noteInBubble = purchased != null && tutorial && step != null && !busy
+        val quiet = busy || (purchased != null && !noteInBubble)
+        val hint = step.takeIf { !quiet }
         // Подсказка проявляется, когда ребёнок замешкался, и гаснет от касания. Какой
         // был последний шаг, помним отдельно: на угасании кольцо должно остаться на
         // цели, а не пропасть кадром, когда шаг сменился на null.
@@ -1058,6 +1092,7 @@ private fun HomeContent(
             step = if (visibility > 0f && !showcase.hand) shownStep else null,
             targets = hintTargets,
             bubble = shownStep?.takeIf { tutorial }?.bubble(),
+            note = purchased.takeIf { noteInBubble },
             spotlight = tutorial,
             animate = animations,
             burst = { burst.value },
@@ -1122,6 +1157,7 @@ private fun HomeContent(
                         CareOption(it.item, it, isSelected = it.item.id == picked)
                     },
                     onPick = { picked = it },
+                    guide = state.level == 1,
                     confirmLabel = when (target) {
                         CareTarget.FOOD -> "Купить и покормить"
                         CareTarget.BATH -> "Купить и помыть"
@@ -1186,12 +1222,10 @@ private fun HomeContent(
                     card = card,
                     picked = dreamPicked,
                     cardsLeft = state.sleepCardsPerSleep - dreamsAsked,
-                    sleepGain = state.sleepPerCard,
                     onPick = { word ->
                         dreamPicked = word
                         dreamsAsked++
                         lastDream = card.termId
-                        onSleepCard(word == card.answer)
                         if (word == card.answer) {
                             sounds.play(Sfx.Correct)
                             // Верно — над спящим всплывают сердечки, как когда его гладят.
@@ -1205,6 +1239,7 @@ private fun HomeContent(
                         dreamPicked = null
                     },
                     onClose = { dreamCard = null },
+                    onOpenGlossary = { dreamCard = null; onOpenGlossary() },
                     modifier = Modifier.pointerInput(Unit) { detectTapGestures { } },
                 )
             }
@@ -1264,14 +1299,52 @@ private fun HomeContent(
                     level = state.level,
                     check = state.check,
                     levelGame = state.levelGame,
+                    planGap = state.planGap,
+                    canEarn = state.levelGames.any { !it.passed && it.reward > 0 },
                     asleep = sleeping,
                     onFinish = {
                         levelOpen = false
                         onClosePeriod()
                     },
+                    onAction = { action ->
+                        levelOpen = false
+                        when (action) {
+                            LevelAction.GAME -> state.check.levelTaskId?.let(onOpenTask)
+                            LevelAction.GAMES -> gamesOpen = true
+                            LevelAction.SAVE -> onOpenGoals()
+                            LevelAction.PLAN -> onOpenBudget()
+                            // Уход — в комнате: панель закрывается, и подсказка шага
+                            // показывает, какую кнопку нажать.
+                            LevelAction.CARE -> Unit
+                        }
+                    },
                     onOpenBudget = { levelOpen = false; onOpenBudget() },
                     onOpenProgress = { levelOpen = false; onOpenProgress() },
                     onDismiss = { levelOpen = false },
+                    modifier = Modifier.pointerInput(Unit) { detectTapGestures { } },
+                )
+            }
+        }
+
+        if (gamesOpen) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(FinneyInk.copy(alpha = 0.45f))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClickLabel = "Закрыть",
+                        onClick = { gamesOpen = false },
+                    )
+                    .systemBarsPadding()
+                    .padding(16.dp),
+                contentAlignment = Alignment.BottomCenter,
+            ) {
+                LevelGamesPanel(
+                    games = state.levelGames,
+                    onPlay = { gamesOpen = false; onOpenTask(it) },
+                    onDismiss = { gamesOpen = false },
                     modifier = Modifier.pointerInput(Unit) { detectTapGestures { } },
                 )
             }
@@ -1297,6 +1370,23 @@ private fun HomeContent(
                     previewStage = previewStage,
                     onPreviewStage = { previewStage = it },
                     modifier = Modifier.pointerInput(Unit) { detectTapGestures { } },
+                )
+            }
+        }
+
+        // Итог покупки — поверх всего, но только если его не взял пузырь подсказки.
+        if (purchased != null && !noteInBubble) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .systemBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 96.dp),
+                contentAlignment = Alignment.TopCenter,
+            ) {
+                ActionFeedbackCard(
+                    feedback = purchased,
+                    compact = true,
+                    modifier = Modifier.clickable(onClickLabel = "Скрыть", onClick = onHidePurchased),
                 )
             }
         }
@@ -1368,19 +1458,38 @@ private fun LevelPanel(
     level: Int,
     check: LevelCheck,
     levelGame: String?,
+    planGap: PlanGap?,
+    canEarn: Boolean,
     asleep: Boolean,
     onFinish: () -> Unit,
+    onAction: (LevelAction) -> Unit,
     onOpenBudget: () -> Unit,
     onOpenProgress: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var confirmRestart by rememberSaveable { mutableStateOf(false) }
+    val missing = missingSteps(check, levelGame, planGap, canEarn)
+    // Нажали на запертое «Завершить» — строки «чего не хватает» вздрагивают.
+    var nudge by remember { mutableIntStateOf(0) }
+    // Прокрутка: с пунктами «чего не хватает» панель выше экрана 360 × 740, и без
+    // неё нижние кнопки сплющивало (плейтест 29.09).
     Column(
-        modifier = modifier,
+        modifier = modifier.verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        LevelTitle(level)
+        // «✕» есть всегда: у непройденного уровня внизу «Начать заново», а не
+        // «Ещё поиграю», и выйти из панели было нечем.
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            LevelTitle(level)
+            CloseButton(
+                onClick = onDismiss,
+                description = "Закрыть",
+                size = 56.dp,
+                modifier = Modifier.align(Alignment.CenterEnd),
+            )
+        }
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1442,16 +1551,19 @@ private fun LevelPanel(
                         modifier = Modifier.weight(1f),
                     ) { LevelIcon(R.drawable.ic_level_piggy) }
                 }
-                Text(
-                    if (check.willPass) {
-                        "Готово! Уровень будет пройден, и придут новые деньги."
-                    } else {
-                        "Если завершить сейчас, уровень начнётся заново — с новыми деньгами."
-                    },
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = FinneyInk,
-                    textAlign = TextAlign.Center,
-                )
+                if (check.willPass) {
+                    Text(
+                        "Готово! Уровень будет пройден, и придут новые деньги.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = FinneyInk,
+                        textAlign = TextAlign.Center,
+                    )
+                } else {
+                    // Чего не хватает — прямо и по пунктам, и каждый пункт ведёт туда,
+                    // где его выполняют. Плейтест 29.09: ребёнок видел «2 из 3», жал
+                    // «Завершить», и уровень молча начинался заново.
+                    MissingList(missing, onAction = onAction, nudge = nudge)
+                }
                 // Во сне уровень не завершают: условия видно, а итог — утром.
                 if (asleep) {
                     Text(
@@ -1461,13 +1573,21 @@ private fun LevelPanel(
                         textAlign = TextAlign.Center,
                     )
                 }
-                FinneyButton(
-                    text = "Завершить уровень",
-                    onClick = onFinish,
-                    enabled = !asleep,
-                    textStyle = LevelMainButtonText,
-                    modifier = Modifier.graphicsLayer { alpha = if (asleep) NightDim else 1f },
-                )
+                if (check.willPass) {
+                    FinneyButton(
+                        text = "Завершить уровень",
+                        onClick = onFinish,
+                        enabled = !asleep,
+                        textStyle = LevelMainButtonText,
+                        modifier = Modifier.graphicsLayer { alpha = if (asleep) NightDim else 1f },
+                    )
+                } else {
+                    // Не готово — «Завершить» заперто: бледное, с замком, и на нажатие
+                    // отвечает «нельзя» и показывает, чего не хватает. Плейтест 29.09:
+                    // жёлтая «Доиграть уровень» выглядела так же, как «Завершить», а весь
+                    // взгляд ребёнка — на главной кнопке, и плашка над ней не спасала.
+                    LockedFinishButton(onTap = { nudge++ })
+                }
             }
             // Уже основной: рядом с главным действием второстепенные не должны
             // спорить с ним ни цветом, ни шириной.
@@ -1479,14 +1599,294 @@ private fun LevelPanel(
                 textStyle = LevelSideButtonText,
                 modifier = Modifier.fillMaxWidth(SideButtonWidth),
             )
-            // «Ещё поиграю» — просто закрыть панель, звать к нему не нужно:
-            // спокойная кнопка, как «Назад» в знакомстве.
-            FinneyQuietButton(
-                text = "Ещё поиграю",
-                onClick = onDismiss,
-                sound = Sfx.Back,
-                modifier = Modifier.fillMaxWidth(SideButtonWidth),
+            if (check.planConfirmed && !check.willPass) {
+                // Сдаться можно, но только спокойной кнопкой и через вопрос: уровень не
+                // засчитается, и ребёнок должен знать это до нажатия, а не после.
+                FinneyQuietButton(
+                    text = "Начать заново",
+                    onClick = { if (!asleep) confirmRestart = true },
+                    modifier = Modifier
+                        .fillMaxWidth(SideButtonWidth)
+                        .graphicsLayer { alpha = if (asleep) NightDim else 1f },
+                )
+            } else {
+                // «Ещё поиграю» — просто закрыть панель, звать к нему не нужно:
+                // спокойная кнопка, как «Назад» в знакомстве.
+                FinneyQuietButton(
+                    text = "Ещё поиграю",
+                    onClick = onDismiss,
+                    sound = Sfx.Back,
+                    modifier = Modifier.fillMaxWidth(SideButtonWidth),
+                )
+            }
+        }
+    }
+    if (confirmRestart) {
+        RestartLevelDialog(
+            level = level,
+            missing = missing,
+            onKeepPlaying = { confirmRestart = false; onDismiss() },
+            onRestart = { confirmRestart = false; onFinish() },
+        )
+    }
+}
+
+/** Куда ведёт пункт «чего не хватает». */
+private enum class LevelAction { GAME, GAMES, CARE, PLAN, SAVE }
+
+/**
+ * Пункт «чего не хватает»: что сделать словами и куда нажатие ведёт; null — никуда.
+ * [conditions] — сколько условий уровня он закрывает: взнос по плану — сразу два.
+ */
+private data class MissingStep(val text: String, val action: LevelAction?, val conditions: Int = 1)
+
+/** Что осталось до прохождения: заголовок над пунктами и сами пункты. */
+private data class Missing(val title: String, val steps: List<MissingStep>)
+
+/**
+ * Чего не хватает до прохождения — пунктами, которые можно выполнить: «Пройди игру»,
+ * «Положи в копилку ещё 10». Пусто — всё готово.
+ *
+ * План — не «план не выполнен», а почему и что сделать ([PlanGap]): в копилке меньше
+ * задуманного — положить; потрачено больше — отыграть в игре, монеты после плана
+ * закрывают перерасход (`PeriodRules.planMatched`). Плейтест 29.09: «не понимаю,
+ * зачем план и почему он не получается».
+ */
+private fun missingSteps(check: LevelCheck, levelGame: String?, planGap: PlanGap?, canEarn: Boolean): Missing {
+    val game = mutableListOf<MissingStep>()
+    if (levelGame != null && check.levelTaskId != null && check.gameRequired && !check.gamePassed) {
+        game += MissingStep("Пройди игру «$levelGame»", LevelAction.GAME)
+    }
+    val left = (check.toPass - check.met).coerceAtLeast(0)
+    if (left == 0) return Missing("Уровень пока не пройден. Осталось:", game)
+
+    val savingsLeft = planGap?.savingsLeft ?: 0
+    val overspent = planGap?.overspent ?: 0
+    val open = mutableListOf<MissingStep>()
+    if (!check.needsCovered) {
+        open += MissingStep("Уход: покорми, помой и уложи спать", LevelAction.CARE)
+    }
+    // Копилка пуста, а по плану в неё что-то задумано, — один взнос закрывает оба.
+    val savingsClosesPlan = !check.savingsAdded && !check.planMatched && savingsLeft > 0 && overspent == 0
+    if (!check.savingsAdded) {
+        open += if (savingsClosesPlan) {
+            MissingStep("Копилка и план: положи в копилку $savingsLeft", LevelAction.SAVE, conditions = 2)
+        } else {
+            MissingStep("Копилка: положи в неё хоть немного", LevelAction.SAVE)
+        }
+    }
+    if (!check.planMatched && !savingsClosesPlan) {
+        open += when {
+            overspent > 0 && canEarn ->
+                MissingStep("План: потрачено на $overspent больше. Выиграй игру — монеты закроют разницу", LevelAction.GAMES)
+            overspent > 0 ->
+                MissingStep("План: потрачено на $overspent больше плана — выручат другие условия", null)
+            savingsLeft > 0 ->
+                MissingStep("План: положи в копилку ещё $savingsLeft", LevelAction.SAVE)
+            else -> MissingStep("План: сверь траты в «План и факт»", LevelAction.PLAN)
+        }
+    }
+    // Пункт, без которого остальных не хватит, — обязательный. Хватает одних
+    // обязательных — показываем только их: «уход» не просим, если взнос по плану
+    // и так закрывает два условия. Не хватает — выбор за ребёнком: «любые из этих».
+    val total = open.sumOf { it.conditions }
+    val must = open.filter { total - it.conditions < left }
+    if (must.sumOf { it.conditions } >= left) return Missing("Уровень пока не пройден. Осталось:", game + must)
+    val title = when {
+        left == 1 -> if (game.isEmpty()) "Осталось одно — любое из этих:" else "Игра и ещё одно — любое из этих:"
+        game.isEmpty() -> "Осталось $left условия — выбирай из этих:"
+        else -> "Игра и ещё $left условия — выбирай из этих:"
+    }
+    return Missing(title, game + open)
+}
+
+/**
+ * «Чего не хватает» пунктами-кнопками: у каждого «!» — не только цвет (ТЗ п. 3.6), —
+ * и стрелка, если пункт ведёт туда, где его выполняют. [nudge] растёт — пункты
+ * вздрагивают: нажали на запертое «Завершить».
+ */
+@Composable
+private fun MissingList(missing: Missing, onAction: ((LevelAction) -> Unit)?, nudge: Int = 0) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(missing.title, style = MaterialTheme.typography.titleMedium, color = FinneyInk)
+        missing.steps.forEach { step -> MissingRow(step, onAction, nudge) }
+    }
+}
+
+@Composable
+private fun MissingRow(step: MissingStep, onAction: ((LevelAction) -> Unit)?, nudge: Int) {
+    val bump = remember { Animatable(1f) }
+    LaunchedEffect(nudge) {
+        if (nudge == 0 || !motionEnabled()) return@LaunchedEffect
+        bump.snapTo(1.06f)
+        bump.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
+    }
+    val action = step.action.takeIf { onAction != null }
+    val shape = RoundedCornerShape(RadiusCard)
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = bump.value
+                scaleY = bump.value
+            }
+            .defaultMinSize(minHeight = 52.dp)
+            .clip(shape)
+            .background(Color.White)
+            .border(StrokeRegular, FinneyInk, shape)
+            .then(
+                if (action != null && onAction != null) {
+                    Modifier.clickable(role = Role.Button, onClickLabel = "Перейти") { onAction(action) }
+                } else {
+                    Modifier
+                },
             )
+            .semantics(mergeDescendants = true) {}
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+    ) {
+        WarningBadge(size = 28.dp)
+        Text(step.text, style = MaterialTheme.typography.bodyLarge, color = FinneyInk, modifier = Modifier.weight(1f))
+        if (action != null) OutlinedText("›", style = MaterialTheme.typography.headlineMedium)
+    }
+}
+
+/**
+ * «Завершить уровень», пока рано: бледная, с замком, но нажимается — отвечает звуком
+ * «нельзя», вздрагивает и зовёт взгляд к пунктам над собой. Погашенная кнопка у нас
+ * бледная, и рядом словами, чего не хватает: слова — пункты выше.
+ */
+@Composable
+private fun LockedFinishButton(onTap: () -> Unit) {
+    val shake = remember { Animatable(0f) }
+    val scope = rememberCoroutineScope()
+    val animations = LocalAnimations.current
+    FinneyButton(
+        text = "Завершить уровень",
+        onClick = {
+            onTap()
+            if (animations) {
+                scope.launch {
+                    shake.snapTo(0f)
+                    shake.animateTo(
+                        0f,
+                        keyframes {
+                            durationMillis = 360
+                            -10f at 60
+                            10f at 140
+                            -6f at 220
+                            6f at 290
+                        },
+                    )
+                }
+            }
+        },
+        sound = Sfx.Denied,
+        icon = { FinneyIcon(FinneyIcons.Lock, size = 28.dp) },
+        textStyle = LevelMainButtonText,
+        modifier = Modifier
+            .graphicsLayer {
+                alpha = LockedAlpha
+                translationX = shake.value * density
+            }
+            .semantics { stateDescription = "Закрыто: сначала выполни пункты выше" },
+    )
+}
+
+/** Бледность запертой «Завершить» — как у погашенной кнопки. */
+private const val LockedAlpha = 0.5f
+
+/**
+ * Вопрос перед тем, как завершить непройденный уровень. Главная кнопка — доиграть:
+ * случайное нажатие не должно стоить ребёнку уровня.
+ */
+@Composable
+private fun RestartLevelDialog(level: Int, missing: Missing, onKeepPlaying: () -> Unit, onRestart: () -> Unit) {
+    Dialog(onDismissRequest = onKeepPlaying) {
+        FinneyPanel(title = "Начать заново?") {
+            Text(
+                "Уровень $level не засчитается: питомец останется на уровне $level.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = FinneyInk,
+            )
+            MissingList(missing, onAction = null)
+            Text(
+                "Если начать заново, придут деньги на новую попытку, и нужно будет снова составить план.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = FinneyInk,
+            )
+            FinneyButton(text = "Доиграть уровень", onClick = onKeepPlaying)
+            FinneyQuietButton(text = "Начать заново", onClick = onRestart, modifier = Modifier.fillMaxWidth())
+        }
+    }
+}
+
+/**
+ * «Игры уровня»: обязательная первой и крупнее, две по желанию — за монеты.
+ * Обязательная отмечена звездой и словами, а не цветом (ТЗ п. 3.6).
+ */
+@Composable
+private fun LevelGamesPanel(
+    games: List<LevelGame>,
+    onPlay: (taskId: String) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    FinneyPanel(title = "Игры уровня", onClose = onDismiss, modifier = modifier) {
+        Text(
+            "Первая игра нужна, чтобы пройти уровень. Ещё две — по желанию, за монеты.",
+            style = MaterialTheme.typography.bodyLarge,
+            color = FinneyInk,
+        )
+        games.forEach { game -> LevelGameCard(game, onClick = { onPlay(game.taskId) }) }
+    }
+}
+
+/** Строка игры: картинка, название, обязательна ли, и справа — «✓» или награда. */
+@Composable
+private fun LevelGameCard(game: LevelGame, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(RadiusCard)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = 72.dp)
+            .clip(shape)
+            .background(if (game.passed) FinneyGreen else Color.White)
+            .border(if (game.required) StrokeBold else StrokeRegular, FinneyInk, shape)
+            .clickable(role = Role.Button, onClickLabel = "Играть", onClick = onClick)
+            .clearAndSetSemantics {
+                contentDescription = buildString {
+                    append("«${game.title}», ")
+                    append(if (game.required) "нужна для уровня" else "по желанию")
+                    append(if (game.passed) ", пройдена" else if (game.reward > 0) ", награда ${game.reward}" else "")
+                }
+            }
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(contentAlignment = Alignment.TopStart) {
+            game.icon?.let { ItemPicture(it, game.title, 48.dp) } ?: FinneyIcon(FinneyIcons.Star, size = 40.dp)
+            if (game.required) FinneyIcon(FinneyIcons.Star, size = 20.dp, modifier = Modifier.offset(x = (-6).dp, y = (-6).dp))
+        }
+        Column(Modifier.weight(1f)) {
+            Text(game.title, style = MaterialTheme.typography.titleMedium, color = FinneyInk)
+            Text(
+                if (game.required) "Нужна для уровня" else "По желанию",
+                style = MaterialTheme.typography.bodyMedium,
+                color = FinneyInk,
+            )
+        }
+        when {
+            game.passed -> CheckBadge(size = 32.dp)
+            game.reward > 0 -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                OutlinedText("+${game.reward}", style = MaterialTheme.typography.titleLarge)
+                Coin(size = 24.dp)
+            }
         }
     }
 }
@@ -1543,7 +1943,9 @@ private fun LevelGameRow(game: String, passed: Boolean, required: Boolean) {
             .clearAndSetSemantics {
                 contentDescription = "Игра «$game», $note: ${if (passed) "пройдена" else "пока нет"}"
             }
-            .padding(start = 20.dp, end = 14.dp, top = 6.dp, bottom = 22.dp),
+            // Справа поле шире: отметка стоит у скругления плашки, и с узким полем
+            // она упиралась в обводку и заходила на нижнюю полосу (плейтест 29.09).
+            .padding(start = 20.dp, end = 24.dp, top = 8.dp, bottom = 22.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -1563,7 +1965,7 @@ private fun LevelGameRow(game: String, passed: Boolean, required: Boolean) {
             maxLines = 2,
             modifier = Modifier.weight(1f),
         )
-        CheckSquare(passed)
+        CheckSquare(passed, side = 34.dp)
     }
 }
 
@@ -1612,18 +2014,18 @@ private fun ConditionTile(
 
 /** Отметка условия: квадрат с галочкой или пустой — отличаются формой, а не цветом. */
 @Composable
-private fun CheckSquare(done: Boolean) {
+private fun CheckSquare(done: Boolean, side: Dp = 40.dp) {
     val shape = RoundedCornerShape(RadiusCheckbox)
     Box(
         modifier = Modifier
-            .size(40.dp)
+            .size(side)
             .clip(shape)
             .background(if (done) FinneyYellow else FinneyCream)
             .border(StrokeRegular, FinneyInk, shape),
         contentAlignment = Alignment.Center,
     ) {
         if (done) {
-            Canvas(Modifier.size(24.dp)) {
+            Canvas(Modifier.size(side * 0.6f)) {
                 val w = size.minDimension
                 drawPath(
                     Path().apply {
@@ -1667,6 +2069,7 @@ private fun HomeMenu(
     onOpenHelp: () -> Unit,
     onOpenBudget: () -> Unit,
     onOpenWardrobe: () -> Unit,
+    onOpenGlossary: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
     DropdownMenu(
@@ -1676,19 +2079,29 @@ private fun HomeMenu(
     ) {
         // Каждый пункт сначала закрывает меню: иначе после возврата с экрана
         // оно осталось бы раскрытым поверх главного.
-        HomeMenuItem("План расходов") { onDismiss(); onOpenBudget() }
-        HomeMenuItem("Гардероб") { onDismiss(); onOpenWardrobe() }
+        HomeMenuItem("План расходов", icon = { FinneyIcon(FinneyIcons.Plan, size = MenuIconSize) }) { onDismiss(); onOpenBudget() }
+        HomeMenuItem("Гардероб", icon = { FinneyIcon(FinneyIcons.Hanger, size = MenuIconSize) }) { onDismiss(); onOpenWardrobe() }
         // Знакомство в режиме подсказки: в конце «Понятно» и назад, без «Создать питомца».
-        HomeMenuItem("Как играть") { onDismiss(); onOpenHelp() }
-        HomeMenuItem("Настройки") { onDismiss(); onOpenSettings() }
+        HomeMenuItem("Как играть", icon = { FinneyIcon(FinneyIcons.Help, size = MenuIconSize) }) { onDismiss(); onOpenHelp() }
+        // Справочник раньше жил только в «Прогрессе» и настройках — его не находили
+        // (плейтест 29.09). Здесь он рядом с «Как играть»: оба — «что это значит».
+        HomeMenuItem("Справочник", icon = { GlossaryBook(size = MenuIconSize) }) { onDismiss(); onOpenGlossary() }
+        HomeMenuItem("Настройки", icon = { FinneyIcon(FinneyIcons.Gear, size = MenuIconSize) }) { onDismiss(); onOpenSettings() }
     }
 }
 
-/** Пункт меню «бургера». */
+/** Значок пункта меню. */
+private val MenuIconSize = 28.dp
+
+/**
+ * Пункт меню «бургера» со значком слева. Значок — у каждого пункта: плейтест 29.09,
+ * «либо всем значки, либо никому».
+ */
 @Composable
-private fun HomeMenuItem(text: String, onClick: () -> Unit) {
+private fun HomeMenuItem(text: String, icon: @Composable () -> Unit, onClick: () -> Unit) {
     val sounds = LocalSounds.current
     DropdownMenuItem(
+        leadingIcon = { Box(Modifier.size(MenuIconSize), contentAlignment = Alignment.Center) { icon() } },
         text = { Text(text, style = MaterialTheme.typography.bodyLarge, color = FinneyInk) },
         onClick = {
             sounds.play(Sfx.Tap)
@@ -1730,6 +2143,7 @@ private fun InfoChip(
     enabled: Boolean = true,
     progress: Pair<Int, Int>? = null,
     done: Boolean = false,
+    doneTitle: String = "Пройдена!",
 ) {
     Row(
         modifier = modifier
@@ -1756,7 +2170,7 @@ private fun InfoChip(
             // «Пройдена!» — первой строкой и целиком: длинное название иначе съедало
             // обе строки, и слово обрезалось. Название — ниже, сколько влезет.
             Column {
-                Text("Пройдена!", style = MaterialTheme.typography.bodyMedium, color = FinneyInk, maxLines = 1)
+                Text(doneTitle, style = MaterialTheme.typography.bodyMedium, color = FinneyInk, maxLines = 1)
                 Text(text, style = MaterialTheme.typography.bodyMedium, color = FinneyInk, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         } else {

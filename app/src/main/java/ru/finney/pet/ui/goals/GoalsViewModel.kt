@@ -20,6 +20,7 @@ import ru.finney.pet.domain.game.GoalProgress
 import ru.finney.pet.domain.game.Rejection
 import ru.finney.pet.domain.game.Session
 import ru.finney.pet.domain.game.WithdrawPreview
+import ru.finney.pet.domain.model.EntryType
 import ru.finney.pet.domain.model.GameContent
 import ru.finney.pet.domain.model.Goal
 import ru.finney.pet.domain.model.GameState
@@ -49,19 +50,37 @@ sealed interface GoalsUiState {
         /** Копилка цели набрана: можно подтвердить достижение. */
         val canComplete: Boolean,
         val rejection: Rejection?,
-        /** Окно с итогом — только для достигнутой цели: это событие, а не рутина. */
+        /**
+         * Окно с итогом — только для достигнутой цели: это событие, а не рутина. Экран
+         * показывает из него вещь, заголовок и «почему», без строк «было → стало».
+         */
         val feedback: ActionFeedback? = null,
-        /** Итог последнего взноса или снятия одной строкой под кнопками — без всплывающих окон. */
+        /** Итог последнего взноса или снятия словами — под кошельком и копилкой, без окон. */
         val note: String? = null,
-        /** На сколько сдвинулась копилка последним действием: звук монеты в копилку или из неё. */
+        /**
+         * На сколько сдвинулась копилка последним действием: звук, монеты летят между
+         * кошельком и копилкой и «+15» / «−15» над ними.
+         */
         val savingsMove: SavingsMove? = null,
+        /** Последние взносы и снятия по этой цели, новые сверху: что положил и что взял. */
+        val moves: List<SavingsEntry> = emptyList(),
         /** Снятие ждёт подтверждения: как изменятся копилка и срок (ТЗ п. 2.5.7). */
         val pendingWithdraw: PendingWithdraw? = null,
+        /**
+         * Сколько по плану этого уровня ещё отложить; 0 — план уже выполнен или его нет.
+         * С этой суммы начинается «−/+»: одно нажатие «Положить» — и копилка по плану.
+         */
+        val planSavingsLeft: Int = 0,
+        /** Первые уровни: рука показывает на «Положить», пока по плану не отложено. */
+        val guide: Boolean = false,
     ) : GoalsUiState
 }
 
 /** Сдвиг копилки. [id] растёт с каждым действием: два одинаковых взноса подряд — два звука. */
 data class SavingsMove(val id: Int, val delta: Int)
+
+/** Строка истории копилки: плюс — положил, минус — взял. */
+data class SavingsEntry(val delta: Int)
 
 /** Снятие, которое ещё не подтвердили. */
 data class PendingWithdraw(val amount: Int, val preview: WithdrawPreview)
@@ -128,15 +147,19 @@ class GoalsViewModel(
         ) { session.execute { withdraw(it, pending.amount) } }
     }
 
-    /** Цель достигнута: вещь переходит питомцу и сразу надета. */
+    /**
+     * Цель достигнута: вещь переходит питомцу и сразу надета. Итог — окном с самой
+     * вещью и одной фразой: плейтест 29.09 назвал прежнее окно захламлённым.
+     */
     fun completeGoal() = run(
         feedback = { before, after ->
             val goal = before.activeGoalId?.let(content::goal)
             ActionFeedback(
                 title = "${goal?.label ?: "Цель"} — твоя!",
                 lines = changesBetween(before, after),
-                why = "Ты копил — и получилось. Она уже на питомце.",
+                why = "Копил — и получилось! Она уже на питомце.",
                 next = "Переодеть можно в гардеробе. Выбери новую цель.",
+                itemId = goal?.reward,
             )
         },
     ) { session.execute { completeGoal(it) } }
@@ -168,6 +191,8 @@ class GoalsViewModel(
     private fun toUiState(saved: SavedGame, screen: GoalsScreenState): GoalsUiState {
         val state = saved.state
         val progress = game.goalProgress(state)
+        val planSavingsLeft = game.planReport(state)
+            ?.let { (it.plan.savings - it.facts.savings).coerceAtLeast(0) } ?: 0
         return GoalsUiState.Ready(
             goals = content.goals.map { goal ->
                 GoalRow(
@@ -186,10 +211,25 @@ class GoalsViewModel(
             note = screen.note,
             pendingWithdraw = screen.pendingWithdraw,
             savingsMove = screen.savingsMove,
+            moves = state.activeGoalId?.let { id ->
+                state.ledger
+                    .filter { it.goalId == id && (it.type == EntryType.SAVINGS_DEPOSIT || it.type == EntryType.SAVINGS_WITHDRAW) }
+                    .takeLast(HISTORY_ROWS)
+                    .reversed()
+                    .map { SavingsEntry(it.savingsDelta) }
+            }.orEmpty(),
+            planSavingsLeft = planSavingsLeft,
+            guide = game.level(state) <= GUIDED_LEVELS && planSavingsLeft > 0,
         )
     }
 
     companion object {
+        /** До какого уровня рука показывает на «Положить» — как рука подсказки на главном. */
+        private const val GUIDED_LEVELS = 3
+
+        /** Сколько последних движений копилки видно: больше — это уже «Итоги и история». */
+        private const val HISTORY_ROWS = 4
+
         val Factory = viewModelFactory {
             initializer { appContainer().let { GoalsViewModel(it.session, it.game, it.content) } }
         }

@@ -28,6 +28,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import ru.finney.pet.ui.components.drawPointingHand
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.Constraints

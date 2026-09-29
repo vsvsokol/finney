@@ -49,6 +49,7 @@ import ru.finney.pet.ui.components.FinneyIcon
 import ru.finney.pet.ui.components.categoryIcon
 import ru.finney.pet.ui.components.HoldStepper
 import ru.finney.pet.ui.components.OutlinedText
+import ru.finney.pet.ui.components.StableOutlinedText
 import ru.finney.pet.ui.components.fadingScroll
 import ru.finney.pet.ui.theme.FinneyBlue
 import ru.finney.pet.ui.theme.FinneyCream
@@ -248,7 +249,14 @@ internal fun Stepper(
         plusDescription = "Больше: $what",
         modifier = modifier,
     ) { bump ->
-        OutlinedText(value, style = MaterialTheme.typography.headlineMedium, modifier = bump.padding(horizontal = 4.dp))
+        // Место под число — по самому широкому двузначному: «9» → «10» больше не
+        // сдвигает кнопку «−» из-под пальца (плейтест 29.09, лавка: «жмётся через раз»).
+        StableOutlinedText(
+            value,
+            widest = "8".repeat(maxOf(2, value.length)),
+            style = MaterialTheme.typography.headlineMedium,
+            modifier = bump.padding(horizontal = 4.dp),
+        )
     }
 }
 

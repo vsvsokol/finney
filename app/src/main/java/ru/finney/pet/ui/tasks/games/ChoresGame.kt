@@ -33,6 +33,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import ru.finney.pet.ui.components.WarningBadge
 import ru.finney.pet.domain.model.Chore
@@ -58,6 +59,11 @@ import ru.finney.pet.ui.theme.FinneyYellow
 // часики дня. Дело в дне нажатием убирается. Пустой день — отдых, и хотя бы
 // один нужен: деньги за работу, но и время не бесконечно. Сколько заработано
 // и сколько часиков занято, считает ядро.
+//
+// Одно дело два дня подряд — питомец устаёт, и платят меньше (tiredCut). Это видно
+// сразу, до «Готово»: плитка дела показывает уменьшенную плату и зачёркнутую
+// обычную, а дело в дне — голубую метку «−10». Плейтест 29.09: правило было только
+// во вступлении, и в самой игре его не замечали.
 
 @Composable
 internal fun ChoresGame(task: ChoresTask, character: PetCharacter, onClose: () -> Unit, onSubmit: (TaskInput) -> Unit) {
@@ -65,12 +71,20 @@ internal fun ChoresGame(task: ChoresTask, character: PetCharacter, onClose: () -
     var selected by remember { mutableIntStateOf(0) }
     val sounds = LocalSounds.current
     val earned = TaskEngines.choresEarned(task, week)
+    val pay = TaskEngines.choresPay(task, week)
     val rest = week.count { it.isEmpty() }
     val times = week.flatten().groupingBy { it }.eachCount()
     val freeToday = task.hoursPerDay - TaskEngines.dayHours(task, week[selected])
 
     fun canAdd(chore: Chore) = TaskEngines.choreOpen(chore, selected) && chore.hours <= freeToday &&
         (chore.maxTimes == null || (times[chore.id] ?: 0) < chore.maxTimes)
+
+    // Сколько на самом деле принесёт дело в выбранный день — с усталостью, но без
+    // бонуса за разные дела: бонус — отдельная награда, а не плата за это дело.
+    fun gain(chore: Chore): Int {
+        val with = TaskEngines.choresPay(task, week.mapIndexed { d, day -> if (d == selected) day + chore.id else day })
+        return (with.fees - with.tiredLoss) - (pay.fees - pay.tiredLoss)
+    }
 
     GameScene(backdrop = Backdrop.DOTS, onClose = onClose) {
         SceneBody(
@@ -83,7 +97,7 @@ internal fun ChoresGame(task: ChoresTask, character: PetCharacter, onClose: () -
             // обычно, дни стоят одним рядом, а питомец меньше.
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 GoalCard(task, earned, rest)
-                PetSays(character, petLine(task, earned, rest), petSize = 56.dp)
+                PetSays(character, petLine(task, earned, rest, pay.tiredLoss), petSize = 56.dp)
 
                 // Все дни одним рядом: вторым рядом неделя не влезала в экран.
                 Row(horizontalArrangement = Arrangement.spacedBy(DayGap), modifier = Modifier.fillMaxWidth()) {
@@ -91,6 +105,8 @@ internal fun ChoresGame(task: ChoresTask, character: PetCharacter, onClose: () -
                         DayCard(
                             number = i + 1,
                             chores = ids.map { id -> task.chores.first { it.id == id } },
+                            yesterday = week.getOrNull(i - 1).orEmpty().toSet(),
+                            tiredCut = task.tiredCut,
                             hours = task.hoursPerDay,
                             selected = i == selected,
                             modifier = Modifier.weight(1f),
@@ -111,6 +127,7 @@ internal fun ChoresGame(task: ChoresTask, character: PetCharacter, onClose: () -
                                 ChoreTile(
                                     chore = chore,
                                     fee = TaskEngines.choreFee(chore, selected),
+                                    gain = gain(chore),
                                     left = chore.maxTimes?.let { it - (times[chore.id] ?: 0) },
                                     enabled = canAdd(chore),
                                     modifier = Modifier.weight(1f),
@@ -133,10 +150,11 @@ internal fun ChoresGame(task: ChoresTask, character: PetCharacter, onClose: () -
  * Реплика. Про отдых — сразу, как только свободных дней стало мало, а не когда
  * деньги уже набраны: иначе ребёнок узнаёт правило только в итоге.
  */
-private fun petLine(task: ChoresTask, earned: Int, rest: Int): String {
+private fun petLine(task: ChoresTask, earned: Int, rest: Int, tiredLoss: Int): String {
     val left = task.goal.price - earned
     return when {
         rest < task.minRestDays -> "Мне нужен отдых — освободи день"
+        left > 0 && tiredLoss > 0 -> "Одно дело два дня подряд — я устал, платят меньше"
         left > 0 -> "Нужно ещё $left"
         else -> "Хватает, и есть отдых!"
     }
@@ -210,11 +228,14 @@ private fun slotsHeight(hours: Int) = SlotHeight * hours + SlotGap * (hours - 1)
  * День: номер и столбик часиков. Дело занимает столько клеток, сколько часиков,
  * нажатие на него убирает. Свободные часики — пустые клетки. Пустой день — лампа
  * и «отдых» во весь столбик. Выбранный день — жёлтый и с толстой рамкой.
+ * Дело, которое было и [yesterday], — голубое и с меткой «−[tiredCut]»: устал.
  */
 @Composable
 private fun DayCard(
     number: Int,
     chores: List<Chore>,
+    yesterday: Set<String>,
+    tiredCut: Int,
     hours: Int,
     selected: Boolean,
     modifier: Modifier,
@@ -248,16 +269,21 @@ private fun DayCard(
             }
         } else {
             chores.forEachIndexed { n, chore ->
+                val tired = chore.id in yesterday && tiredCut > 0
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(slotsHeight(chore.hours))
                         .clip(RoundedCornerShape(10.dp))
-                        .background(Color.White)
+                        .background(if (tired) FinneyBlue.copy(alpha = 0.45f) else Color.White)
                         .border(2.dp, FinneyInk, RoundedCornerShape(10.dp))
-                        .clickable(role = Role.Button, onClickLabel = "Убрать ${chore.label}") { onRemove(n) },
-                ) { ItemPicture(chore, chore.label, 32.dp) }
+                        .clickable(role = Role.Button, onClickLabel = "Убрать ${chore.label}") { onRemove(n) }
+                        .semantics { if (tired) contentDescription = "${chore.label}: второй день подряд, на $tiredCut меньше" },
+                ) {
+                    ItemPicture(chore, chore.label, 32.dp)
+                    if (tired) TiredMark(tiredCut, Modifier.align(Alignment.BottomCenter))
+                }
             }
             repeat(hours - chores.sumOf { it.hours }) {
                 Box(
@@ -270,6 +296,19 @@ private fun DayCard(
             }
         }
     }
+}
+
+/** Метка усталости на деле в дне: «−10» на голубом — предупреждение, не ошибка. */
+@Composable
+private fun TiredMark(cut: Int, modifier: Modifier = Modifier) {
+    Box(
+        modifier
+            .padding(bottom = 1.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(FinneyBlue)
+            .border(2.dp, FinneyInk, RoundedCornerShape(8.dp))
+            .padding(horizontal = 3.dp),
+    ) { Text("−$cut", style = MaterialTheme.typography.labelMedium, color = FinneyInk) }
 }
 
 /** Часики кружками — сколько времени занимает дело. */
@@ -285,21 +324,31 @@ private fun Clocks(count: Int) {
 /**
  * Дело плиткой: рисунок, награда и часики. Название — для TalkBack, на плитке его
  * заменяет рисунок. «×2» — сколько раз ещё дают. Нажатие кладёт дело в выбранный день.
+ * [gain] меньше [fee] — дело рядом с таким же днём: плитка голубая, плата — уменьшенная,
+ * а обычная рядом зачёркнута.
  */
 @Composable
-private fun ChoreTile(chore: Chore, fee: Int, left: Int?, enabled: Boolean, modifier: Modifier, onAdd: () -> Unit) {
+private fun ChoreTile(chore: Chore, fee: Int, gain: Int, left: Int?, enabled: Boolean, modifier: Modifier, onAdd: () -> Unit) {
+    val tired = enabled && gain < fee
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         modifier = modifier
             .defaultMinSize(minHeight = 52.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(if (enabled) Color.White else FinneyCream)
+            .background(
+                when {
+                    !enabled -> FinneyCream
+                    tired -> FinneyBlue.copy(alpha = 0.45f)
+                    else -> Color.White
+                },
+            )
             .border(3.dp, FinneyInk, RoundedCornerShape(12.dp))
             .clickable(enabled = enabled, role = Role.Button, onClickLabel = "Добавить в день", onClick = onAdd)
             .semantics(mergeDescendants = true) {
                 contentDescription = buildString {
-                    append("${chore.label}: ${chore.hours} ч., $fee финок")
+                    append("${chore.label}: ${chore.hours} ч., ")
+                    append(if (tired) "два дня подряд — $gain финок вместо $fee" else "$fee финок")
                     if (left != null) append(", осталось $left раз")
                 }
             }
@@ -310,10 +359,19 @@ private fun ChoreTile(chore: Chore, fee: Int, left: Int?, enabled: Boolean, modi
         ItemPicture(chore, chore.label, 36.dp, fade)
         Column(fade.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                OutlinedText("+$fee", style = MaterialTheme.typography.titleMedium)
+                OutlinedText("+${if (tired) gain else fee}", style = MaterialTheme.typography.titleMedium)
                 Coin(size = 18.dp)
             }
-            Clocks(chore.hours)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Clocks(chore.hours)
+                if (tired) {
+                    Text(
+                        "+$fee",
+                        style = MaterialTheme.typography.labelMedium.copy(textDecoration = TextDecoration.LineThrough),
+                        color = FinneyInk,
+                    )
+                }
+            }
         }
         if (left != null) {
             Box(

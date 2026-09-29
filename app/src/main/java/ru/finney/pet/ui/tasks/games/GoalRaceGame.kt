@@ -408,9 +408,12 @@ private fun EventCard(
             PriceTag(event.price.toString())
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // На кнопке — чем обернётся выбор: сколько сегодня ляжет в копилку и что
+            // с сердечком. Плейтест 29.09: «что мы получаем, если отказываемся или нет».
             ChoiceButton(
                 text = "Купить",
                 up = true,
+                saves = (task.incomePerDay - event.price).coerceAtLeast(0),
                 enabled = shown && event.price <= task.incomePerDay,
                 moodCounts = moodCounts,
                 modifier = Modifier.weight(1f),
@@ -419,6 +422,7 @@ private fun EventCard(
             ChoiceButton(
                 text = "Не надо",
                 up = false,
+                saves = task.incomePerDay,
                 enabled = shown,
                 moodCounts = moodCounts,
                 modifier = Modifier.weight(1f),
@@ -428,40 +432,48 @@ private fun EventCard(
     }
 }
 
-/** Кнопка выбора: слово и «+♥» / «−♥». */
+/** Кнопка выбора: слово, «+♥» / «−♥» и сколько сегодня ляжет в копилку ([saves]). */
 @Composable
 private fun ChoiceButton(
     text: String,
     up: Boolean,
+    saves: Int,
     enabled: Boolean,
     moodCounts: Boolean,
     modifier: Modifier,
     onClick: () -> Unit,
 ) {
     val sounds = LocalSounds.current
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
         modifier = modifier
-            .defaultMinSize(minHeight = 52.dp)
+            .defaultMinSize(minHeight = 64.dp)
             .alpha(if (enabled) 1f else 0.4f)
-            .clip(RoundedCornerShape(50))
+            .clip(RoundedCornerShape(24.dp))
             .background(FinneyCream)
-            .border(StrokeRegular, FinneyInk, RoundedCornerShape(50))
+            .border(StrokeRegular, FinneyInk, RoundedCornerShape(24.dp))
             .clickable(enabled = enabled, role = Role.Button) {
                 sounds.play(Sfx.Tap)
                 onClick()
             }
             .semantics {
-                contentDescription = text + if (moodCounts) (if (up) ", настроение плюс одно" else ", настроение минус одно") else ""
+                contentDescription = text + ", в копилку $saves" +
+                    if (moodCounts) (if (up) ", настроение плюс одно" else ", настроение минус одно") else ""
             }
-            .padding(horizontal = 8.dp),
+            .padding(horizontal = 8.dp, vertical = 4.dp),
     ) {
-        Text(text, style = MaterialTheme.typography.titleMedium, color = FinneyInk)
-        // Грустному Финни сердечки уже не вернуть — значок не обещает лишнего.
-        if (moodCounts) {
-            Text(if (up) "+" else "−", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
-            HeartIcon(filled = up, size = 18.dp)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(text, style = MaterialTheme.typography.titleMedium, color = FinneyInk)
+            // Грустному Финни сердечки уже не вернуть — значок не обещает лишнего.
+            if (moodCounts) {
+                Text(if (up) "+" else "−", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
+                HeartIcon(filled = up, size = 18.dp)
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            FinneyIcon(FinneyIcons.Piggy, size = 18.dp)
+            Text("+$saves", style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
         }
     }
 }

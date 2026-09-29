@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -142,6 +143,7 @@ data class ChangeLine(val label: String, val before: Int, val after: Int) {
 /**
  * Что произошло после действия: заголовок, изменения, причина и следующий шаг.
  * [itemId] — купленный предмет: его рисунок стоит в карточке рядом с заголовком.
+ * [warning] — о чём предупредить даже в короткой всплывашке: трата вышла за план.
  */
 data class ActionFeedback(
     val title: String,
@@ -149,6 +151,7 @@ data class ActionFeedback(
     val why: String,
     val next: String,
     val itemId: String? = null,
+    val warning: String? = null,
 )
 
 /**
@@ -204,10 +207,25 @@ fun FeedbackSound(feedback: ActionFeedback?, rejection: Rejection?) {
  * через несколько секунд. Полная — в окне магазина: там ещё причина и следующий шаг
  * словами (ТЗ п. 2.5.9).
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ActionFeedbackCard(feedback: ActionFeedback, modifier: Modifier = Modifier, compact: Boolean = false) {
     FeedbackBox(color = FinneyCream, modifier = modifier) {
+        ActionFeedbackSummary(feedback)
+        if (!compact) {
+            Text(feedback.why, style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
+            Text(feedback.next, style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
+        }
+    }
+}
+
+/**
+ * Суть итога без рамки: рисунок и заголовок, что сдвинулось и предупреждение.
+ * Её же показывает пузырь подсказки на обучении — вместе со следующим шагом.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun ActionFeedbackSummary(feedback: ActionFeedback, modifier: Modifier = Modifier) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -231,9 +249,15 @@ fun ActionFeedbackCard(feedback: ActionFeedback, modifier: Modifier = Modifier, 
                 feedback.lines.forEach { ChangeChip(it) }
             }
         }
-        if (!compact) {
-            Text(feedback.why, style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
-            Text(feedback.next, style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
+        feedback.warning?.let { warning ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.semantics(mergeDescendants = true) {},
+            ) {
+                WarningBadge(size = 26.dp)
+                Text(warning, style = MaterialTheme.typography.titleMedium, color = FinneyInk, modifier = Modifier.weight(1f))
+            }
         }
     }
 }

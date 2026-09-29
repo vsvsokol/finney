@@ -103,8 +103,10 @@ fun GoalsScreen(
                 onCancel = viewModel::cancelWithdraw,
             )
         }
+        // Итог есть только у забранной цели — у неё своё окно, праздничное.
+        ready.feedback?.let { GoalDoneDialog(it, onDismiss = viewModel::dismissFeedback) }
         FeedbackDialog(
-            feedback = ready.feedback,
+            feedback = null,
             rejection = ready.rejection,
             onDismiss = viewModel::dismissFeedback,
         )
@@ -165,7 +167,12 @@ private fun GoalsContent(
     onComplete: () -> Unit,
     onBack: () -> Unit,
 ) {
-    var amount by rememberSaveable { mutableIntStateOf(AMOUNT_STEP) }
+    // Сумма начинается с того, что по плану ещё отложить: одно «Положить» — и копилка
+    // по плану. Плейтест 29.09: «план не выполняется», потому что запланированное
+    // в копилку само туда не кладётся, а до кнопки ребёнок не доходил.
+    var amount by rememberSaveable {
+        mutableIntStateOf(state.planSavingsLeft.coerceAtMost(state.balance).coerceAtLeast(AMOUNT_STEP))
+    }
     FinneyScreen(
         backdrop = MenuBackdrop.SHAPES,
         scrollable = true,
@@ -174,11 +181,9 @@ private fun GoalsContent(
     ) {
         OutlinedText("Копилка", style = MaterialTheme.typography.headlineLarge)
 
-        FinneyPanel(title = "На что копим") {
-            state.goals.forEach { row ->
-                GoalCard(row = row, onSelect = { onSelect(row.goal.id) })
-            }
-        }
+        // Цели нет — сначала выбрать. Есть — список уходит вниз: плейтест 29.09,
+        // «Положить» пряталась под списком целей, и на обучении до неё не доходили.
+        if (state.progress == null) GoalList(state, onSelect)
 
         state.progress?.let { progress ->
             FinneyPanel(title = progress.goal.label) {
@@ -191,7 +196,15 @@ private fun GoalsContent(
                 } else {
                     0
                 }
-                SavedBar(saved = progress.saved, price = progress.goal.price, pending = preview, previews = state.canMoveMoney)
+                // Рядом с полосой — сама вещь: копят на то, что видно (как в списке целей).
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    progress.goal.reward?.let(::accessoryArt)?.let {
+                        Image(painter = painterResource(it.res), contentDescription = null, modifier = Modifier.size(64.dp))
+                    }
+                    Box(Modifier.weight(1f)) {
+                        SavedBar(saved = progress.saved, price = progress.goal.price, pending = preview, previews = state.canMoveMoney)
+                    }
+                }
                 // Остаток и срок — двумя плитками «число над словом», а не строками
                 // «подпись … число» через весь экран: там глаз терял, что к чему.
                 if (progress.remaining > 0) {
@@ -214,8 +227,17 @@ private fun GoalsContent(
             }
         }
 
-        // Сколько денег можно отложить — монеткой с числом, без подписи «На балансе:».
-        CoinAmount(amount = state.balance)
+        // Кошелёк и копилка рядом: между ними летят монеты, и словами — что сейчас было.
+        // Плейтест 29.09: одинокое «0 (монетка)» не читалось как «сколько у тебя».
+        val progressNow = state.progress
+        if (progressNow != null) {
+            MoneyPair(balance = state.balance, saved = progressNow.saved, move = state.savingsMove)
+            state.note?.let {
+                Text(text = it, style = MaterialTheme.typography.bodyLarge, color = FinneyInk, textAlign = TextAlign.Center)
+            }
+        } else {
+            CoinAmount(amount = state.balance)
+        }
 
         val progress = state.progress
         if (progress != null && state.canComplete) {
@@ -228,12 +250,14 @@ private fun GoalsContent(
             FinneyButton(text = "Забрать: ${progress.goal.label}", onClick = onComplete)
         } else if (progress != null && state.canMoveMoney) {
             val limit = maxOf(state.balance, progress.saved)
+            if (state.planSavingsLeft > 0) PlanSavingsLine(state.planSavingsLeft)
             AmountStepper(
                 label = "Сумма",
                 value = amount,
                 onChange = { amount = it.coerceAtLeast(AMOUNT_STEP) },
                 canAdd = amount + AMOUNT_STEP <= limit,
                 canRemove = amount > AMOUNT_STEP,
+                above = { Text("Сколько переложить", style = MaterialTheme.typography.labelMedium, color = FinneyInk) },
             )
             SavingsSwitch(
                 amount = amount,
@@ -241,11 +265,11 @@ private fun GoalsContent(
                 onPut = { onDeposit(amount) },
                 canTake = progress.saved >= amount,
                 canPut = state.balance >= amount,
+                pointPut = state.guide,
             )
-            state.note?.let {
-                Text(text = it, style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
-            }
         }
+
+        if (state.moves.isNotEmpty()) SavingsHistory(state.moves, moveId = state.savingsMove?.id)
 
         if (!state.canMoveMoney && !state.canComplete) {
             Text(
@@ -255,6 +279,37 @@ private fun GoalsContent(
             )
         }
 
+        if (state.progress != null) GoalList(state, onSelect)
+    }
+}
+
+@Composable
+private fun GoalList(state: GoalsUiState.Ready, onSelect: (String) -> Unit) {
+    FinneyPanel(title = "На что копим") {
+        state.goals.forEach { row ->
+            GoalCard(row = row, onSelect = { onSelect(row.goal.id) })
+        }
+    }
+}
+
+/**
+ * Сколько ещё отложить по плану — рядом с «−/+»: связывает копилку с планом.
+ * Звезда — та же, что у «План» в панели уровня: сдержал план — звезда.
+ */
+@Composable
+private fun PlanSavingsLine(left: Int) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) {},
+    ) {
+        FinneyIcon(FinneyIcons.Plan, size = 28.dp)
+        Text(
+            "По плану отложить ещё $left — нажми «Положить».",
+            style = MaterialTheme.typography.bodyLarge,
+            color = FinneyInk,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 

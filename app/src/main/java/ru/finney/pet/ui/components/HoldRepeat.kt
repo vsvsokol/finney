@@ -255,6 +255,8 @@ fun HoldStepper(
     minusDescription: String,
     plusDescription: String,
     modifier: Modifier = Modifier,
+    /** Показать рукой на «+»: обучение, ребёнок ещё не нашёл, куда жать. */
+    pointPlus: Boolean = false,
     number: @Composable RowScope.(bump: Modifier) -> Unit,
 ) {
     val bump = remember { Animatable(1f) }
@@ -290,6 +292,7 @@ fun HoldStepper(
             onStep = { onPlus(); jump() },
             enabled = plusEnabled,
             contentDescription = plusDescription,
+            modifier = Modifier.pointHere(pointPlus && plusEnabled),
         ) {
             StepSign(plus = true)
         }

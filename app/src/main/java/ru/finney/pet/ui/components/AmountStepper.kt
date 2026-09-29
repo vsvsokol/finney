@@ -26,6 +26,8 @@ fun AmountStepper(
     modifier: Modifier = Modifier,
     canRemove: Boolean = value > 0,
     step: Int = AMOUNT_STEP,
+    /** Показать рукой на «+» — обучение (см. [pointHere]). */
+    pointPlus: Boolean = false,
     /** Что над суммой между кнопками — например, рисунки того, на что эти монеты. */
     above: (@Composable () -> Unit)? = null,
 ) {
@@ -37,6 +39,7 @@ fun AmountStepper(
         minusDescription = "$label: убавить",
         plusDescription = "$label: добавить",
         modifier = modifier.fillMaxWidth(),
+        pointPlus = pointPlus,
     ) { bump ->
         Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
             above?.invoke()

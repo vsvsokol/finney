@@ -36,6 +36,7 @@ import ru.finney.pet.domain.model.Category
 import ru.finney.pet.domain.model.PetStats
 import ru.finney.pet.domain.model.ShopItem
 import ru.finney.pet.domain.model.StatEffect
+import ru.finney.pet.ui.components.pointHere
 import ru.finney.pet.ui.components.CheckBadge
 import ru.finney.pet.ui.components.CoinAmount
 import ru.finney.pet.ui.components.FinneyButton
@@ -51,6 +52,7 @@ import ru.finney.pet.ui.theme.FinneyBlue
 import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneyPeach
 import ru.finney.pet.ui.theme.FinneyTheme
+import ru.finney.pet.ui.theme.RadiusCard
 import ru.finney.pet.ui.theme.StrokeThin
 
 /**
@@ -130,8 +132,16 @@ fun CarePanel(
     tiles: Boolean = false,
     groupBanner: (@Composable (Category) -> Unit)? = null,
     tilePicture: Dp = TilePicture,
+    guide: Boolean = false,
 ) {
     val selected = options.firstOrNull { it.isSelected }
+    // Обучение: рука показывает сначала товар, потом «Купить». Плейтест 29.09 — не
+    // дочитавший «Нажми на товар» ребёнок жал погашенную кнопку и застревал. Первым
+    // зовём нужное, на которое хватает: с него уровень и начинается.
+    val pointAt = if (guide && selected == null && block == null) {
+        options.firstOrNull { it.item.category == Category.NEEDS && it.preview.shortage == 0 }
+            ?: options.firstOrNull { it.preview.shortage == 0 }
+    } else null
 
     FinneyPanel(title = title, onClose = onDismiss, modifier = modifier) {
         header?.invoke()
@@ -162,14 +172,23 @@ fun CarePanel(
                         // Высота ряда — по высокой плитке: у соседки с «не хватает» текста больше.
                         Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             pair.forEach { option ->
-                                CareTile(option, tilePicture, onPick = { onPick(option.item.id) }, modifier = Modifier.weight(1f).fillMaxHeight())
+                                CareTile(
+                                    option,
+                                    tilePicture,
+                                    onPick = { onPick(option.item.id) },
+                                    modifier = Modifier.weight(1f).fillMaxHeight().pointHere(option == pointAt, corner = RadiusCard),
+                                )
                             }
                             if (pair.size == 1) Spacer(Modifier.weight(1f))
                         }
                     }
                 } else {
                     group.forEach { option ->
-                        CareRow(option = option, onPick = { onPick(option.item.id) })
+                        CareRow(
+                            option = option,
+                            onPick = { onPick(option.item.id) },
+                            modifier = Modifier.pointHere(option == pointAt, corner = RadiusCard),
+                        )
                     }
                 }
             }
@@ -195,10 +214,12 @@ fun CarePanel(
         // Купить можно только выбранное и только когда хватает денег. У строки
         // с нехваткой уже написано, сколько не достаёт и что делать, — кнопка
         // молча неактивной не остаётся.
+        val canBuy = selected != null && (allowShortage || selected.preview.shortage == 0)
         FinneyButton(
             text = confirmLabel,
             onClick = { selected?.let { onConfirm(it.item.id) } },
-            enabled = selected != null && (allowShortage || selected.preview.shortage == 0),
+            enabled = canBuy,
+            modifier = Modifier.pointHere(guide && canBuy),
         )
     }
 }
@@ -228,7 +249,7 @@ fun PickHint(modifier: Modifier = Modifier) {
  * категория и влияние были видны до покупки.
  */
 @Composable
-private fun CareRow(option: CareOption, onPick: () -> Unit) {
+private fun CareRow(option: CareOption, onPick: () -> Unit, modifier: Modifier = Modifier) {
     val preview = option.preview
     val notEnough = preview.shortage > 0
     val needed = option.item.category == Category.NEEDS
@@ -242,7 +263,7 @@ private fun CareRow(option: CareOption, onPick: () -> Unit) {
     }
 
     FinneyCard(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .semantics(mergeDescendants = true) {
                 contentDescription = "${option.item.label}, ${if (needed) "нужное" else "желаемое"}"

@@ -380,10 +380,16 @@ private val StillPose: () -> PetPose = { PetPose() }
  * к краю, и хвостик смотрел в пустоту.
  */
 @Composable
-internal fun PetSays(character: PetCharacter, text: String, modifier: Modifier = Modifier, petSize: Dp = 120.dp) {
+internal fun PetSays(
+    character: PetCharacter,
+    text: String,
+    modifier: Modifier = Modifier,
+    petSize: Dp = 120.dp,
+    mood: PetMood = PetMood.HAPPY,
+) {
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.End) {
         Bubble(text, Tail.RIGHT, Modifier.weight(1f, fill = false), maxWidth = 240.dp)
-        ScenePet(character, petSize, Modifier.width(petSize))
+        ScenePet(character, petSize, Modifier.width(petSize), mood = mood)
     }
 }
 

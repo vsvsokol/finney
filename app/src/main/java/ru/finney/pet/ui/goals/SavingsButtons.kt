@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -39,6 +40,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import ru.finney.pet.ui.components.FinneyIcon
 import ru.finney.pet.ui.components.FinneyIcons
+import ru.finney.pet.ui.components.pointHere
 import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.sound.LocalSounds
 import ru.finney.pet.ui.sound.Sfx
@@ -69,6 +71,8 @@ internal fun SavingsSwitch(
     canTake: Boolean,
     canPut: Boolean,
     modifier: Modifier = Modifier,
+    /** Показать рукой на «Положить» — обучение (см. [pointHere]). */
+    pointPut: Boolean = false,
 ) {
     val stroke = strokeFor(SwitchHeight)
     Box(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -113,6 +117,14 @@ internal fun SavingsSwitch(
                 .border(stroke, FinneyInk, CircleShape),
             contentAlignment = Alignment.Center,
         ) { FinneyIcon(FinneyIcons.Piggy, size = 36.dp) }
+        // Рука — отдельным слоем поверх: капсула обрезана по форме, и внутри половины
+        // кольцо с рукой срезало бы. Слой пустой и нажатий не ловит.
+        if (pointPut && canPut) {
+            Row(Modifier.matchParentSize()) {
+                Spacer(Modifier.weight(1f))
+                Box(Modifier.weight(1f).fillMaxHeight().pointHere(true))
+            }
+        }
     }
 }
 

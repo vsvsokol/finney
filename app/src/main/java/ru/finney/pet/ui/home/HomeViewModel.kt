@@ -22,6 +22,7 @@ import ru.finney.pet.domain.game.LevelCheck
 import ru.finney.pet.domain.game.PurchasePreview
 import ru.finney.pet.domain.game.Rejection
 import ru.finney.pet.domain.game.Session
+import ru.finney.pet.domain.model.Category
 import ru.finney.pet.domain.model.GlossaryTerm
 import ru.finney.pet.domain.model.GameContent
 import ru.finney.pet.domain.model.GameState
@@ -30,6 +31,11 @@ import ru.finney.pet.domain.model.PetAppearance
 import ru.finney.pet.domain.model.PetStats
 import ru.finney.pet.domain.model.SavedGame
 import ru.finney.pet.domain.model.ShopItem
+import ru.finney.pet.domain.model.ItemArt
+import ru.finney.pet.domain.model.TaskDefinition
+import ru.finney.pet.domain.model.TaskOutcome
+import ru.finney.pet.ui.tasks.games.taskIcon
+import kotlin.random.Random
 import ru.finney.pet.domain.pet.Emotion
 import ru.finney.pet.ui.components.ActionFeedback
 import ru.finney.pet.ui.components.changesBetween
@@ -118,9 +124,8 @@ sealed interface HomeUiState {
         val wantsLeft: Int? = null,
         /** Справочник — для карточек во сне (SleepCards.kt). */
         val glossary: List<GlossaryTerm> = emptyList(),
-        /** Сколько карточек сна-загадки за один сон и сколько сна даёт верный ответ — из economy.json. */
+        /** Сколько карточек сна-загадки за один сон — из economy.json. */
         val sleepCardsPerSleep: Int = 5,
-        val sleepPerCard: Int = 15,
         /** Что надето сейчас — id аксессуара из магазина. */
         val worn: List<String> = emptyList(),
         /** Питомец спит; null — не спит. */
@@ -139,6 +144,10 @@ sealed interface HomeUiState {
         val toyPlayed: Boolean = false,
         /** Что подсветить сейчас; null — ничего. */
         val nextStep: NextStep? = null,
+        /** Игры уровня: первая — обязательная игра уровня, дальше — по желанию, за монеты. */
+        val levelGames: List<LevelGame> = emptyList(),
+        /** Почему план пока не сходится — словами и числом; null — сходится или плана нет. */
+        val planGap: PlanGap? = null,
     ) : HomeUiState {
         /** Уровень завершается только после подтверждения плана. */
         val canClosePeriod: Boolean get() = phase == PeriodPhase.ACTIVE
@@ -168,6 +177,31 @@ data class SleepInfo(
         return energyFrom + ((100 - energyFrom) * slept).toInt()
     }
 }
+
+/**
+ * Игра в панели «Игры уровня». [required] — игра уровня: без неё уровень не пройти.
+ * [passed] — пройдена в этом уровне. [reward] — сколько дадут за первую победу;
+ * 0 — награда за эту игру уже получена раньше.
+ */
+data class LevelGame(
+    val taskId: String,
+    val title: String,
+    val icon: ItemArt?,
+    val required: Boolean,
+    val passed: Boolean,
+    val reward: Int,
+)
+
+/**
+ * Чем план расходится с тратами. [savingsLeft] — сколько ещё положить в копилку, как
+ * задумано. [overspent] — сколько потрачено сверх плана и ещё не покрыто монетами,
+ * пришедшими после плана: их даёт выигрыш в игре, и перерасход можно отыграть.
+ * Засчитан ли план, решает ядро (`LevelCheck.planMatched`), здесь — только почему нет.
+ */
+data class PlanGap(val savingsLeft: Int, val overspent: Int)
+
+/** Сколько игр по желанию стоит на уровне рядом с обязательной: вместе с ней — три. */
+private const val EXTRA_LEVEL_GAMES = 2
 
 /** Какая панель ухода открыта поверх комнаты. */
 enum class CareTarget(val title: String) {
@@ -236,6 +270,7 @@ class HomeViewModel(
                                     why = "Еда и мытьё — это нужное.",
                                     next = "Кольца у кнопок покажут, что ещё нужно.",
                                     itemId = item.id,
+                                    warning = overPlanWarning(result.state, item.category),
                                 ),
                             ),
                         )
@@ -260,11 +295,6 @@ class HomeViewModel(
      * разбудило его перед командой (тогда `wake` отвечает NotAsleep). Итог в обоих
      * случаях считается от состояния до пробуждения.
      */
-    /** Ответ на карточку сна-загадки: верный — сон сразу прибавляется (Game.answerSleepCard). */
-    fun answerSleepCard(correct: Boolean) {
-        viewModelScope.launch { session.execute { answerSleepCard(it, correct) } }
-    }
-
     fun wake() {
         viewModelScope.launch {
             val before = session.activeGame.first()?.state?.takeIf { it.sleepingSince != null } ?: return@launch
@@ -316,13 +346,14 @@ class HomeViewModel(
             phase = state.currentPeriod.phase,
             needsHint = game.needsHint(state),
             levelGame = state.currentPeriod.levelTaskId?.let { content.task(it)?.title },
+            levelGames = levelGames(state),
+            planGap = planGap(state, check),
             // Что лежит на столе и что в ванной, решает не список имён, а эффект
             // предмета: добавят в контент новую еду — она появится на столе сама.
             food = previews(state) { it.effect.satiety > 0 },
             care = previews(state) { it.effect.hygiene > 0 },
             glossary = content.glossary,
             sleepCardsPerSleep = content.economy.sleepCards.maxPerSleep,
-            sleepPerCard = content.economy.sleepCards.energyPerCorrect,
             needsLeft = game.planReport(state)?.let { (it.plan.needs - it.facts.needs).coerceAtLeast(0) },
             wantsLeft = game.planReport(state)?.let { (it.plan.wants - it.facts.wants).coerceAtLeast(0) },
             worn = state.worn,
@@ -356,6 +387,66 @@ class HomeViewModel(
                 needsThreshold = content.economy.pet.needsThreshold,
                 asleep = state.sleepingSince != null,
             ),
+        )
+    }
+
+    /**
+     * Три игры на уровень (плейтест 29.09: одной игры на уровень мало). Обязательная —
+     * та, что выдало ядро; две по желанию — из открытых игр других серий. Сначала те,
+     * за которые награду ещё не получали, чтобы игра по желанию чего-то стоила. Порядок
+     * задаёт номер уровня: пока уровень идёт, набор не меняется от входа к входу.
+     * Условия уровня и награды не трогаем — их по-прежнему считает ядро.
+     */
+    private fun levelGames(state: GameState): List<LevelGame> {
+        val period = state.currentPeriod
+        val required = period.levelTaskId?.let(content::task) ?: return emptyList()
+        fun everWon(id: String) = state.attempts.any { it.taskId == id && it.outcome == TaskOutcome.SUCCESS }
+        // Порядок — по победам до этого уровня: выигранная сейчас игра не должна
+        // уезжать в конец и выпадать из тройки. Плейтест 29.09: «засчитывается только
+        // одна» — пройденную по желанию подменяла другая, ещё не пройденная.
+        fun wonBefore(id: String) = state.attempts.any {
+            it.taskId == id && it.outcome == TaskOutcome.SUCCESS && it.periodNumber < period.number
+        }
+        fun row(task: TaskDefinition, isRequired: Boolean) = LevelGame(
+            taskId = task.id,
+            title = task.title,
+            icon = taskIcon(task),
+            required = isRequired,
+            passed = state.attempts.any {
+                it.periodNumber == period.number && it.taskId == task.id && it.outcome == TaskOutcome.SUCCESS
+            },
+            reward = if (everWon(task.id)) 0 else (task.reward ?: content.economy.taskReward).success,
+        )
+        val extras = game.currentTasks(state)
+            .filter { it.seriesId != required.seriesId && game.isTaskAvailable(state, it) }
+            .shuffled(Random(period.number))
+            .sortedBy { wonBefore(it.id) }
+            .take(EXTRA_LEVEL_GAMES)
+        return listOf(row(required, isRequired = true)) + extras.map { row(it, isRequired = false) }
+    }
+
+    /**
+     * Покупка вышла за план — сразу, в карточке покупки, а не только в итогах уровня.
+     * Плейтест 29.09: «не выполнил план» узнавали в самом конце и не понимали, когда.
+     */
+    private fun overPlanWarning(after: GameState, category: Category): String? {
+        val report = game.planReport(after) ?: return null
+        val over = when (category) {
+            Category.NEEDS -> report.facts.needs - report.plan.needs
+            Category.WANTS -> report.facts.wants - report.plan.wants
+        }
+        if (over <= 0) return null
+        val part = if (category == Category.NEEDS) "нужное" else "«хочется»"
+        return "На $part уже на $over больше плана"
+    }
+
+    private fun planGap(state: GameState, check: LevelCheck): PlanGap? {
+        if (check.planMatched) return null
+        val report = game.planReport(state) ?: return null
+        val tolerance = content.economy.planTolerance
+        return PlanGap(
+            savingsLeft = (report.plan.savings - report.facts.savings).takeIf { it > tolerance } ?: 0,
+            overspent = (report.overspend - report.facts.unplannedIncome).takeIf { it > tolerance } ?: 0,
         )
     }
 

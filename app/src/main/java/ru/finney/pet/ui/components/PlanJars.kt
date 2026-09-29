@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import ru.finney.pet.domain.model.Category
@@ -48,19 +49,23 @@ import ru.finney.pet.ui.theme.StrokeRegular
 private const val JarHeadroom = 0.85f
 
 private val JarWidth = 64.dp
-private val JarHeight = 160.dp
+private val JarHeight = 124.dp
 private val JarIcon = 48.dp
 
 /**
  * Три банки плана: нужное, желаемое, копилка. Числа ядра показываются как есть —
  * здесь ничего не пересчитывается, только раскладывается по высоте.
+ *
+ * Под значком — слово и что в эту часть входит. Плейтест 29.09: на первых уровнях
+ * по одному значку не понять, что тут «нужное», а что «хочется».
  */
 @Composable
 fun PlanJars(plan: Plan, facts: PeriodFacts, modifier: Modifier = Modifier) {
-    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-        PlanJar(categoryIcon(Category.NEEDS), "Нужное", plan.needs, facts.needs, saving = false)
-        PlanJar(categoryIcon(Category.WANTS), "Желаемое", plan.wants, facts.wants, saving = false)
-        PlanJar(SavingsIcon, "Копилка", plan.savings, facts.savings, saving = true)
+    Row(modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        val jar = Modifier.weight(1f)
+        PlanJar(categoryIcon(Category.NEEDS), "Нужное", "еда и мытьё", plan.needs, facts.needs, saving = false, jar)
+        PlanJar(categoryIcon(Category.WANTS), "Желаемое", "игрушки и сладости", plan.wants, facts.wants, saving = false, jar)
+        PlanJar(SavingsIcon, "Копилка", "на цель", plan.savings, facts.savings, saving = true, jar)
     }
 }
 
@@ -70,7 +75,15 @@ fun PlanJars(plan: Plan, facts: PeriodFacts, modifier: Modifier = Modifier) {
  * заливка просто идёт выше черты.
  */
 @Composable
-private fun PlanJar(icon: FinneyIcons, label: String, planned: Int, fact: Int, saving: Boolean) {
+private fun PlanJar(
+    icon: FinneyIcons,
+    label: String,
+    hint: String,
+    planned: Int,
+    fact: Int,
+    saving: Boolean,
+    modifier: Modifier = Modifier,
+) {
     val over = !saving && fact > planned
     val scale = maxOf(planned, fact).coerceAtLeast(1) / JarHeadroom
     val shown by animateFloatAsState((fact / scale).coerceIn(0f, 1f), label = "jar")
@@ -79,8 +92,8 @@ private fun PlanJar(icon: FinneyIcons, label: String, planned: Int, fact: Int, s
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.clearAndSetSemantics {
-            contentDescription = "$label: задумал $planned, $done $fact" +
+        modifier = modifier.clearAndSetSemantics {
+            contentDescription = "$label ($hint): задумал $planned, $done $fact" +
                 if (over) ", больше плана на ${fact - planned}" else ""
         },
     ) {
@@ -94,6 +107,10 @@ private fun PlanJar(icon: FinneyIcons, label: String, planned: Int, fact: Int, s
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("$fact/$planned", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
             if (over) AlertBadge(size = 22.dp)
+        }
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(label, style = MaterialTheme.typography.titleMedium, color = FinneyInk, textAlign = TextAlign.Center)
+            Text(hint, style = MaterialTheme.typography.labelMedium, color = FinneyInk, textAlign = TextAlign.Center)
         }
     }
 }

@@ -1,8 +1,11 @@
 package ru.finney.pet.ui.tasks.games
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -33,7 +36,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -44,13 +49,20 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 import ru.finney.pet.domain.model.PetCharacter
 import ru.finney.pet.domain.model.StandIngredient
 import ru.finney.pet.domain.model.StandTask
@@ -58,6 +70,9 @@ import ru.finney.pet.domain.tasks.TaskInput
 import ru.finney.pet.domain.tasks.TaskInputError
 import ru.finney.pet.ui.components.Coin
 import ru.finney.pet.ui.components.FinneyButton
+import ru.finney.pet.ui.components.FinneyIconButton
+import ru.finney.pet.ui.components.HeartIcon
+import ru.finney.pet.ui.motion.motionEnabled
 import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.theme.FinneyCream
 import ru.finney.pet.ui.theme.FinneyGreen
@@ -171,54 +186,217 @@ private fun Morning(
     }
 }
 
+/**
+ * День лавки. Плейтест 29.09: «непонятно, что происходит», и кнопка «жмётся через раз» —
+ * после нажатия на экране почти ничего не менялось: очередь из четырёх так и стояла,
+ * «+5» мелькало мелко в углу. Теперь каждое нажатие видно трижды: гость уходит со
+ * стаканом и сердечком, монета от него летит в кошелёк, а табло «лимоны − / выручка + /
+ * итог» пересчитывается. Итог начинается с минуса — деньги ушли на лимоны — и растёт
+ * с каждым стаканом: так видно, когда лавка вышла в плюс. Налить можно и нажатием на гостя.
+ */
 @Composable
 private fun Day(task: StandTask, character: PetCharacter, count: Int, money: Int, onClose: () -> Unit, onDone: () -> Unit) {
     var served by remember { mutableIntStateOf(0) }
+    // Сколько монет уже долетело до кошелька: кошелёк растёт, когда монета в нём, а не раньше.
+    var landed by remember { mutableIntStateOf(0) }
     val cups = count * task.ingredient.yields
     val waiting = task.guests - served
     val cupsLeft = cups - served
     val done = waiting == 0 || cupsLeft == 0
+    val spent = count * task.ingredient.price
     val sounds = LocalSounds.current
+    val scope = rememberCoroutineScope()
+    val walletPop = remember { Animatable(1f) }
+    var walletAt by remember { mutableStateOf<Offset?>(null) }
+    var queueAt by remember { mutableStateOf<Offset?>(null) }
+    val flying = remember { mutableStateListOf<CoinFlight>() }
+    val others = remember(character) { PetCharacter.entries.filter { it != character } }
+    // Монетка кошелька — у его правого края; монета вылетает от первого гостя в очереди.
+    val density = LocalDensity.current
+    val walletCoinInset = with(density) { 27.dp.toPx() }
+    val guestInset = with(density) { 36.dp.toPx() }
 
-    GameScene(backdrop = Backdrop.SKY, onClose = onClose, money = money + served * task.cupPrice) {
-        Column(Modifier.fillMaxSize().padding(top = HudHeight), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            CupStrip(cups = cups, poured = served)
-
-            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                Stall(character, task.cupPrice)
-                PourPop(served, task.cupPrice, Modifier.align(Alignment.TopStart).padding(start = 40.dp, top = 8.dp))
+    fun pour() {
+        if (done) return
+        sounds.play(Sfx.Pour)
+        served++
+        val from = queueAt
+        val to = walletAt
+        scope.launch {
+            if (from == null || to == null || !motionEnabled()) {
+                landed++
+                sounds.play(Sfx.Coin)
+                return@launch
             }
+            val coin = CoinFlight(from, to)
+            flying += coin
+            coin.t.animateTo(1f, tween(CoinFlightMs, easing = FastOutSlowInEasing))
+            flying -= coin
+            landed++
+            sounds.play(Sfx.Coin, 1f + 0.03f * landed.coerceAtMost(10))
+            walletPop.snapTo(1.2f)
+            walletPop.animateTo(1f, spring(dampingRatio = 0.4f, stiffness = Spring.StiffnessMedium))
+        }
+    }
 
-            when {
-                waiting == 0 && cupsLeft > 0 -> Note("Гости кончились, а осталось ${cupCount(cupsLeft)}.", color = FinneyPeach)
-                cupsLeft == 0 && waiting > 0 -> Note("Лимонад кончился! Без лимонада ушли $waiting.", color = FinneyPeach)
-                done -> Note("Всем хватило, и ничего не осталось!", color = FinneyGreen)
-            }
+    var origin by remember { mutableStateOf(Offset.Zero) }
+    Box(Modifier.fillMaxSize().onGloballyPositioned { origin = it.positionInRoot() }) {
+        GameScene(
+            backdrop = Backdrop.SKY,
+            onClose = onClose,
+            money = money + landed * task.cupPrice,
+            moneyModifier = Modifier
+                .onGloballyPositioned { c -> c.boundsInRoot().let { walletAt = Offset(it.right - walletCoinInset, it.center.y) } }
+                .graphicsLayer {
+                    scaleX = walletPop.value
+                    scaleY = walletPop.value
+                },
+        ) {
+            Column(Modifier.fillMaxSize().padding(top = HudHeight), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                StandTally(ingredient = task.ingredient, spent = spent, earned = served * task.cupPrice)
+                CupStrip(cups = cups, poured = served)
 
-            Row(verticalAlignment = Alignment.Bottom) {
-                // Сколько гостей ждёт — числом над очередью, а не строкой «Гостей ждёт: 8».
-                Box(Modifier.weight(1f).semantics(mergeDescendants = true) { contentDescription = "Гостей ждёт: $waiting" }) {
-                    if (waiting > 0) {
-                        OutlinedText("$waiting", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.align(Alignment.TopStart))
+                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Stall(character, task.cupPrice)
+                    // Обслуженный гость уходит вправо со стаканом и сердечком.
+                    ServedGuest(served, others, Modifier.align(Alignment.BottomEnd))
+                }
+
+                when {
+                    waiting == 0 && cupsLeft > 0 -> Note("Гости кончились, а осталось ${cupCount(cupsLeft)}.", color = FinneyPeach)
+                    cupsLeft == 0 && waiting > 0 -> Note("Лимонад кончился! Без лимонада ушли $waiting.", color = FinneyPeach)
+                    done -> Note("Всем хватило, и ничего не осталось!", color = FinneyGreen)
+                }
+
+                Row(verticalAlignment = Alignment.Bottom) {
+                    // Сколько гостей ждёт — числом над очередью, а не строкой «Гостей ждёт: 8».
+                    Box(Modifier.weight(1f).semantics(mergeDescendants = true) { contentDescription = "Гостей ждёт: $waiting" }) {
+                        if (waiting > 0) {
+                            OutlinedText("$waiting", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.align(Alignment.TopStart))
+                        }
+                        Row(
+                            modifier = Modifier
+                                .padding(top = 28.dp)
+                                .onGloballyPositioned { c -> queueAt = c.boundsInRoot().let { Offset(it.left + guestInset, it.center.y) } }
+                                // Нажатие на гостя — тоже «налить»: дети жали на того, кого обслуживают.
+                                .clickable(enabled = !done, role = Role.Button, onClickLabel = "Налить лимонад", onClick = ::pour),
+                            horizontalArrangement = Arrangement.spacedBy((-18).dp),
+                        ) {
+                            // Больше четырёх гостей не рисуем — очередь видна и числом. Первый в
+                            // очереди — следующий по счёту гость, и очередь сдвигается при каждом стакане.
+                            repeat(minOf(waiting, 4)) { n -> Guest(others[(served + n) % others.size], 72.dp, Modifier.width(72.dp)) }
+                        }
                     }
-                Row(Modifier.padding(top = 28.dp), horizontalArrangement = Arrangement.spacedBy((-18).dp)) {
-                    // Больше четырёх гостей не рисуем — очередь видна и числом.
-                    val others = PetCharacter.entries.filter { it != character }
-                    repeat(minOf(waiting, 4)) { n -> Guest(others[n % others.size], 72.dp, Modifier.width(72.dp)) }
-                }
-                }
-                if (done) {
-                    FinneyButton(text = "Закрыть лавку", onClick = onDone, fillWidth = false)
-                } else {
-                    PourButton {
-                        sounds.play(Sfx.Pour)
-                        served++
+                    if (done) {
+                        FinneyButton(text = "Закрыть лавку", onClick = onDone, fillWidth = false)
+                    } else {
+                        PourButton(task.cupPrice, onPour = ::pour)
                     }
                 }
             }
         }
+        // Монеты — поверх всей сцены: они летят от очереди в кошелёк в верхней полосе.
+        flying.forEach { coin ->
+            Coin(
+                size = 30.dp,
+                modifier = Modifier
+                    .offset {
+                        val p = coin.at() - origin
+                        IntOffset((p.x - 15.dp.toPx()).roundToInt(), (p.y - 15.dp.toPx()).roundToInt())
+                    },
+            )
+        }
     }
 }
+
+/** Монета от гостя к кошельку: по дуге вверх, [t] — 0…1 пути. */
+private class CoinFlight(val from: Offset, val to: Offset) {
+    val t = Animatable(0f)
+
+    fun at(): Offset {
+        val k = t.value
+        val bend = Offset(from.x, to.y)
+        val u = 1f - k
+        return from * (u * u) + bend * (2f * u * k) + to * (k * k)
+    }
+}
+
+private const val CoinFlightMs = 550
+
+/**
+ * Табло дня: сколько ушло на сырьё, сколько пришло за стаканы и что получилось.
+ * Итог сначала отрицательный — это и есть расход на лимоны; вышел в плюс — жёлтая
+ * плашка и «✓» (жёлтый — деньги, и рядом знак, не только цвет).
+ */
+@Composable
+private fun StandTally(ingredient: StandIngredient, spent: Int, earned: Int) {
+    val kept = earned - spent
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clearAndSetSemantics { contentDescription = "Лимоны минус $spent, выручка $earned, итог $kept" },
+    ) {
+        TallyCell(Modifier.weight(1f), "−$spent", FinneyCream) { ItemPicture(ingredient, ingredient.label, 24.dp) }
+        TallyCell(Modifier.weight(1f), "+$earned", FinneyCream) { CupIcon(22.dp, full = true) }
+        Text("=", style = MaterialTheme.typography.titleLarge, color = FinneyInk)
+        TallyCell(Modifier.weight(1.2f), if (kept > 0) "+$kept" else if (kept < 0) "−${-kept}" else "0", if (kept > 0) FinneyYellow else FinneyCream) {
+            if (kept > 0) Text("✓", style = MaterialTheme.typography.titleLarge, color = FinneyInk) else Coin(size = 22.dp)
+        }
+    }
+}
+
+@Composable
+private fun TallyCell(modifier: Modifier, value: String, fill: Color, icon: @Composable () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
+        modifier = modifier
+            .defaultMinSize(minHeight = 44.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(fill)
+            .border(StrokeRegular, FinneyInk, RoundedCornerShape(12.dp))
+            .padding(horizontal = 6.dp, vertical = 4.dp),
+    ) {
+        icon()
+        OutlinedText(value, style = MaterialTheme.typography.titleLarge)
+    }
+}
+
+/**
+ * Гость, которому только что налили: со стаканом и сердечком уходит вправо и тает.
+ * Новый стакан — новый уходящий гость ([served] — ключ).
+ */
+@Composable
+private fun ServedGuest(served: Int, others: List<PetCharacter>, modifier: Modifier = Modifier) {
+    if (served == 0) return
+    val walk = remember(served) { Animatable(0f) }
+    LaunchedEffect(served) {
+        if (!motionEnabled()) {
+            walk.snapTo(0.5f)
+            return@LaunchedEffect
+        }
+        walk.animateTo(1f, tween(ServedWalkMs, easing = LinearEasing))
+    }
+    Row(
+        verticalAlignment = Alignment.Bottom,
+        modifier = modifier
+            .clearAndSetSemantics {}
+            .graphicsLayer {
+                translationX = walk.value * 60.dp.toPx()
+                alpha = (1f - walk.value).coerceIn(0f, 1f) * 1.4f
+            },
+    ) {
+        Guest(others[(served - 1) % others.size], 64.dp, Modifier.width(64.dp))
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            HeartIcon(filled = true, size = 22.dp)
+            CupIcon(26.dp, full = true)
+        }
+    }
+}
+
+private const val ServedWalkMs = 900
 
 /** Стаканы дня: налитые — жёлтые, пустые — белые. */
 @Composable
@@ -289,33 +467,22 @@ private fun Stall(character: PetCharacter, cupPrice: Int) {
     }
 }
 
-/** «+5» над лавкой после каждого налитого стакана — монетка ушла в кассу. */
+/**
+ * Большая круглая кнопка со стаканом и подпись «Налить · +5» под ней: сколько
+ * принесёт стакан, видно до нажатия. Кнопка из кита — сжимается под пальцем,
+ * как все: прежний плоский круг не отзывался, и казалось, что нажатие не прошло.
+ */
 @Composable
-private fun PourPop(served: Int, cupPrice: Int, modifier: Modifier) {
-    var visible by remember { mutableStateOf(false) }
-    LaunchedEffect(served) {
-        if (served == 0) return@LaunchedEffect
-        visible = true
-        delay(700)
-        visible = false
+private fun PourButton(cupPrice: Int, onPour: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        FinneyIconButton(onClick = onPour, contentDescription = "Налить лимонад, плюс $cupPrice", size = 96.dp, sound = null) {
+            CupIcon(44.dp, full = true)
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.clearAndSetSemantics {}) {
+            OutlinedText("Налить · +$cupPrice", style = MaterialTheme.typography.titleMedium)
+            Coin(size = 20.dp)
+        }
     }
-    AnimatedVisibility(visible, modifier, exit = fadeOut() + slideOutVertically { -it }) {
-        OutlinedText("+$cupPrice", style = MaterialTheme.typography.headlineMedium, fill = FinneyYellow)
-    }
-}
-
-/** Большая круглая кнопка со стаканом — одно нажатие, один стакан. Слово «Налить» — для TalkBack. */
-@Composable
-private fun PourButton(onPour: () -> Unit) {
-    Box(
-        Modifier
-            .size(96.dp)
-            .clip(CircleShape)
-            .background(FinneyYellow)
-            .border(4.dp, FinneyInk, CircleShape)
-            .clickable(role = Role.Button, onClickLabel = "Налить лимонад", onClick = onPour),
-        contentAlignment = Alignment.Center,
-    ) { CupIcon(44.dp, full = true) }
 }
 
 /**

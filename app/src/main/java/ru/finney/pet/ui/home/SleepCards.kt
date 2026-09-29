@@ -45,6 +45,7 @@ import ru.finney.pet.ui.components.FinneyPanel
 import ru.finney.pet.ui.components.FinneyQuietButton
 import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.components.WarningBadge
+import ru.finney.pet.ui.progress.GlossaryBook
 import ru.finney.pet.ui.progress.TermPicture
 import ru.finney.pet.ui.progress.hasPicture
 import ru.finney.pet.ui.theme.FinneyBlue
@@ -60,9 +61,11 @@ import ru.finney.pet.ui.theme.FinneyYellow
 //
 // Сон не превращается в экзамен: уложил — ничего не выскакивает, облачко просто
 // висит, его можно не трогать. Неверный ответ ничего не отнимает и не ругает —
-// «Почти!» и верное слово (ТЗ п. 8.1: без стыда и давления). Верный — сон сразу
-// прибавляется, и питомец просыпается раньше (Game.answerSleepCard). Сколько сна за
-// ответ и сколько карточек за сон — числа economy.json (sleepCards), экран их не придумывает.
+// «Почти!» и верное слово (ТЗ п. 8.1: без стыда и давления). Верный — сердечки над
+// спящим. Сна загадка больше не прибавляет: плейтест 29.09 попросил убрать ускорение —
+// сон шёл быстрее за угадывание, и загадка становилась способом проспать уровень.
+// Зато после ответа — дорога в справочник: там все эти слова, и загадка их оттуда берёт.
+// Сколько карточек за сон — число economy.json (sleepCards), экран его не придумывает.
 
 /**
  * Карточка: объяснение [clue] и три слова [options], верное — [answer].
@@ -127,7 +130,15 @@ fun DreamCloud(done: Boolean, animate: Boolean, onClick: () -> Unit, modifier: M
     ) {
         Canvas(Modifier.fillMaxSize()) { drawThoughtCloud() }
         Box(Modifier.size(CloudBody), contentAlignment = Alignment.Center) {
-            OutlinedText(if (done) "Zz" else "?", style = MaterialTheme.typography.headlineLarge)
+            if (done) {
+                OutlinedText("Zz", style = MaterialTheme.typography.headlineLarge)
+            } else {
+                // Книжка — та же, что на кнопке «Все слова — в справочнике»: загадка из справочника.
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    GlossaryBook(size = 34.dp)
+                    OutlinedText("?", style = MaterialTheme.typography.headlineLarge)
+                }
+            }
         }
     }
 }
@@ -167,7 +178,8 @@ private fun DrawScope.drawThoughtCloud() {
 
 /**
  * Карточка сна. [picked] — какое слово выбрано, null — ещё не отвечали. После ответа
- * кнопки слов гаснут, внизу — «Ещё» (если карточки на этот сон остались) и «Хватит».
+ * кнопки слов гаснут, внизу — «Ещё» (если карточки на этот сон остались) и «Хватит»,
+ * а над ними — «Справочник»: все слова загадок — оттуда.
  */
 @Composable
 fun SleepCardPanel(
@@ -175,10 +187,10 @@ fun SleepCardPanel(
     card: SleepCard,
     picked: String?,
     cardsLeft: Int,
-    sleepGain: Int,
     onPick: (String) -> Unit,
     onNext: () -> Unit,
     onClose: () -> Unit,
+    onOpenGlossary: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     FinneyPanel(title = "Сон-загадка", onClose = onClose, modifier = modifier) {
@@ -226,12 +238,20 @@ fun SleepCardPanel(
             ) {
                 if (right) CheckBadge(size = 28.dp) else WarningBadge(size = 28.dp)
                 Text(
-                    text = if (right) "Верно! Сон +$sleepGain — $petName проснётся раньше" else "Почти! Это «${card.answer}»",
+                    text = if (right) "Верно! $petName радуется во сне" else "Почти! Это «${card.answer}»",
                     style = MaterialTheme.typography.titleMedium,
                     color = FinneyInk,
                     modifier = Modifier.weight(1f),
                 )
             }
+            // Связь со справочником — прямо здесь: слово только что было в загадке,
+            // и на нём проще всего показать, что всё объяснено в одном месте.
+            FinneyQuietButton(
+                text = "Все слова — в справочнике",
+                onClick = onOpenGlossary,
+                icon = { GlossaryBook(size = 28.dp) },
+                modifier = Modifier.fillMaxWidth(),
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 if (cardsLeft > 0) {
                     FinneyQuietButton(text = "Хватит", onClick = onClose, modifier = Modifier.weight(1f))
@@ -285,7 +305,7 @@ private fun WordButton(text: String, mark: WordMark, enabled: Boolean, onClick: 
 private fun SleepCardPanelPreview() {
     val card = SleepCard("budget", "Все монетки, которые у тебя есть на этот раз.", listOf("Баланс", "Бюджет", "Запас"), "Бюджет")
     FinneyTheme {
-        SleepCardPanel("Финни", card, picked = "Баланс", cardsLeft = 3, sleepGain = 15, onPick = {}, onNext = {}, onClose = {})
+        SleepCardPanel("Финни", card, picked = "Баланс", cardsLeft = 3, onPick = {}, onNext = {}, onClose = {}, onOpenGlossary = {})
     }
 }
 

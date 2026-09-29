@@ -14,6 +14,7 @@ import ru.finney.pet.domain.model.Category
 import ru.finney.pet.ui.components.Coin
 import ru.finney.pet.ui.components.FinneyIcon
 import ru.finney.pet.ui.components.FinneyIcons
+import ru.finney.pet.ui.components.pointHere
 import ru.finney.pet.ui.components.FinneyQuietButton
 import ru.finney.pet.ui.components.PlanDonut
 import ru.finney.pet.ui.components.SavingsIcon
@@ -97,6 +98,7 @@ import ru.finney.pet.ui.theme.FinneyInk
 import ru.finney.pet.ui.theme.FinneyPink
 import ru.finney.pet.ui.theme.FinneyTheme
 import ru.finney.pet.ui.theme.RadiusCard
+import ru.finney.pet.ui.theme.StrokeThin
 import ru.finney.pet.ui.theme.StrokeRegular
 import ru.finney.pet.ui.sound.LocalSounds
 import ru.finney.pet.ui.sound.Sfx
@@ -166,6 +168,10 @@ private fun PlanningContent(
         // внизу, и он должен быть виден всегда (плейтест).
         top = { PlanHeader(state) },
     ) {
+        // Зачем план — до того, как что-то раскладывать. Плейтест 29.09: «так и не
+        // понимаю, зачем нужен план», а «не выполнил план» было загадкой в конце уровня.
+        PlanWhy()
+
         // Пока ничего не разложено — одна строка, что делать. Дальше её место
         // занимают сами части: круг уже показывает, что происходит.
         if (state.planned == 0) {
@@ -189,6 +195,11 @@ private fun PlanningContent(
         // Шаг помещается в остаток — значит, добавлять ещё можно.
         val canAdd = state.remainder >= STEP
 
+        // Первый уровень — обучение: рука показывает, что жать дальше, по одному
+        // шагу. Плейтест 29.09: не дочитавший «Положи монетки в „Желаемое“» ребёнок
+        // жал погашенную «Подтвердить» и застревал.
+        val point = if (state.level <= 1) planPoint(state, canAdd) else null
+
         AmountRow(
             icon = categoryIcon(Category.NEEDS),
             label = "Нужное",
@@ -198,6 +209,7 @@ private fun PlanningContent(
             canAdd = canAdd,
             budget = state.budget,
             minimum = state.needsHint?.takeIf { it > 0 },
+            point = point == PlanPoint.NEEDS,
         )
         AmountRow(
             icon = categoryIcon(Category.WANTS),
@@ -207,14 +219,19 @@ private fun PlanningContent(
             onChange = onWantsChange,
             canAdd = canAdd,
             budget = state.budget,
+            point = point == PlanPoint.WANTS,
         )
         // Без выбранной цели откладывать некуда: цель выбирается прямо здесь,
         // а не на другом экране, — иначе план было бы не собрать.
+        // Рука показывает на весь выбор, а не на первую цель: на что копить, ребёнок
+        // решает сам (плейтест 29.09 — «игра показывает, на что копить»).
         if (state.goalLabel == null) {
-            FinneyCard {
+            FinneyCard(modifier = Modifier.pointHere(point == PlanPoint.GOAL, corner = RadiusCard)) {
                 CategoryTitle(SavingsIcon, "Копилка")
-                Text("На что копим? Выбери цель:", style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
-                state.goals.forEach { goal -> GoalChoice(goal, onClick = { onSelectGoal(goal.id) }) }
+                Text("На что копим? Выбери сам — любую:", style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
+                state.goals.forEach { goal ->
+                    GoalChoice(goal, onClick = { onSelectGoal(goal.id) })
+                }
             }
         } else {
             AmountRow(
@@ -226,6 +243,7 @@ private fun PlanningContent(
                 canAdd = canAdd,
                 budget = state.budget,
                 subtitle = "Цель: ${state.goalLabel}",
+                point = point == PlanPoint.SAVINGS,
             )
         }
 
@@ -240,6 +258,51 @@ private fun PlanningContent(
             text = "Подтвердить план",
             onClick = onConfirm,
             enabled = state.canConfirm,
+            modifier = Modifier.pointHere(point == PlanPoint.CONFIRM),
+        )
+    }
+}
+
+/** Куда показывает рука на обучении. */
+private enum class PlanPoint { NEEDS, WANTS, GOAL, SAVINGS, CONFIRM }
+
+/**
+ * Следующий шаг плана по порядку частей: пустая часть — её «+», цели нет — выбор цели
+ * целиком, всё разложено — «Подтвердить». Нужное меньше «хотя бы» — тоже его «+».
+ */
+private fun planPoint(state: BudgetUiState.Planning, canAdd: Boolean): PlanPoint? = when {
+    state.canConfirm && state.needs >= (state.needsHint ?: 0) -> PlanPoint.CONFIRM
+    !canAdd -> null
+    state.needs == 0 || state.needs < (state.needsHint ?: 0) -> PlanPoint.NEEDS
+    state.wants == 0 -> PlanPoint.WANTS
+    state.goalLabel == null -> PlanPoint.GOAL
+    state.savings == 0 -> PlanPoint.SAVINGS
+    else -> null
+}
+
+/**
+ * Зачем план — одной фразой: план — обещание себе, и сдержанное обещание —
+ * звезда «План» в итогах уровня. Значок — тетрадь плана, не звезда: звезда у нас —
+ * «Желаемое» (Categories.kt), и рядом с его карточкой они путались бы.
+ */
+@Composable
+private fun PlanWhy() {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(RadiusCard))
+            .background(FinneyCream)
+            .border(StrokeThin, FinneyInk, RoundedCornerShape(RadiusCard))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+    ) {
+        FinneyIcon(FinneyIcons.Plan, size = 32.dp)
+        Text(
+            "План — это обещание себе: сколько потратишь и сколько отложишь. Сдержишь — получишь звезду уровня.",
+            style = MaterialTheme.typography.bodyLarge,
+            color = FinneyInk,
+            modifier = Modifier.weight(1f),
         )
     }
 }
@@ -296,13 +359,14 @@ private fun AmountRow(
     budget: Int,
     minimum: Int? = null,
     subtitle: String? = null,
+    point: Boolean = false,
 ) {
     FinneyCard {
         CategoryTitle(icon, label)
         subtitle?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = FinneyInk) }
         // Рисунки — над суммой, между «−» и «+»: что покупают на эти монеты, стоит
         // прямо на них, а не у края карточки. Диктору они не нужны: слово он уже прочёл.
-        AmountStepper(label = label, value = value, onChange = onChange, canAdd = canAdd, step = STEP) {
+        AmountStepper(label = label, value = value, onChange = onChange, canAdd = canAdd, step = STEP, pointPlus = point) {
             Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                 pictures.forEach { art ->
                     Image(painter = painterResource(art), contentDescription = null, modifier = Modifier.size(40.dp))
@@ -377,11 +441,11 @@ private fun MinimumBar(value: Int, minimum: Int, budget: Int) {
  * тем же путём, что в гардеробе и на экране целей; у цели без рисунка — только слова.
  */
 @Composable
-private fun GoalChoice(goal: Goal, onClick: () -> Unit) {
+private fun GoalChoice(goal: Goal, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = 64.dp)
             .clip(RoundedCornerShape(RadiusCard))
