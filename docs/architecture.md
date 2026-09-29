@@ -273,14 +273,16 @@ content/
 └── glossary.json   справочник терминов, ТЗ п. 2.5.11
 ```
 
-Пример `economy.json` — значения по умолчанию из [economy.md](economy.md):
+Фрагмент `economy.json` — правила периода и питомца (весь файл — `assets/content/economy.json`,
+пояснения к каждому числу — [economy.md](economy.md)):
 
 ```json
 {
   "incomeByStage": [50, 55, 60, 65, 70, 70],
-  "taskReward": { "success": 15, "fail": 5 },
+  "taskReward": { "success": 15, "fail": 5, "bonus": 5 },
   "parentBonus": { "step": 5, "maxPerPeriod": 20 },
   "planTolerance": 5,
+  "planDirections": 3,
   "points": {
     "needsCovered": 2,
     "planMatched": 2,
@@ -289,19 +291,28 @@ content/
     "taskSuccessMaxPerPeriod": 2
   },
   "conditionsToPass": 2,
-  "maxLevel": 6,
-  "stageStartLevels": [1, 2, 3, 4, 5, 6],
+  "demoConditionsToPass": 1,
+  "demoLevelGameRequired": false,
+  "maxLevel": 30,
+  "stageStartLevels": [1, 2, 4, 6, 12, 20],
   "pet": {
-    "start": { "satiety": 70, "hygiene": 70, "mood": 70 },
+    "start": { "satiety": 70, "hygiene": 70, "mood": 70, "energy": 90 },
     "decayByStage": [
-      { "satiety": 40, "hygiene": 30, "mood": 20 },
-      { "satiety": 50, "hygiene": 35, "mood": 25 },
-      { "satiety": 60, "hygiene": 40, "mood": 30 }
+      { "satiety": 40, "hygiene": 30, "mood": 20, "energy": 15 },
+      { "satiety": 45, "hygiene": 32, "mood": 22, "energy": 20 },
+      { "satiety": 50, "hygiene": 35, "mood": 25, "energy": 25 },
+      { "satiety": 55, "hygiene": 37, "mood": 27, "energy": 30 },
+      { "satiety": 60, "hygiene": 40, "mood": 30, "energy": 40 },
+      { "satiety": 60, "hygiene": 40, "mood": 30, "energy": 50 }
     ],
     "needsThreshold": 50,
     "emotionLow": 30,
-    "emotionHappy": 60
+    "emotionHappy": 60,
+    "sleepMinutes": 30,
+    "sleepMinutesByStage": [4, 5, 8, 12, 20, 30],
+    "demoSleepSeconds": 10
   }
+  …
 }
 ```
 
