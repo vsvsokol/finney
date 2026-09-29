@@ -199,10 +199,16 @@ fun ColumnScope.ResultBody(task: TaskDefinition, details: TaskDetails, input: Ta
             // Сначала то, из-за чего «почти», потом суммы: причину видно сразу, её не ищут.
             if (details.keptWants == 0) ResultRow(null, "Неделя без радостей", ok = false)
             if (details.shortage > 0) ResultRow(null, "Запаса не хватило ${details.shortage}", ok = false)
-            if (details.droppedNeeds > 0) ResultRow(null, "Пришлось перенести нужное", ok = false)
-            if (details.droppedWants > 0) ResultRow(null, "Пришлось отменить желаемое", ok = false)
+            // Перенесённое — поимённо, с картинкой. Общие строки «нужное перенесли» и
+            // «желаемое отменено» — только когда назвать нечего: иначе одно и то же
+            // говорилось дважды (редизайн 28.09 сократил итог до трёх строк).
             val dropped = (input as? TaskInput.Reserve)?.dropped.orEmpty()
-            reserve?.spendings?.filter { it.id in dropped }?.forEach { ResultRow(it, "${it.label} — перенесли", ok = false) }
+            val droppedItems = reserve?.spendings?.filter { it.id in dropped }.orEmpty()
+            if (droppedItems.isEmpty()) {
+                if (details.droppedNeeds > 0) ResultRow(null, "Нужное перенесли", ok = false)
+                if (details.droppedWants > 0) ResultRow(null, "Желаемое отменено", ok = false)
+            }
+            droppedItems.forEach { ResultRow(it, "${it.label} — перенесли", ok = false) }
             // Без радостей в плане запас хватает сам собой — зелёная строка выглядела бы победой.
             if (details.shortage == 0 && details.keptWants > 0) ResultRow(null, "Запаса хватило", ok = true)
             if (bonus > 0) SumRow("Запас на всё непредвиденное", "+$bonus")

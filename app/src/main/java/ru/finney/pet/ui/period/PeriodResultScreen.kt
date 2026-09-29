@@ -28,7 +28,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import ru.finney.pet.domain.model.Category
 import ru.finney.pet.domain.model.ItemArt
 import ru.finney.pet.domain.model.PeriodFacts
 import ru.finney.pet.domain.model.Plan
@@ -36,11 +35,8 @@ import ru.finney.pet.ui.components.CheckBadge
 import ru.finney.pet.ui.components.CoinAmount
 import ru.finney.pet.ui.components.FinneyIcon
 import ru.finney.pet.ui.components.FinneyIcons
-import ru.finney.pet.ui.components.SavingsIcon
-import ru.finney.pet.ui.components.categoryIcon
-import ru.finney.pet.ui.components.FillBar
 import ru.finney.pet.ui.components.FinneyButton
-import ru.finney.pet.ui.components.SpendBar
+import ru.finney.pet.ui.components.PlanJars
 import ru.finney.pet.ui.tasks.games.ItemPicture
 import ru.finney.pet.ui.components.FinneyPanel
 import ru.finney.pet.ui.components.FinneyScreen
@@ -124,11 +120,9 @@ private fun PeriodResultContent(state: PeriodResultUiState.Ready, onBack: () -> 
         }
 
         FinneyPanel(title = "Как вышло") {
-            // Траты — полосой «из плана» без зелёного: потратить больше — не успех.
-            // Копилка — полосой прогресса: отложить сколько задумал — хорошо.
-            FactRow(categoryIcon(Category.NEEDS), "Нужное", state.facts.needs, state.plan.needs)
-            FactRow(categoryIcon(Category.WANTS), "Желаемое", state.facts.wants, state.plan.wants)
-            FactRow(SavingsIcon, "Копилка", state.facts.savings, state.plan.savings, progress = true)
+            // Те же банки, что в «План и факт» посреди уровня: черта — задумал, заливка — вышло.
+            // Трата сверх плана — розовым над чертой и «!», копилке выше черты можно.
+            PlanJars(state.plan, state.facts)
             if (state.facts.unplannedIncome > 0) {
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text("Пришло сверх плана", style = MaterialTheme.typography.bodyLarge, color = FinneyInk, modifier = Modifier.weight(1f))
@@ -192,32 +186,6 @@ private fun PlanVerdict(matched: Boolean) {
                 )
             }
         }
-    }
-}
-
-/**
- * Строка «потрачено из запланированного» и полоса под ней. [progress] — это
- * накопление, а не трата: полная полоса отмечена «✓». Направление узнаётся по
- * значку [icon], а не по цвету полосы.
- */
-@Composable
-private fun FactRow(icon: FinneyIcons, label: String, fact: Int, planned: Int, progress: Boolean = false) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            FinneyIcon(icon, size = 28.dp)
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyLarge,
-                color = FinneyInk,
-                modifier = Modifier.weight(1f),
-            )
-            Text(text = "$fact из $planned", style = MaterialTheme.typography.titleMedium, color = FinneyInk)
-        }
-        if (progress) FillBar(fact, planned, Modifier.fillMaxWidth()) else SpendBar(fact, planned, Modifier.fillMaxWidth())
     }
 }
 

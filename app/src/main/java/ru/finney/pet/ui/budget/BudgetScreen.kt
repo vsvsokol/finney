@@ -17,10 +17,8 @@ import ru.finney.pet.ui.components.FinneyIcons
 import ru.finney.pet.ui.components.FinneyQuietButton
 import ru.finney.pet.ui.components.PlanDonut
 import ru.finney.pet.ui.components.SavingsIcon
-import ru.finney.pet.ui.components.StableText
 import ru.finney.pet.ui.components.categoryIcon
 import ru.finney.pet.ui.room.itemArt
-import ru.finney.pet.ui.theme.FinneyPeach
 import ru.finney.pet.ui.theme.FinneyYellow
 import ru.finney.pet.ui.theme.StrokeBold
 import androidx.compose.foundation.background
@@ -69,11 +67,30 @@ import ru.finney.pet.ui.components.FeedbackSound
 import ru.finney.pet.ui.components.FillBar
 import ru.finney.pet.ui.components.FinneyButton
 import ru.finney.pet.ui.components.FinneyCard
-import ru.finney.pet.ui.components.FinneyPanel
 import ru.finney.pet.ui.components.FinneyScreen
+import ru.finney.pet.ui.components.LevelBadge
+import ru.finney.pet.ui.components.PlanJars
+import ru.finney.pet.domain.model.PetCharacter
+import androidx.compose.ui.unit.Dp
 import ru.finney.pet.ui.components.OutlinedText
-import ru.finney.pet.ui.components.SpendBar
 import ru.finney.pet.ui.pet.accessoryArt
+import ru.finney.pet.ui.pet.PetMood
+import ru.finney.pet.ui.pet.colorFilter
+import ru.finney.pet.ui.pet.glassesPlacement
+import ru.finney.pet.ui.pet.hatPlacement
+import ru.finney.pet.ui.pet.skin
+import ru.finney.pet.domain.model.BodyColor
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathOperation
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
+import kotlin.math.cos
+import kotlin.math.sin
 import ru.finney.pet.ui.theme.FinneyBlue
 import ru.finney.pet.ui.theme.FinneyCream
 import ru.finney.pet.ui.theme.FinneyInk
@@ -499,106 +516,153 @@ private fun ActiveContent(state: BudgetUiState.Active, onBack: () -> Unit) {
     ) {
         OutlinedText("План и факт", style = MaterialTheme.typography.headlineLarge)
 
-        // Сначала вывод, потом подробности: плейтест спрашивал, «что я должен понять»
-        // из строк с числами, — вот это одной фразой.
-        VerdictNote(state.verdict)
-
-        FinneyPanel(title = "Уровень ${state.level}") {
-            PlanFact(categoryIcon(Category.NEEDS), "Нужное", report.plan.needs, report.facts.needs, done = "Потратил")
-            PlanFact(categoryIcon(Category.WANTS), "Желаемое", report.plan.wants, report.facts.wants, done = "Потратил")
-            PlanFact(SavingsIcon, "Копилка", report.plan.savings, report.facts.savings, done = "Отложил", saving = true)
-        }
-
-        // Одна монетка с числом внизу была непонятно чем — подписываем словами.
+        // Уровень и деньги — одной строкой сверху, как в редизайне 28.09: раньше «Сейчас
+        // у тебя» стояло под панелью, и до него не долистывали.
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.semantics(mergeDescendants = true) {},
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth(),
         ) {
-            Text("Сейчас у тебя", style = MaterialTheme.typography.bodyLarge, color = FinneyInk)
-            CoinAmount(amount = state.balance)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.semantics(mergeDescendants = true) {},
+            ) {
+                OutlinedText("Уровень", style = MaterialTheme.typography.titleLarge)
+                LevelBadge(level = state.level, size = 44.dp)
+            }
+            // Монетка с числом в плашке, как кошелёк на главном: так видно, что это деньги сейчас.
+            CoinAmount(
+                amount = state.balance,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(Color.White)
+                    .border(StrokeRegular, FinneyInk, RoundedCornerShape(50))
+                    .padding(horizontal = 14.dp, vertical = 4.dp),
+            )
+        }
+
+        // Банки вместо пар полос «Собирался / Потратил»: черта — задумал, заливка — вышло.
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(RadiusCard))
+                .background(Color.White)
+                .border(StrokeRegular, FinneyInk, RoundedCornerShape(RadiusCard))
+                .padding(vertical = 16.dp),
+        ) {
+            PlanJars(report.plan, report.facts)
+        }
+
+        // Вывод говорит сам питомец: плейтест спрашивал, «что я должен понять» из чисел, —
+        // вот это одной фразой. Уровень ещё идёт, это не итог, поэтому без зелёного и розового.
+        // Как в редизайне 28.09: одна голова питомца слева внизу, над ней справа — овальный
+        // пузырь, хвостик которого смотрит на голову.
+        // Пузырь начинается выше головы, а не над ней целиком: так пара занимает высоту
+        // головы, и на 360 dp экран помещается без прокрутки.
+        Row(modifier = Modifier.fillMaxWidth()) {
+            PetHead(state.character, state.bodyColor, state.worn, HeadSize, Modifier.padding(top = HeadSize * 0.3f))
+            SpeechBalloon(verdictSpeech(state.verdict), Modifier.weight(1f))
+        }
+    }
+}
+
+/** Ширина головы питомца у реплики «План и факт». */
+private val HeadSize = 136.dp
+
+/** Голова на холсте питомца кончается на 0.84 его высоты — ниже пусто, место не занимаем. */
+private const val HeadBottom = 0.84f
+
+/**
+ * Только голова: базовый слой питомца без туловища, рук и ног, как в редизайне.
+ * Слой лица по холсту совпадает с остальными, поэтому шляпа и очки садятся на него
+ * так же, как на целого питомца. Картинка неподвижна: реплика читается, а не играется.
+ */
+@Composable
+private fun PetHead(character: PetCharacter, bodyColor: BodyColor, worn: List<String>, size: Dp, modifier: Modifier = Modifier) {
+    val skin = character.skin
+    Box(
+        contentAlignment = Alignment.TopCenter,
+        modifier = modifier
+            .width(size)
+            .height(size * HeadBottom)
+            .clearAndSetSemantics {},
+    ) {
+        Box(Modifier.requiredSize(size)) {
+            Image(
+                painter = painterResource(skin.face(PetMood.HAPPY).base),
+                contentDescription = null,
+                colorFilter = bodyColor.colorFilter,
+                modifier = Modifier.matchParentSize(),
+            )
+            // Очки раньше шляпы — тот же порядок, что у целого питомца.
+            worn.mapNotNull(::accessoryArt).sortedBy { !it.onEyes }.forEach { art ->
+                Image(
+                    painter = painterResource(art.res),
+                    contentDescription = null,
+                    contentScale = ContentScale.FillWidth,
+                    modifier = if (art.onEyes) Modifier.glassesPlacement(skin, art) else Modifier.hatPlacement(skin.hat, art.brim),
+                )
+            }
         }
     }
 }
 
 /**
- * Вывод «План и факт» одной фразой со значком. Уровень ещё идёт, это не итог,
- * поэтому панель нейтральная: персиковое «План» на зелёной подложке читали как
- * «красный текст на зелёном — будто я что-то сделал не так» (ТЗ п. 2.5.9, 3.6).
+ * Пузырь реплики из редизайна: белый овал с обводкой и изогнутый хвостик слева внизу.
+ * Овал и хвостик — одна фигура (объединение путей), чтобы обводка не шла поперёк хвостика.
  */
 @Composable
-private fun VerdictNote(verdict: PlanVerdict) {
-    val (title, line) = when (verdict) {
-        PlanVerdict.OnTrack -> "Идёшь по плану" to "Тратишь не больше, чем задумал."
-        is PlanVerdict.Overspent -> "Больше плана на ${verdict.amount}" to "Купил больше, чем задумал. Смотри, где полоса длиннее."
-        is PlanVerdict.SavingsShort -> "В копилку ещё ${verdict.amount}" to "Отложи их до конца уровня — так по плану."
-        PlanVerdict.OffTrack -> "Пока не по плану" to "Сравни полосы: что задумал и что вышло."
-    }
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(RadiusCard))
-            .background(FinneyCream)
-            .border(StrokeRegular, FinneyInk, RoundedCornerShape(RadiusCard))
-            .padding(14.dp)
-            .semantics(mergeDescendants = true) {},
+private fun SpeechBalloon(text: String, modifier: Modifier = Modifier) {
+    val stroke = StrokeRegular
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .drawWithCache {
+                val t = BalloonTail.toPx()
+                val body = Rect(t * 0.8f, 0f, size.width, size.height - t)
+                val rx = body.width / 2
+                val ry = body.height / 2
+                fun onOval(degrees: Float): Offset {
+                    val a = Math.toRadians(degrees.toDouble())
+                    return Offset(body.center.x + rx * cos(a).toFloat(), body.center.y + ry * sin(a).toFloat())
+                }
+                val from = onOval(118f)
+                val to = onOval(150f)
+                val tip = Offset(0f, size.height)
+                val tail = Path().apply {
+                    moveTo(from.x, from.y)
+                    quadraticTo(from.x - t * 0.4f, tip.y - t * 0.2f, tip.x, tip.y)
+                    quadraticTo(to.x - t * 0.2f, to.y + t * 0.6f, to.x, to.y)
+                    close()
+                }
+                val outline = Path().apply { op(Path().apply { addOval(body) }, tail, PathOperation.Union) }
+                val ink = Stroke(stroke.toPx(), join = StrokeJoin.Round)
+                onDrawBehind {
+                    drawPath(outline, Color.White)
+                    drawPath(outline, FinneyInk, style = ink)
+                }
+            }
+            .padding(start = BalloonTail + 18.dp, end = 18.dp, top = 18.dp, bottom = BalloonTail + 18.dp),
     ) {
-        if (verdict == PlanVerdict.OnTrack) CheckBadge(size = 40.dp) else WarningBadge(size = 40.dp)
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, color = FinneyInk)
-            Text(line, style = MaterialTheme.typography.bodyMedium, color = FinneyInk)
-        }
+        Text(
+            text = text,
+            style = MaterialTheme.typography.titleLarge,
+            color = FinneyInk,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 
-/**
- * Часть плана двумя полосами: «Собирался» — сколько задумал, [done] — сколько вышло.
- * Шкала у пары общая, поэтому длины сравниваются на глаз, без «10 из 10».
- * Трата сверх плана — розовая полоса и «!» ([SpendBar]); у копилки [saving] —
- * там больше плана не ошибка, и полоса обычная.
- */
-@Composable
-private fun PlanFact(icon: FinneyIcons, label: String, planned: Int, fact: Int, done: String, saving: Boolean = false) {
-    val scale = maxOf(planned, fact).coerceAtLeast(1)
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        CategoryTitle(icon, label)
-        BarLine("Собирался", planned) { ScaleBar(planned, scale, FinneyPeach) }
-        BarLine(done, fact) {
-            if (saving || fact <= planned) ScaleBar(fact, scale, FinneyYellow) else SpendBar(fact, planned)
-        }
-    }
-}
+/** Сколько места под пузырём и слева от него занимает хвостик. */
+private val BalloonTail = 20.dp
 
-/** Строка полосы: слово слева, полоса, число справа. Слова и числа — колонками одной ширины. */
-@Composable
-private fun BarLine(word: String, amount: Int, bar: @Composable () -> Unit) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.clearAndSetSemantics { contentDescription = "$word $amount" },
-    ) {
-        StableText(word, widest = "Собирался", style = MaterialTheme.typography.bodyMedium)
-        Box(Modifier.weight(1f)) { bar() }
-        StableText(amount.toString(), widest = "000", style = MaterialTheme.typography.titleMedium)
-    }
-}
-
-/** Полоса [value] из [scale] одним цветом — без «✓» и «!»: это мерка, а не цель. */
-@Composable
-private fun ScaleBar(value: Int, scale: Int, color: Color) {
-    val shown by animateFloatAsState((value.toFloat() / scale).coerceIn(0f, 1f), label = "bar")
-    Canvas(
-        Modifier
-            .fillMaxWidth()
-            .height(14.dp)
-            .clip(RoundedCornerShape(50))
-            .background(FinneyCream)
-            .border(StrokeRegular, FinneyInk, RoundedCornerShape(50)),
-    ) {
-        drawRect(color, size = size.copy(width = size.width * shown))
-    }
+/** Вывод «План и факт» репликой питомца — коротко, как говорят вслух (ТЗ п. 2.5.9). */
+private fun verdictSpeech(verdict: PlanVerdict): String = when (verdict) {
+    PlanVerdict.OnTrack -> "Ура, всё по плану!"
+    is PlanVerdict.Overspent -> "Ой, на ${verdict.amount} больше плана!"
+    is PlanVerdict.SavingsShort -> "Ещё ${verdict.amount} в копилку!"
+    PlanVerdict.OffTrack -> "Пока не по плану. Смотри на черту!"
 }
 
 @Preview(showBackground = true, backgroundColor = 0xFFFFEDCD)

@@ -3,7 +3,6 @@ package ru.finney.pet.ui.components
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -24,7 +23,6 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import ru.finney.pet.ui.sound.Sfx
 
 // Подложка экрана: фон меню и одинаковые поля по краям. Отдельный компонент,
 // чтобы отступы не разъезжались от экрана к экрану и их не приходилось помнить.
@@ -101,17 +99,6 @@ fun FinneyScreen(
             content = content,
         )
         bottom?.invoke(this)
-    }
-}
-
-/**
- * Круглый «✕»: выход с экрана или из панели. 48 dp — меньше палец ребёнка не
- * попадает (ТЗ п. 3.6); для TalkBack — [description].
- */
-@Composable
-fun CloseButton(onClick: () -> Unit, modifier: Modifier = Modifier, description: String = "Назад") {
-    FinneyIconButton(onClick = onClick, contentDescription = description, size = 48.dp, sound = Sfx.Back, modifier = modifier) {
-        OutlinedText("✕", style = MaterialTheme.typography.titleLarge)
     }
 }
 

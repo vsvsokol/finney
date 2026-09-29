@@ -1,26 +1,19 @@
 package ru.finney.pet.ui.progress
 
 import androidx.annotation.DrawableRes
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
@@ -41,12 +34,9 @@ import ru.finney.pet.ui.components.FinneyScreen
 import ru.finney.pet.ui.components.LevelBadge
 import ru.finney.pet.ui.components.OutlinedText
 import ru.finney.pet.ui.components.PlanDonut
+import ru.finney.pet.ui.components.JarGlass
 import ru.finney.pet.ui.components.SavingsIcon
-import ru.finney.pet.ui.theme.FinneyCream
 import ru.finney.pet.ui.theme.FinneyInk
-import ru.finney.pet.ui.theme.FinneyPeach
-import ru.finney.pet.ui.theme.FinneyYellow
-import ru.finney.pet.ui.theme.StrokeThin
 
 /** Термины из glossary.json — учебный контент, не код (ТЗ п. 2.5.11, 3.2). */
 class GlossaryViewModel(val terms: List<GlossaryTerm>) : ViewModel() {
@@ -118,7 +108,7 @@ internal fun hasPicture(id: String) = id in Pictured
 /**
  * Рисунок к термину — то, что ребёнок видит в игре под этим словом:
  * план — круг с экрана плана, остаток — тот же круг с пустым куском,
- * факт — полосы «собирался / потратил», запас — зонтик «на всякий случай».
+ * факт — банка с чертой плана, как на «План и факт», запас — зонтик «на всякий случай».
  */
 @Composable
 internal fun TermPicture(id: String) {
@@ -132,7 +122,7 @@ internal fun TermPicture(id: String) {
         "wants" -> TwoItems(R.drawable.item_treat_candy, R.drawable.item_toy_ball)
         "savings" -> FinneyIcon(SavingsIcon, size = 56.dp)
         "goal" -> Art(R.drawable.acc_hat_cowboy, PictureSize)
-        "fact" -> PlanFactBars()
+        "fact" -> PlanFactJar()
         "period" -> LevelBadge(level = 2, size = 60.dp)
         "reserve" -> Art(R.drawable.item_wear_umbrella, PictureSize)
         "receipt" -> FinneyIcon(FinneyIcons.Cart, size = 56.dp)
@@ -164,25 +154,8 @@ private fun Coins(count: Int) {
     }
 }
 
-/** Мини-копия «План и факт»: полоса задуманного и полоса того, что вышло. */
+/** Мини-копия «План и факт»: та же банка — черта задуманного и заливка того, что вышло. */
 @Composable
-private fun PlanFactBars() {
-    Column(Modifier.size(width = PictureSize, height = 40.dp), verticalArrangement = Arrangement.SpaceEvenly) {
-        MiniBar(0.8f, FinneyPeach)
-        MiniBar(0.6f, FinneyYellow)
-    }
-}
-
-@Composable
-private fun MiniBar(fraction: Float, color: Color) {
-    Canvas(
-        Modifier
-            .fillMaxWidth()
-            .height(12.dp)
-            .clip(RoundedCornerShape(50))
-            .background(FinneyCream)
-            .border(StrokeThin, FinneyInk, RoundedCornerShape(50)),
-    ) {
-        drawRect(color, size = size.copy(width = size.width * fraction))
-    }
+private fun PlanFactJar() {
+    JarGlass(line = 0.7f, shown = 0.45f, over = false, modifier = Modifier.size(width = 40.dp, height = PictureSize))
 }

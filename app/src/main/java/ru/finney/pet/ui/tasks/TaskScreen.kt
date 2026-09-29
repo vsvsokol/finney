@@ -241,7 +241,9 @@ private fun TaskResultScene(state: TaskUiState.Ready, onReplay: () -> Unit, onDo
                 ) {
                     ResultBody(state.task, result.details, result.input, result.bonus)
                 }
-                RewardChip(
+                // Награды нет — нет и плашки: «награда уже получена» была лишней строкой
+                // в и без того длинном итоге (редизайн 28.09).
+                if (result.reward > 0) RewardChip(
                     result.reward,
                     Modifier
                         .align(Alignment.CenterHorizontally)
@@ -267,7 +269,7 @@ private fun TaskResultScene(state: TaskUiState.Ready, onReplay: () -> Unit, onDo
     }
 }
 
-/** Награда плашкой: монетка и «+15». Уже получена — так и сказано, без монетки. */
+/** Награда плашкой: монетка и «+15». Показывается, только когда награда есть. */
 @Composable
 private fun RewardChip(reward: Int, modifier: Modifier = Modifier) {
     Row(
@@ -275,18 +277,12 @@ private fun RewardChip(reward: Int, modifier: Modifier = Modifier) {
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         modifier = modifier
             .clip(RoundedCornerShape(50))
-            .background(if (reward > 0) FinneyYellow else FinneyCream)
+            .background(FinneyYellow)
             .border(StrokeRegular, FinneyInk, RoundedCornerShape(50))
             .padding(horizontal = 16.dp, vertical = 4.dp)
-            .semantics(mergeDescendants = true) {
-                contentDescription = if (reward > 0) "Награда: $reward монет" else "Награда уже получена"
-            },
+            .semantics(mergeDescendants = true) { contentDescription = "Награда: $reward монет" },
     ) {
-        if (reward > 0) {
-            OutlinedText("+$reward", style = MaterialTheme.typography.headlineMedium)
-            Coin(size = 30.dp)
-        } else {
-            Text("награда уже получена", style = MaterialTheme.typography.bodyMedium, color = FinneyInk)
-        }
+        OutlinedText("+$reward", style = MaterialTheme.typography.headlineMedium)
+        Coin(size = 30.dp)
     }
 }

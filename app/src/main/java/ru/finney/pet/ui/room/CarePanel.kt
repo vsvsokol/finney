@@ -3,6 +3,7 @@ package ru.finney.pet.ui.room
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -28,6 +29,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import ru.finney.pet.domain.game.PurchasePreview
 import ru.finney.pet.domain.model.Category
@@ -43,6 +45,7 @@ import ru.finney.pet.ui.components.FinneyIcons
 import ru.finney.pet.ui.components.FinneyPanel
 import ru.finney.pet.ui.components.MoodFace
 import ru.finney.pet.ui.components.OutlinedText
+import ru.finney.pet.ui.components.fadingScroll
 import ru.finney.pet.ui.theme.FinneyYellow
 import ru.finney.pet.ui.theme.FinneyBlue
 import ru.finney.pet.ui.theme.FinneyInk
@@ -106,6 +109,9 @@ data class CareBlock(
  *
  * [groupBanner] — товары разных категорий идут группами, «нужное» первым, и над каждой
  * группой её полоса: на кухне рядом с едой лежит конфета, а она — «хочется» (п. 2.5.6).
+ *
+ * [tilePicture] — размер картинки в плитке: в окне поверх комнаты плитки ниже, чтобы
+ * кухня целиком и кнопка помещались на экран 360 × 740 dp без прокрутки.
  */
 @Composable
 fun CarePanel(
@@ -123,6 +129,7 @@ fun CarePanel(
     withConfirm: Boolean = true,
     tiles: Boolean = false,
     groupBanner: (@Composable (Category) -> Unit)? = null,
+    tilePicture: Dp = TilePicture,
 ) {
     val selected = options.firstOrNull { it.isSelected }
 
@@ -137,26 +144,33 @@ fun CarePanel(
             return@FinneyPanel
         }
 
-        val groups = if (groupBanner == null) {
-            listOf(null to options)
-        } else {
-            options.groupBy { it.item.category }.entries.sortedBy { it.key != Category.NEEDS }.map { it.key to it.value }
-        }
-        for ((category, group) in groups) {
-            if (category != null) groupBanner?.invoke(category)
-            if (tiles) {
-                group.chunked(2).forEach { pair ->
-                    // Высота ряда — по высокой плитке: у соседки с «не хватает» текста больше.
-                    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        pair.forEach { option ->
-                            CareTile(option, onPick = { onPick(option.item.id) }, modifier = Modifier.weight(1f).fillMaxHeight())
-                        }
-                        if (pair.size == 1) Spacer(Modifier.weight(1f))
-                    }
-                }
+        // С кнопкой внутри панели товары прокручиваются, а кнопка стоит на месте: когда на
+        // кухню добавилась конфета своей группой, плитки перестали влезать, и «Купить и
+        // покормить» уезжала за низ экрана — купить было нечем. Без кнопки (магазин)
+        // прокручивает весь экран, и своя прокрутка здесь не нужна.
+        val list = if (withConfirm) Modifier.weight(1f, fill = false).fadingScroll(rememberScrollState()) else Modifier
+        Column(list, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            val groups = if (groupBanner == null) {
+                listOf(null to options)
             } else {
-                group.forEach { option ->
-                    CareRow(option = option, onPick = { onPick(option.item.id) })
+                options.groupBy { it.item.category }.entries.sortedBy { it.key != Category.NEEDS }.map { it.key to it.value }
+            }
+            for ((category, group) in groups) {
+                if (category != null) groupBanner?.invoke(category)
+                if (tiles) {
+                    group.chunked(2).forEach { pair ->
+                        // Высота ряда — по высокой плитке: у соседки с «не хватает» текста больше.
+                        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            pair.forEach { option ->
+                                CareTile(option, tilePicture, onPick = { onPick(option.item.id) }, modifier = Modifier.weight(1f).fillMaxHeight())
+                            }
+                            if (pair.size == 1) Spacer(Modifier.weight(1f))
+                        }
+                    }
+                } else {
+                    group.forEach { option ->
+                        CareRow(option = option, onPick = { onPick(option.item.id) })
+                    }
                 }
             }
         }
@@ -270,7 +284,7 @@ private fun CareRow(option: CareOption, onPick: () -> Unit) {
  * нехватки те же — заливка, «✓» и слова, не только цвет (ТЗ п. 3.6).
  */
 @Composable
-private fun CareTile(option: CareOption, onPick: () -> Unit, modifier: Modifier = Modifier) {
+private fun CareTile(option: CareOption, picture: Dp, onPick: () -> Unit, modifier: Modifier = Modifier) {
     val preview = option.preview
     val notEnough = preview.shortage > 0
     val needed = option.item.category == Category.NEEDS
@@ -290,7 +304,7 @@ private fun CareTile(option: CareOption, onPick: () -> Unit, modifier: Modifier 
         accent = accent,
     ) {
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            ItemPicture(option.item.id, itemFallback(option.item.id), size = TilePicture)
+            ItemPicture(option.item.id, itemFallback(option.item.id), size = picture)
             if (option.isSelected) CheckBadge(Modifier.align(Alignment.TopEnd), size = 28.dp)
         }
         Column(

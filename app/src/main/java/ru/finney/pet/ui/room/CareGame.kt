@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import ru.finney.pet.R
 import ru.finney.pet.ui.components.FinneyIcon
+import ru.finney.pet.ui.components.CloseButton
 import ru.finney.pet.ui.components.FinneyIconButton
 import ru.finney.pet.ui.components.FinneyIcons
 import ru.finney.pet.ui.components.OutlinedText
@@ -146,9 +147,7 @@ internal fun CareGameFrame(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(Modifier.size(RoomButtonSize), contentAlignment = Alignment.Center) {
-                FinneyIconButton(onClick = onCancel, contentDescription = "Не сейчас", size = 56.dp, sound = Sfx.Back) {
-                    OutlinedText("✕", style = MaterialTheme.typography.titleLarge)
-                }
+                CloseButton(onCancel, description = "Не сейчас", size = 56.dp)
             }
             Box(Modifier.size(RoomButtonSize)) {
                 if (slot == CareSlot.KITCHEN) RoomMark(FinneyIcons.Food, progress, progressLabel)

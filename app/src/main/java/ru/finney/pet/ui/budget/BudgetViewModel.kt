@@ -18,10 +18,12 @@ import ru.finney.pet.domain.game.GameResult
 import ru.finney.pet.domain.game.PlanReport
 import ru.finney.pet.domain.game.Rejection
 import ru.finney.pet.domain.game.Session
+import ru.finney.pet.domain.model.BodyColor
 import ru.finney.pet.domain.model.Category
 import ru.finney.pet.domain.model.GameContent
 import ru.finney.pet.domain.model.Goal
 import ru.finney.pet.domain.model.ItemKind
+import ru.finney.pet.domain.model.PetCharacter
 import ru.finney.pet.domain.model.Plan
 import ru.finney.pet.domain.model.SavedGame
 import ru.finney.pet.ui.room.itemArt
@@ -91,6 +93,10 @@ sealed interface BudgetUiState {
         val level: Int,
         val report: PlanReport,
         val balance: Int,
+        /** Питомец игрока — он сам и говорит вывод «План и факт», в своём цвете и шляпе. */
+        val character: PetCharacter = PetCharacter.PUSHISTIK,
+        val bodyColor: BodyColor = BodyColor.A,
+        val worn: List<String> = emptyList(),
     ) : BudgetUiState {
         /**
          * Одна фраза-итог вместо «10 из 10» по строкам (плейтест: «что я должен понять
@@ -175,7 +181,15 @@ class BudgetViewModel(
         val state = saved.state
         val report = game.planReport(state)
         if (report != null) {
-            return BudgetUiState.Active(state.currentPeriod.number, game.level(state), report, state.balance)
+            return BudgetUiState.Active(
+                periodNumber = state.currentPeriod.number,
+                level = game.level(state),
+                report = report,
+                balance = state.balance,
+                character = saved.profile.appearance.character,
+                bodyColor = saved.profile.appearance.bodyColor,
+                worn = state.worn,
+            )
         }
         val goal = game.goalProgress(state)?.goal
         // Прошлый план берётся как есть из истории уровней; предлагаем его, только если он

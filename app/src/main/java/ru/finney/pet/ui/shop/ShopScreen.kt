@@ -176,8 +176,8 @@ private fun ShopHeader(balance: Int, onBack: () -> Unit) {
 /** Полоса раздела. У игрушек заголовок «Игрушки», поэтому «хочется» сказано в полосе. */
 @Composable
 private fun SectionBanner(kind: SectionKind, planLeft: Int?) = when (kind) {
-    SectionKind.NEEDS -> CategoryBanner(Category.NEEDS, "Без этого Финни плохо", planLeft)
-    SectionKind.WANTS -> CategoryBanner(Category.WANTS, "Для радости. Можно и потом", planLeft)
+    SectionKind.NEEDS -> CategoryBanner(Category.NEEDS, "Нужное — сначала", planLeft)
+    SectionKind.WANTS -> CategoryBanner(Category.WANTS, "Хочется — потом", planLeft)
     SectionKind.TOYS -> CategoryBanner(Category.WANTS, "Это «хочется». Игрушка лежит в зале", planLeft)
 }
 

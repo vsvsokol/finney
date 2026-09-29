@@ -1137,6 +1137,9 @@ private fun HomeContent(
                     // та же полоса «нужное» с остатком плана и кошелёк — комната под окном
                     // приглушена, и сумма в углу главного читается плохо.
                     tiles = true,
+                    // Картинки мельче, чем в магазине: окно висит поверх комнаты, и еда с конфетой
+                    // и кнопкой должны влезть в экран целиком.
+                    tilePicture = 64.dp,
                     header = {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -1148,10 +1151,12 @@ private fun HomeContent(
                         }
                     },
                     // Полосы — как в магазине. Конфета сытная, но она «хочется»: своя полоса.
+                    // Подпись — названием части и одним словом, в строку: прежняя «Без этого Финни
+                    // плохо» шла в две строки и звала питомца «Финни», даже если его зовут иначе.
                     groupBanner = { category ->
                         when (category) {
-                            Category.NEEDS -> CategoryBanner(Category.NEEDS, "Без этого Финни плохо", state.needsLeft)
-                            else -> CategoryBanner(category, "Для радости. Можно и потом", state.wantsLeft)
+                            Category.NEEDS -> CategoryBanner(Category.NEEDS, "Нужное — сначала", state.needsLeft)
+                            else -> CategoryBanner(category, "Хочется — потом", state.wantsLeft)
                         }
                     },
                 )
